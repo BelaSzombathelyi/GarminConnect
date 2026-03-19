@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         Garmin Connect Enhancer
 // @namespace    https://connect.garmin.com/
-// @version      0.3
+// @version      0.4
 // @description  Garmin Connect oldalának bővítése egyedi funkciókkal
-// @author       SzombathelyiBéla
+// @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activity/*
 // @grant        GM_xmlhttpRequest
 // @connect      localhost
+// @connect      connectapi.garmin.com
 // ==/UserScript==
 
 (function () {
@@ -23,7 +24,8 @@
 
     // A FIT fájl letöltése a Garmin API-ról, majd átküldése a helyi szerverre
     function fetchAndForwardFit(activityId) {
-        const garminUrl = `https://connect.garmin.com/download-service/files/activity/${activityId}`;
+        // A modern Garmin Connect API host: connectapi.garmin.com (a DI_BACKENDS "gcapi" értéke)
+        const garminUrl = `https://connectapi.garmin.com/download-service/files/activity/${activityId}`;
         console.log('[GarminConnect] FIT letöltése:', garminUrl);
 
         // 1. lépés: FIT fájl lekérése a Garmin szerverről
@@ -32,6 +34,7 @@
             method: 'GET',
             url: garminUrl,
             responseType: 'arraybuffer',
+            anonymous: false,
             onload: (response) => {
                 if (response.status !== 200) {
                     console.error('[GarminConnect] FIT letöltési hiba:', response.status);

@@ -77,3 +77,11 @@ A szkriptnek két extra Tampermonkey engedélyre van szüksége:
 ```
 - `GM_xmlhttpRequest` – CORS-mentes HTTP kérések indítására
 - `@connect localhost` – engedélyezi, hogy a szkript `localhost`-ra küldjön kérést
+
+### Verziókezelés
+
+> **Fontos:** a szkript minden módosításakor kötelező a `@version` értékét emelni a fejlécben:
+> ```js
+> // @version  0.4
+> ```
+> A Tampermonkey csak akkor frissíti automatikusan a telepített szkriptet, ha a verziószám magasabb, mint az előző. Verzió emelés nélkül a módosítás nem érvényesül a böngészőben.

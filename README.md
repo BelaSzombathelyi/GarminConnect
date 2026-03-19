@@ -2,6 +2,8 @@
 
 ## Áttekintés
 
+> **Megjegyzés:** Ez a README elsősorban a helyi **npm/Vite-alapú FIT feldolgozó szervert** dokumentálja. A Tampermonkey szkript leírása a [`Tampermonkey/README.md`](Tampermonkey/README.md) fájlban található.
+
 A projekt célja, hogy a Garmin Connect weboldalon megjelenített tevékenységek FIT fájljait automatikusan letöltse és helyi eszközzel feldolgozza. ChatGPT számára
 
 ## Projekt felépítése
