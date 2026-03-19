@@ -43,7 +43,15 @@ npm install
 npm run dev
 ```
 
-A szerver alapértelmezetten a `http://localhost:3333` címen érhető el.
+A szerver alapértelmezetten a `http://localhost:5173` címen érhető el.
+
+A Tampermonkey szkript az alábbi endpointra küldi a FIT adatot:
+```
+POST http://localhost:5173/api/fit-upload
+Content-Type: application/octet-stream
+X-Activity-Id: {activityId}
+```
+A Vite `configureServer` hook-jában (vagy egy Vite plugin middleware-ben) kell kezelni ezt az útvonalat.
 
 ## Fejlesztési elvek
 

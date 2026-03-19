@@ -51,10 +51,29 @@ https://connect.garmin.com/app/activity/22222900920
 
 ### Lépések, amiket a szkript végrehajt
 
-1. **Oldal betöltésének megvárása** – mivel a Garmin Connect egy React SPA, a szkript megvárja, amíg a fogaskerék (`⚙`) gomb (`.Menu_menuBtn__nELvF`) megjelenik a DOM-ban.
+1. **Oldal betöltésének megvárása** – mivel a Garmin Connect egy React SPA, a szkript megvárja, amíg a fogaskerék (`⚙`) gomb (`[class*="Menu_menuBtn"]`) megjelenik a DOM-ban.
 
-2. **Fogaskerék gomb megnyomása** – a `.Menu_menuBtn__nELvF` szelektorú gombra kattint, ami kinyitja a tevékenység menüt.
+2. **Aktivitás ID kinyerése** – az URL-ből (`/app/activity/{id}`) regex-szel kinyeri az aktivitás azonosítóját.
 
-3. **Menü megjelenésének megvárása** – megvárja, amíg a `.Menu_menuItems__eNgH5` osztályú menüelemek megjelennek.
+3. **FIT fájl letöltése** – `GM_xmlhttpRequest`-tel közvetlenül lekéri a FIT binárist a Garmin API-ról:
+   ```
+   GET https://connect.garmin.com/download-service/files/activity/{activityId}
+   ```
+   A `GM_xmlhttpRequest` nem kötve van a böngésző CORS-szabályaihoz, és a garmin.com session cookie-kat automatikusan elküldi.
 
-4. **„Fájl exportálása" elem megnyomása** – az `innerText` alapján megkeresi és megnyomja a `Fájl exportálása` feliratú menüelemet. Az `innerText` alapján való keresés azért stabil, mert a CSS osztálynevekben lévő hash-ek változhatnak a Garmin Connect frissítésekor.
+4. **FIT adat továbbítása** – a letöltött bináris adatot `GM_xmlhttpRequest` POST kéréssel elküldi a helyi Vite szerverre:
+   ```
+   POST http://localhost:5173/api/fit-upload
+   Content-Type: application/octet-stream
+   X-Activity-Id: {activityId}
+   ```
+
+### Tampermonkey fejléc (`@grant` / `@connect`)
+
+A szkriptnek két extra Tampermonkey engedélyre van szüksége:
+```js
+// @grant   GM_xmlhttpRequest
+// @connect localhost
+```
+- `GM_xmlhttpRequest` – CORS-mentes HTTP kérések indítására
+- `@connect localhost` – engedélyezi, hogy a szkript `localhost`-ra küldjön kérést
