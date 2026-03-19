@@ -54,7 +54,12 @@ export function renderFitData(data: FitUploadResponse, container: HTMLElement): 
     textarea.className = 'fit-raw';
     textarea.readOnly = true;
     textarea.rows = 10;
-    textarea.value = extractUserProfile(data) + '\n\n' + extractLaps(data);
+    textarea.value = [
+        extractUserProfile(data),
+        extractSession(data),
+        extractLaps(data),
+        extractSplits(data),
+    ].filter(Boolean).join('\n\n');
     container.appendChild(textarea);
 
     // Üzenet típusonként összecsukható szekció
@@ -111,6 +116,134 @@ function num(val: unknown, decimals = 1): string {
     return val.toFixed(decimals);
 }
 
+function km(val: unknown): string {
+    if (typeof val !== 'number') return '–';
+    return String(parseFloat((val / 1000).toFixed(3)));
+}
+
+export function extractSession(data: FitUploadResponse): string {
+    const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0];
+    if (!session) return '';
+
+    const lines: string[] = ['--- Edzés összefoglaló ---'];
+
+    // Időpontok
+    if (session['startTime'] instanceof Date) {
+        lines.push(`Kezdés:               ${session['startTime'].toLocaleString('hu-HU')}`);
+    }
+    if (session['timestamp'] instanceof Date) {
+        lines.push(`Befejezés:            ${session['timestamp'].toLocaleString('hu-HU')}`);
+    }
+
+    // Önértékelés
+    if (typeof session['workoutFeel'] === 'number') {
+        lines.push(`Közérzet (0–100):      ${session['workoutFeel']}`);
+    }
+
+    // Edzésterhelés – mindig megjelenjen, hiány esetén –
+    lines.push(`Aerob edzéshatás:      ${typeof session['totalTrainingEffect'] === 'number' ? (session['totalTrainingEffect'] / 10).toFixed(1) + ' / 5.0' : '–'}`);
+    lines.push(`Anaerob edzéshatás:    ${typeof session['totalAnaerobicTrainingEffect'] === 'number' ? (session['totalAnaerobicTrainingEffect'] / 10).toFixed(1) + ' / 5.0' : '–'}`);
+    if (typeof session['trainingStressScore'] === 'number') {
+        lines.push(`Training Stress Score: ${(session['trainingStressScore'] / 10).toFixed(1)}`);
+    }
+    if (typeof session['intensityFactor'] === 'number') {
+        lines.push(`Intenzitás faktor:     ${(session['intensityFactor'] / 1000).toFixed(2)}`);
+    }
+    lines.push(`Edzésterhelés (peak):  ${typeof session['trainingLoadPeak'] === 'number' ? (session['trainingLoadPeak'] / 65536).toFixed(2) : '–'}`);
+
+    return lines.length > 1 ? lines.join('\n') : '';
+}
+
+// Active interval splitType értékek
+const ACTIVE_SPLIT_TYPES = new Set([
+    'intervalActive', 'intervalWarmup', 'intervalCooldown',
+    'intervalRecovery', 'intervalOther', 'runActive', 'ascentSplit',
+]);
+
+const SPLIT_TYPE_HU: Record<string, string> = {
+    intervalActive:    'Aktív interval',
+    intervalRest:      'Pihenő interval',
+    intervalWarmup:    'Bemelegítés',
+    intervalCooldown:  'Levezető',
+    intervalRecovery:  'Felépülés',
+    intervalOther:     'Egyéb interval',
+    runActive:         'Futás (aktív)',
+    runRest:           'Futás (pihenő)',
+    ascentSplit:       'Emelkedő',
+    descentSplit:      'Süllyedő',
+    workoutRound:      'Kör',
+    rwdRun:            'Futás',
+    rwdWalk:           'Gyaloglás',
+    rwdStand:          'Állás',
+    rwdCycle:          'Kerékpározás',
+    rwdActivity:       'Aktivitás',
+};
+
+export function extractSplits(data: FitUploadResponse): string {
+    const splits = data.messages['splitMesgs'] as Record<string, unknown>[] | undefined;
+    const summaries = data.messages['splitSummaryMesgs'] as Record<string, unknown>[] | undefined;
+
+    if (!splits || splits.length === 0) return '';
+
+    const filtered = splits.filter(s => typeof s['totalElapsedTime'] === 'number' && (s['totalElapsedTime'] as number) >= 1);
+    if (filtered.length === 0) return '';
+
+    const header = ['#', 'Típus', 'Táv (km)', 'Idő', 'Pace (min/km)', 'Emelkedés (m)', 'Süllyedés (m)'];
+
+    let activeIdx = 0;
+    const rows = filtered.map((split, i) => {
+        const type = String(split['splitType'] ?? '');
+        const isActive = ACTIVE_SPLIT_TYPES.has(type);
+        const label = SPLIT_TYPE_HU[type] ?? type;
+        const idx = isActive ? `${++activeIdx}.` : `(${i + 1})`;
+
+        return [
+            idx,
+            label,
+            km(split['totalDistance']),
+            typeof split['totalElapsedTime'] === 'number' ? mpsToMinPerKm(
+                typeof split['totalDistance'] === 'number' && split['totalElapsedTime'] > 0
+                    ? (split['totalDistance'] as number) / (split['totalElapsedTime'] as number)
+                    : 0
+            ) : '–',
+            mpsToMinPerKm(split['avgSpeed']),
+            num(split['totalAscent'], 0),
+            num(split['totalDescent'], 0),
+        ];
+    });
+
+    const lines = [
+        `--- Intervallumok / splitMesgs (${filtered.length} bejegyzés, ${activeIdx} aktív) ---`,
+        header.join(','),
+        ...rows.map(r => r.join(',')),
+    ];
+
+    // splitSummaryMesgs: tervezett vs teljesített összefoglaló, ha elérhető
+    if (summaries && summaries.length > 0) {
+        lines.push('');
+        lines.push('--- Intervallum összefoglalók (splitSummaryMesgs) ---');
+        lines.push('Típus,Darab,Össz táv (km),Össz idő');
+        for (const s of summaries) {
+            const type = String(s['splitType'] ?? '');
+            const label = SPLIT_TYPE_HU[type] ?? type;
+            const count = typeof s['numSplits'] === 'number' ? s['numSplits'] : '–';
+            const dist = km(s['totalDistance']);
+            const time = typeof s['totalTimerTime'] === 'number' ? formatSeconds(s['totalTimerTime'] as number) : '–';
+            lines.push(`${label},${count},${dist},${time}`);
+        }
+    }
+
+    return lines.join('\n');
+}
+
+function formatSeconds(secs: number): string {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = Math.round(secs % 60);
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export function extractLaps(data: FitUploadResponse): string {
     const laps = data.messages['lapMesgs'] as Record<string, unknown>[] | undefined;
     if (!laps || laps.length === 0) return '';
@@ -122,6 +255,7 @@ export function extractLaps(data: FitUploadResponse): string {
         'Emelkedés (m)',
         'Süllyedés (m)',
         'Kadencia (lép/p)',
+        'Max kadencia',
         'Lépéshossz (m)',
         'Vert. osz. (mm)',
         'Talajérintés (ms)',
@@ -130,14 +264,15 @@ export function extractLaps(data: FitUploadResponse): string {
 
     const rows = laps.map((lap, i) => [
         `${i + 1}.`,
-        typeof lap['totalDistance'] === 'number' ? num(lap['totalDistance'] / 1000, 3) : '–',
+        km(lap['totalDistance']),
         mpsToMinPerKm(lap['avgSpeed']),
         num(lap['totalAscent'], 0),
         num(lap['totalDescent'], 0),
-        num(lap['avgRunCadence'] ?? lap['avgCadence'], 0),
-        num(lap['avgStrideLength'], 2),
+        num(lap['avgRunningCadence'] ?? lap['avgCadence'], 0),
+        num(lap['maxRunningCadence'] ?? lap['maxCadence'], 0),
+        num(lap['avgStepLength'], 2),
         num(lap['avgVerticalOscillation'], 1),
-        num(lap['avgGroundContactTime'], 0),
+        num(lap['avgStanceTime'], 0),
         num(lap['avgVerticalRatio'], 1),
     ]);
 
@@ -154,11 +289,17 @@ export function extractUserProfile(data: FitUploadResponse): string {
     if (!profile) return '(nincs userProfileMesgs adat)';
 
     const lines = [
-        `Ébredési idő:  ${secondsToHHMM(profile['wakeTime'])}`,
         `Alvási idő:    ${secondsToHHMM(profile['sleepTime'])}`,
+        `Ébredési idő:  ${secondsToHHMM(profile['wakeTime'])}`,
         `Súly:          ${typeof profile['weight'] === 'number' ? profile['weight'] + ' kg' : '–'}`,
         `Magasság:      ${typeof profile['height'] === 'number' ? profile['height'] + ' m' : '–'}`,
     ];
+
+    const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0];
+    if (session?.['startTime'] instanceof Date) {
+        lines.push(`Edzés kezdete: ${session['startTime'].toLocaleString('hu-HU')}`);
+    }
+
     return lines.join('\n');
 }
 
