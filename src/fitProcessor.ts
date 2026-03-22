@@ -50,16 +50,30 @@ export function renderFitData(data: FitUploadResponse, container: HTMLElement): 
     container.appendChild(summary);
 
     // Nyers szöveg összefoglaló textarea
+    const mergeLabel = document.createElement('label');
+    mergeLabel.className = 'fit-merge-label';
+    const mergeCheckbox = document.createElement('input');
+    mergeCheckbox.type = 'checkbox';
+    mergeCheckbox.checked = false;
+    mergeLabel.appendChild(mergeCheckbox);
+    mergeLabel.append(' Rövid gyaloglás összevonása állássá');
+    container.appendChild(mergeLabel);
+
     const textarea = document.createElement('textarea');
     textarea.className = 'fit-raw';
     textarea.readOnly = true;
     textarea.rows = 10;
-    textarea.value = [
-        extractUserProfile(data),
-        extractSession(data),
-        extractLaps(data),
-        extractSplits(data),
-    ].filter(Boolean).join('\n\n');
+
+    const updateTextarea = () => {
+        textarea.value = [
+            extractUserProfile(data),
+            extractSession(data),
+            extractLaps(data),
+            extractSplits(data, mergeCheckbox.checked),
+        ].filter(Boolean).join('\n\n');
+    };
+    updateTextarea();
+    mergeCheckbox.addEventListener('change', updateTextarea);
     container.appendChild(textarea);
 
     // Üzenet típusonként összecsukható szekció
@@ -116,6 +130,19 @@ function num(val: unknown, decimals = 1): string {
     return val.toFixed(decimals);
 }
 
+// A FIT strides/min értéket steps/min-re alakítja (×2)
+function cadence(val: unknown): string {
+    if (typeof val !== 'number') return '–';
+    return String(Math.round(val * 2));
+}
+
+function toDate(val: unknown): Date | null {
+    if (val instanceof Date) return val;
+    if (typeof val === 'number') return new Date(val * 1000);
+    if (typeof val === 'string') { const d = new Date(val); return isNaN(d.getTime()) ? null : d; }
+    return null;
+}
+
 function km(val: unknown): string {
     if (typeof val !== 'number') return '–';
     return String(parseFloat((val / 1000).toFixed(3)));
@@ -127,29 +154,82 @@ export function extractSession(data: FitUploadResponse): string {
 
     const lines: string[] = ['--- Edzés összefoglaló ---'];
 
+    // Sport
+    if (session['sportProfileName']) lines.push(`Sport profil:          ${session['sportProfileName']}`);
+    if (session['sport'])           lines.push(`Sport:                 ${session['sport']}`);
+    if (session['subSport'])        lines.push(`Alsport:               ${session['subSport']}`);
+
     // Időpontok
-    if (session['startTime'] instanceof Date) {
-        lines.push(`Kezdés:               ${session['startTime'].toLocaleString('hu-HU')}`);
+    const startDate = toDate(session['startTime']);
+    if (startDate) lines.push(`Kezdés:                ${startDate.toLocaleString('hu-HU')}`);
+    const endDate = toDate(session['timestamp']);
+    if (endDate) lines.push(`Befejezés:             ${endDate.toLocaleString('hu-HU')}`);
+
+    // Kalória
+    if (typeof session['totalCalories'] === 'number')    lines.push(`Kalória:               ${session['totalCalories']} kcal`);
+    if (typeof session['metabolicCalories'] === 'number') lines.push(`Metabolikus kalória:   ${session['metabolicCalories']} kcal`);
+
+    // Pulzus
+    if (typeof session['avgHeartRate'] === 'number') lines.push(`Átl. pulzus:           ${session['avgHeartRate']} bpm`);
+    if (typeof session['maxHeartRate'] === 'number') lines.push(`Max. pulzus:           ${session['maxHeartRate']} bpm`);
+
+    // Kadencia / lépések
+    if (typeof session['avgRunningCadence'] === 'number') {
+        lines.push(`Átl. futókadencia:     ${cadence(session['avgRunningCadence'])} lép/p`);
+    } else if (typeof session['avgCadence'] === 'number') {
+        lines.push(`Átl. kadencia:         ${cadence(session['avgCadence'])} lép/p`);
     }
-    if (session['timestamp'] instanceof Date) {
-        lines.push(`Befejezés:            ${session['timestamp'].toLocaleString('hu-HU')}`);
+    if (typeof session['maxRunningCadence'] === 'number') {
+        lines.push(`Max. futókadencia:     ${cadence(session['maxRunningCadence'])} lép/p`);
+    } else if (typeof session['maxCadence'] === 'number') {
+        lines.push(`Max. kadencia:         ${cadence(session['maxCadence'])} lép/p`);
     }
+    if (typeof session['totalStrides'] === 'number') lines.push(`Össz. lépés:           ${session['totalStrides']}`);
+
+    // Hőmérséklet
+    if (typeof session['avgTemperature'] === 'number') lines.push(`Átl. hőmérséklet:      ${session['avgTemperature']} °C`);
+    if (typeof session['maxTemperature'] === 'number') lines.push(`Max. hőmérséklet:      ${session['maxTemperature']} °C`);
+    if (typeof session['minTemperature'] === 'number') lines.push(`Min. hőmérséklet:      ${session['minTemperature']} °C`);
+
+    // Légzés (rpm)
+    if (typeof session['enhancedAvgRespirationRate'] === 'number') lines.push(`Átl. légzés:           ${session['enhancedAvgRespirationRate'].toFixed(1)} l/p`);
+    if (typeof session['enhancedMaxRespirationRate'] === 'number') lines.push(`Max. légzés:           ${session['enhancedMaxRespirationRate'].toFixed(1)} l/p`);
+    if (typeof session['enhancedMinRespirationRate'] === 'number') lines.push(`Min. légzés:           ${session['enhancedMinRespirationRate'].toFixed(1)} l/p`);
+
+    // Futásdinamika
+    if (typeof session['avgStepLength'] === 'number')        lines.push(`Átl. lépéshossz:       ${(session['avgStepLength'] as number).toFixed(2)} m`);
+    if (typeof session['avgStanceTime'] === 'number')        lines.push(`Átl. talajérintés:     ${(session['avgStanceTime'] as number).toFixed(0)} ms`);
+    if (typeof session['avgStanceTimePercent'] === 'number') lines.push(`Talajérintés %:        ${(session['avgStanceTimePercent'] as number).toFixed(1)} %`);
+    if (typeof session['avgStanceTimeBalance'] === 'number') lines.push(`Talajérintés bal/jobb: ${(session['avgStanceTimeBalance'] as number).toFixed(1)} %`);
+    if (typeof session['avgVerticalRatio'] === 'number')     lines.push(`Vert. arány:           ${(session['avgVerticalRatio'] as number).toFixed(1)} %`);
 
     // Önértékelés
-    if (typeof session['workoutFeel'] === 'number') {
-        lines.push(`Közérzet (0–100):      ${session['workoutFeel']}`);
+    if (typeof session['workoutFeel'] === 'number') lines.push(`Közérzet:              ${session['workoutFeel']} %`);
+    if (typeof session['workoutRpe'] === 'number') {
+        const rpeVal = Math.round((session['workoutRpe'] as number) / 10);
+        const rpeLabels: Record<number, string> = {
+            1: 'Nagyon könnyű', 2: 'Könnyű', 3: 'Mérsékelt', 4: 'Kissé nehéz',
+            5: 'Nehéz', 6: 'Nehéz', 7: 'Nagyon nehéz', 8: 'Nagyon nehéz',
+            9: 'Rendkívül nehéz', 10: 'Maximális',
+        };
+        lines.push(`RPE:                   ${rpeVal}/10 – ${rpeLabels[rpeVal] ?? ''}`);
     }
 
-    // Edzésterhelés – mindig megjelenjen, hiány esetén –
-    lines.push(`Aerob edzéshatás:      ${typeof session['totalTrainingEffect'] === 'number' ? (session['totalTrainingEffect'] / 10).toFixed(1) + ' / 5.0' : '–'}`);
-    lines.push(`Anaerob edzéshatás:    ${typeof session['totalAnaerobicTrainingEffect'] === 'number' ? (session['totalAnaerobicTrainingEffect'] / 10).toFixed(1) + ' / 5.0' : '–'}`);
+    // Edzésterhelés
+    const aerobicTE = typeof session['totalTrainingEffect'] === 'number' ? session['totalTrainingEffect'] as number : null;
+    const anaerobicTE = typeof session['totalAnaerobicTrainingEffect'] === 'number' ? session['totalAnaerobicTrainingEffect'] as number : null;
+    lines.push(`Aerob edzéshatás:      ${aerobicTE !== null ? aerobicTE.toFixed(1) + ' / 5.0 – ' + teLabel(aerobicTE) : '–'}`);
+    lines.push(`Anaerob edzéshatás:    ${anaerobicTE !== null ? anaerobicTE.toFixed(1) + ' / 5.0 – ' + teLabel(anaerobicTE) : '–'}`);
     if (typeof session['trainingStressScore'] === 'number') {
         lines.push(`Training Stress Score: ${(session['trainingStressScore'] / 10).toFixed(1)}`);
     }
     if (typeof session['intensityFactor'] === 'number') {
         lines.push(`Intenzitás faktor:     ${(session['intensityFactor'] / 1000).toFixed(2)}`);
     }
-    lines.push(`Edzésterhelés (peak):  ${typeof session['trainingLoadPeak'] === 'number' ? (session['trainingLoadPeak'] / 65536).toFixed(2) : '–'}`);
+    const trainingLoad = typeof session['trainingLoadPeak'] === 'number' ? session['trainingLoadPeak'] as number : null;
+    if (trainingLoad !== null && trainingLoad !== 0) {
+        lines.push(`Edzésterhelés (peak):  ${trainingLoad.toFixed(1)}`);
+    }
 
     return lines.length > 1 ? lines.join('\n') : '';
 }
@@ -179,33 +259,65 @@ const SPLIT_TYPE_HU: Record<string, string> = {
     rwdActivity:       'Aktivitás',
 };
 
-export function extractSplits(data: FitUploadResponse): string {
+export function extractSplits(data: FitUploadResponse, mergeShortWalks = false): string {
     const splits = data.messages['splitMesgs'] as Record<string, unknown>[] | undefined;
     const summaries = data.messages['splitSummaryMesgs'] as Record<string, unknown>[] | undefined;
 
     if (!splits || splits.length === 0) return '';
 
-    const filtered = splits.filter(s => typeof s['totalElapsedTime'] === 'number' && (s['totalElapsedTime'] as number) >= 1);
+    const filtered = splits.filter(s =>
+        typeof s['totalElapsedTime'] === 'number' && (s['totalElapsedTime'] as number) >= 1 &&
+        typeof s['totalDistance'] === 'number' && (s['totalDistance'] as number) > 0
+    );
     if (filtered.length === 0) return '';
+
+    // 7 méternél rövidebb gyaloglás → állás (csak ha engedélyezett)
+    const reclassified = mergeShortWalks ? filtered.map(s => {
+        if (String(s['splitType']) === 'rwdWalk' && (typeof s['totalDistance'] !== 'number' || (s['totalDistance'] as number) < 7)) {
+            return { ...s, splitType: 'rwdStand' };
+        }
+        return s;
+    }) : filtered;
+
+    // Szomszédos rwdStand bejegyzések összevonása
+    const merged: Record<string, unknown>[] = [];
+    for (const split of reclassified) {
+        const prev = merged[merged.length - 1];
+        if (prev && String(prev['splitType']) === 'rwdStand' && String(split['splitType']) === 'rwdStand') {
+            const d1 = typeof prev['totalDistance'] === 'number' ? prev['totalDistance'] as number : 0;
+            const d2 = typeof split['totalDistance'] === 'number' ? split['totalDistance'] as number : 0;
+            const t1 = typeof prev['totalElapsedTime'] === 'number' ? prev['totalElapsedTime'] as number : 0;
+            const t2 = typeof split['totalElapsedTime'] === 'number' ? split['totalElapsedTime'] as number : 0;
+            const totalDist = d1 + d2;
+            const totalTime = t1 + t2;
+            merged[merged.length - 1] = {
+                ...prev,
+                totalDistance: totalDist,
+                totalElapsedTime: totalTime,
+                avgSpeed: totalTime > 0 ? totalDist / totalTime : 0,
+                totalAscent: (typeof prev['totalAscent'] === 'number' ? prev['totalAscent'] as number : 0) + (typeof split['totalAscent'] === 'number' ? split['totalAscent'] as number : 0),
+                totalDescent: (typeof prev['totalDescent'] === 'number' ? prev['totalDescent'] as number : 0) + (typeof split['totalDescent'] === 'number' ? split['totalDescent'] as number : 0),
+            };
+        } else {
+            merged.push({ ...split });
+        }
+    }
 
     const header = ['#', 'Típus', 'Táv (km)', 'Idő', 'Pace (min/km)', 'Emelkedés (m)', 'Süllyedés (m)'];
 
     let activeIdx = 0;
-    const rows = filtered.map((split, i) => {
+    let passiveIdx = 0;
+    const rows = merged.map((split) => {
         const type = String(split['splitType'] ?? '');
         const isActive = ACTIVE_SPLIT_TYPES.has(type);
         const label = SPLIT_TYPE_HU[type] ?? type;
-        const idx = isActive ? `${++activeIdx}.` : `(${i + 1})`;
+        const idx = isActive ? `${++activeIdx}.` : `(${++passiveIdx})`;
 
         return [
             idx,
             label,
             km(split['totalDistance']),
-            typeof split['totalElapsedTime'] === 'number' ? mpsToMinPerKm(
-                typeof split['totalDistance'] === 'number' && split['totalElapsedTime'] > 0
-                    ? (split['totalDistance'] as number) / (split['totalElapsedTime'] as number)
-                    : 0
-            ) : '–',
+            typeof split['totalElapsedTime'] === 'number' ? formatSeconds(split['totalElapsedTime'] as number) : '–',
             mpsToMinPerKm(split['avgSpeed']),
             num(split['totalAscent'], 0),
             num(split['totalDescent'], 0),
@@ -213,7 +325,7 @@ export function extractSplits(data: FitUploadResponse): string {
     });
 
     const lines = [
-        `--- Intervallumok / splitMesgs (${filtered.length} bejegyzés, ${activeIdx} aktív) ---`,
+        `--- Intervallumok / splitMesgs (${merged.length} bejegyzés, ${activeIdx} aktív) ---`,
         header.join(','),
         ...rows.map(r => r.join(',')),
     ];
@@ -223,8 +335,10 @@ export function extractSplits(data: FitUploadResponse): string {
         lines.push('');
         lines.push('--- Intervallum összefoglalók (splitSummaryMesgs) ---');
         lines.push('Típus,Darab,Össz táv (km),Össz idő');
+        const NOISE_TYPES = new Set(['rwdWalk', 'rwdStand']);
         for (const s of summaries) {
             const type = String(s['splitType'] ?? '');
+            if (NOISE_TYPES.has(type) && typeof s['totalTimerTime'] === 'number' && (s['totalTimerTime'] as number) < 30) continue;
             const label = SPLIT_TYPE_HU[type] ?? type;
             const count = typeof s['numSplits'] === 'number' ? s['numSplits'] : '–';
             const dist = km(s['totalDistance']);
@@ -234,6 +348,15 @@ export function extractSplits(data: FitUploadResponse): string {
     }
 
     return lines.join('\n');
+}
+
+function teLabel(val: number): string {
+    if (val >= 5.0) return 'Megterhelés';
+    if (val >= 4.0) return 'Magas fejlődés';
+    if (val >= 3.0) return 'Fejlődés';
+    if (val >= 2.0) return 'Fenntartás';
+    if (val >= 1.0) return 'Kis hatás';
+    return 'Nincs hatás';
 }
 
 function formatSeconds(secs: number): string {
@@ -268,8 +391,8 @@ export function extractLaps(data: FitUploadResponse): string {
         mpsToMinPerKm(lap['avgSpeed']),
         num(lap['totalAscent'], 0),
         num(lap['totalDescent'], 0),
-        num(lap['avgRunningCadence'] ?? lap['avgCadence'], 0),
-        num(lap['maxRunningCadence'] ?? lap['maxCadence'], 0),
+        cadence(lap['avgRunningCadence'] ?? lap['avgCadence']),
+        cadence(lap['maxRunningCadence'] ?? lap['maxCadence']),
         num(lap['avgStepLength'], 2),
         num(lap['avgVerticalOscillation'], 1),
         num(lap['avgStanceTime'], 0),
@@ -288,17 +411,27 @@ export function extractUserProfile(data: FitUploadResponse): string {
     const profile = (data.messages['userProfileMesgs'] as Record<string, unknown>[])?.[0];
     if (!profile) return '(nincs userProfileMesgs adat)';
 
+    const sleepSec = typeof profile['sleepTime'] === 'number' ? profile['sleepTime'] as number : null;
+    const wakeSec  = typeof profile['wakeTime']  === 'number' ? profile['wakeTime']  as number : null;
+    let sleepDuration = '';
+    if (sleepSec !== null && wakeSec !== null) {
+        const DAY = 24 * 3600;
+        const dur = ((wakeSec - sleepSec) + DAY) % DAY;
+        const dh = Math.floor(dur / 3600);
+        const dm = Math.floor((dur % 3600) / 60);
+        sleepDuration = ` (${dh} ó ${String(dm).padStart(2, '0')} p)`;
+    }
+
     const lines = [
-        `Alvási idő:    ${secondsToHHMM(profile['sleepTime'])}`,
-        `Ébredési idő:  ${secondsToHHMM(profile['wakeTime'])}`,
         `Súly:          ${typeof profile['weight'] === 'number' ? profile['weight'] + ' kg' : '–'}`,
         `Magasság:      ${typeof profile['height'] === 'number' ? profile['height'] + ' m' : '–'}`,
+        `Alvási idő:    ${secondsToHHMM(profile['sleepTime'])}`,
+        `Ébredési idő:  ${secondsToHHMM(profile['wakeTime'])}${sleepDuration}`,
     ];
 
     const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0];
-    if (session?.['startTime'] instanceof Date) {
-        lines.push(`Edzés kezdete: ${session['startTime'].toLocaleString('hu-HU')}`);
-    }
+    const sessionStart = toDate(session?.['startTime']);
+    if (sessionStart) lines.push(`Edzés kezdete: ${sessionStart.toLocaleString('hu-HU')}`);
 
     return lines.join('\n');
 }
@@ -306,6 +439,7 @@ export function extractUserProfile(data: FitUploadResponse): string {
 function formatValue(val: unknown): string {
     if (val === null || val === undefined) return '–';
     if (val instanceof Date) return val.toLocaleString('hu-HU');
+    if (typeof val === 'number' && val > 631065600 && val < 4294967295) return new Date(val * 1000).toLocaleString('hu-HU');
     if (typeof val === 'object') return JSON.stringify(val);
     return String(val);
 }
