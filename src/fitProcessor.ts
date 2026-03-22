@@ -383,6 +383,8 @@ export function extractLaps(data: FitUploadResponse): string {
         'Vert. osz. (mm)',
         'Talajérintés (ms)',
         'Vert. arány (%)',
+        'Átl. légzés (l/p)',
+        'Max. légzés (l/p)',
     ];
 
     const rows = laps.map((lap, i) => [
@@ -397,6 +399,8 @@ export function extractLaps(data: FitUploadResponse): string {
         num(lap['avgVerticalOscillation'], 1),
         num(lap['avgStanceTime'], 0),
         num(lap['avgVerticalRatio'], 1),
+        num(lap['enhancedAvgRespirationRate'], 1),
+        num(lap['enhancedMaxRespirationRate'], 1),
     ]);
 
     const lines = [
