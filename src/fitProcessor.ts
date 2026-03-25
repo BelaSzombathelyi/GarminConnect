@@ -162,8 +162,11 @@ export function extractSession(data: FitUploadResponse): string {
     // Időpontok
     const startDate = toDate(session['startTime']);
     if (startDate) lines.push(`Kezdés:                ${startDate.toLocaleString('hu-HU')}`);
-    const endDate = toDate(session['timestamp']);
-    if (endDate) lines.push(`Befejezés:             ${endDate.toLocaleString('hu-HU')}`);
+    const elapsed = typeof session['totalElapsedTime'] === 'number' ? session['totalElapsedTime'] as number : null;
+    if (startDate && elapsed !== null) {
+        const endDate = new Date(startDate.getTime() + elapsed * 1000);
+        lines.push(`Befejezés:             ${endDate.toLocaleString('hu-HU')}`);
+    }
 
     // Kalória
     if (typeof session['totalCalories'] === 'number')    lines.push(`Kalória:               ${session['totalCalories']} kcal`);
