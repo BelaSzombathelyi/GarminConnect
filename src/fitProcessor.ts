@@ -268,10 +268,10 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
 
     if (!splits || splits.length === 0) return '';
 
-    const filtered = splits.filter(s =>
+    const filtered = mergeShortWalks ? splits.filter(s =>
         typeof s['totalElapsedTime'] === 'number' && (s['totalElapsedTime'] as number) >= 1 &&
         typeof s['totalDistance'] === 'number' && (s['totalDistance'] as number) > 0
-    );
+    ) : splits;
     if (filtered.length === 0) return '';
 
     // 7 méternél rövidebb gyaloglás → állás (csak ha engedélyezett)
