@@ -234,6 +234,60 @@ export function extractSession(data: FitUploadResponse): string {
         lines.push(`Edzésterhelés (peak):  ${trainingLoad.toFixed(1)}`);
     }
 
+    // Séta / futás / állás idők a splitSummaryMesgs-ből
+    const summaries = data.messages['splitSummaryMesgs'] as Record<string, unknown>[] | undefined;
+    if (summaries && summaries.length > 0) {
+        const rwdTypes: Record<string, string> = { rwdRun: 'Futás idő:', rwdWalk: 'Séta idő:', rwdStand: 'Állás idő:' };
+        for (const [key, label] of Object.entries(rwdTypes)) {
+            const entry = summaries.find(s => String(s['splitType']) === key);
+            if (entry && typeof entry['totalTimerTime'] === 'number') {
+                lines.push(`${label} ${formatSeconds(entry['totalTimerTime'] as number)}`);
+            }
+        }
+    }
+
+
+    // Edzéslépések (workoutStepMesgs)
+    const workoutSteps = data.messages['workoutStepMesgs'] as Record<string, unknown>[] | undefined;
+    if (workoutSteps && workoutSteps.length > 0) {
+        lines.push('');
+        lines.push('Edzéslépések:');
+        for (let i = 0; i < workoutSteps.length; i++) {
+            const step = workoutSteps[i];
+            // A notes tömb első eleme a szöveges megjegyzés
+            const notesArr = Array.isArray(step['notes']) ? step['notes'] as unknown[] : null;
+            const noteText = notesArr && typeof notesArr[0] === 'string' && notesArr[0].trim() ? notesArr[0].trim() : '';
+
+            const intensity = typeof step['intensity'] === 'string' ? step['intensity'] : '';
+            const durationType = typeof step['durationType'] === 'string' ? step['durationType'] : '';
+            const durationTime = typeof step['durationTime'] === 'number' ? step['durationTime'] as number : null;
+            const targetType = typeof step['targetType'] === 'string' ? step['targetType'] : '';
+            const hrZone = typeof step['targetHrZone'] === 'number' ? step['targetHrZone'] as number : 0;
+            const hrLow = typeof step['customTargetHeartRateLow'] === 'number' ? step['customTargetHeartRateLow'] as number : null;
+            const hrHigh = typeof step['customTargetHeartRateHigh'] === 'number' ? step['customTargetHeartRateHigh'] as number : null;
+
+            const durationStr = durationType === 'time' && durationTime !== null
+                ? formatSeconds(durationTime)
+                : durationType || '–';
+
+            let targetStr = '';
+            if (targetType === 'heartRate') {
+                if (hrZone > 0) targetStr = `HR Z${hrZone}`;
+                else if (hrLow !== null && hrHigh !== null) targetStr = `${hrLow}–${hrHigh} bpm`;
+            } else if (targetType) {
+                targetStr = targetType;
+            }
+
+            const parts = [`${i + 1}.`];
+            if (noteText) parts.push(noteText);
+            if (intensity) parts.push(`[${intensity}]`);
+            parts.push(durationStr);
+            if (targetStr) parts.push(targetStr);
+            lines.push('  ' + parts.join('  '));
+        }
+    }
+
+
     return lines.length > 1 ? lines.join('\n') : '';
 }
 
