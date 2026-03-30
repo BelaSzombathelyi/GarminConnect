@@ -247,6 +247,16 @@ export function extractSession(data: FitUploadResponse): string {
     }
 
 
+    // Edzés neve és leírása (workoutMesgs)
+    const workoutMesgs = data.messages['workoutMesgs'] as Record<string, unknown>[] | undefined;
+    const workout = workoutMesgs?.[0];
+    if (workout) {
+        const wktNameArr = Array.isArray(workout['wktName']) ? (workout['wktName'] as unknown[]).filter(s => typeof s === 'string' && (s as string).trim()) : null;
+        const wktName = wktNameArr && wktNameArr.length > 0 ? (wktNameArr as string[]).join(' ') : (typeof workout['wktName'] === 'string' ? workout['wktName'] : '');
+        if (wktName) lines.push(`Edzés neve:            ${wktName}`);
+        if (typeof workout['numValidSteps'] === 'number') lines.push(`Lépések száma:         ${workout['numValidSteps']}`);
+    }
+
     // Edzéslépések (workoutStepMesgs)
     const workoutSteps = data.messages['workoutStepMesgs'] as Record<string, unknown>[] | undefined;
     if (workoutSteps && workoutSteps.length > 0) {
