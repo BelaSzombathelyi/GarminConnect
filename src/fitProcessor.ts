@@ -326,55 +326,199 @@ const SPLIT_TYPE_HU: Record<string, string> = {
     rwdActivity:       'Aktivitás',
 };
 
+function extractStops(data: FitUploadResponse, splits: Record<string, unknown>[]): string {
+    const records = data.messages['recordMesgs'] as Record<string, unknown>[] | undefined;
+    const laps = data.messages['lapMesgs'] as Record<string, unknown>[] | undefined;
+
+    if (!records || records.length === 0 || !laps || laps.length === 0) return '';
+
+    const stops: { start: number; end: number }[] = [];
+    let current: { start: number } | null = null;
+
+    for (const r of records) {
+        const speed = r['enhancedSpeed'] as number | undefined;
+        const cadence = r['cadence'] as number | undefined;
+        const time = toDate(r['timestamp'])?.getTime();
+
+        if (!time) continue;
+
+        const isStopped =
+            (typeof speed === 'number' && speed < 0.3) ||
+            (typeof cadence === 'number' && cadence === 0);
+
+        if (isStopped) {
+            if (!current) current = { start: time };
+        } else if (current) {
+            stops.push({ start: current.start, end: time });
+            current = null;
+        }
+    }
+
+    const MIN_STOP_MS = 10_000;
+    const validStops = stops
+        .filter(s => (s.end - s.start) >= MIN_STOP_MS)
+        .sort((a, b) => a.start - b.start); // 🔥 FIX
+
+    if (validStops.length === 0) return '';
+
+    function findLapIndex(ts: number) {
+        return laps.findIndex(l => {
+            const start = toDate(l['startTime'])?.getTime();
+            const end = toDate(l['endTime'])?.getTime();
+            if (!start || !end) return false;
+            return ts >= start && ts <= end;
+        });
+    }
+
+    const lines: string[] = ['--- Megállások ---'];
+
+    for (const stop of validStops) {
+        const idx = findLapIndex(stop.start);
+        if (idx === -1) continue;
+
+        const lap = laps[idx];
+        const lapStart = toDate(lap['startTime'])?.getTime();
+        if (!lapStart) continue;
+
+        const offsetSec = Math.floor((stop.start - lapStart) / 1000);
+        const durationSec = Math.floor((stop.end - stop.start) / 1000);
+
+        lines.push(`${idx + 1}. kör: +${formatSeconds(offsetSec)} → ${formatSeconds(durationSec)}`);
+    }
+
+    return lines.join('\n');
+}
+
+function extractSlowSegments(
+    data: FitUploadResponse,
+    splits: Record<string, unknown>[]
+): string {
+    const records = data.messages['recordMesgs'] as Record<string, unknown>[] | undefined;
+    const laps = data.messages['lapMesgs'] as Record<string, unknown>[] | undefined;
+
+    if (!records || records.length === 0 || !laps || laps.length === 0) return '';
+
+    const segments: { start: number; end: number }[] = [];
+    let current: { start: number } | null = null;
+
+    for (const r of records) {
+        const speed = r['enhancedSpeed'] as number | undefined;
+        const cadence = r['cadence'] as number | undefined;
+        const vertSpeed = r['enhancedVertSpeed'] as number | undefined;
+        const time = toDate(r['timestamp'])?.getTime();
+
+        if (!time) continue;
+
+        const isSlow =
+            typeof speed === 'number' &&
+            typeof cadence === 'number' &&
+            speed < 1.5 &&
+            cadence < 130 &&
+            (typeof vertSpeed !== 'number' || Math.abs(vertSpeed) < 0.3);
+
+        if (isSlow) {
+            if (!current) current = { start: time };
+        } else if (current) {
+            segments.push({ start: current.start, end: time });
+            current = null;
+        }
+    }
+
+    const MIN_SLOW_MS = 15_000;
+
+    const valid = segments
+        .filter(s => (s.end - s.start) >= MIN_SLOW_MS)
+        .sort((a, b) => a.start - b.start); // 🔥 FIX
+
+    if (valid.length === 0) return '';
+
+    function findLapIndex(ts: number) {
+        return laps.findIndex(l => {
+            const start = toDate(l['startTime'])?.getTime();
+            const end = toDate(l['endTime'])?.getTime();
+            if (!start || !end) return false;
+            return ts >= start && ts <= end;
+        });
+    }
+
+    const lines: string[] = ['--- Lassulások ---'];
+
+    for (const seg of valid) {
+        const idx = findLapIndex(seg.start);
+        if (idx === -1) continue;
+
+        const lap = laps[idx];
+        const lapStart = toDate(lap['startTime'])?.getTime();
+        if (!lapStart) continue;
+
+        const offsetSec = Math.floor((seg.start - lapStart) / 1000);
+        const durationSec = Math.floor((seg.end - seg.start) / 1000);
+
+        lines.push(`${idx + 1}. kör: +${formatSeconds(offsetSec)} → ${formatSeconds(durationSec)}`);
+    }
+
+    return lines.join('\n');
+}
+
 export function extractSplits(data: FitUploadResponse, mergeShortWalks = false): string {
     const splits = data.messages['splitMesgs'] as Record<string, unknown>[] | undefined;
     const summaries = data.messages['splitSummaryMesgs'] as Record<string, unknown>[] | undefined;
 
     if (!splits || splits.length === 0) return '';
 
-    const filtered = mergeShortWalks ? splits.filter(s =>
-        typeof s['totalElapsedTime'] === 'number' && (s['totalElapsedTime'] as number) >= 1 &&
-        typeof s['totalDistance'] === 'number' && (s['totalDistance'] as number) > 0
-    ) : splits;
+    // 🔹 CSAK az intervallum típusokat tartjuk meg
+    const INTERVAL_TYPES = new Set([
+        'intervalWarmup',
+        'intervalActive',
+        'intervalRest',
+        'intervalCooldown',
+    ]);
+
+    const filtered = splits.filter(s => INTERVAL_TYPES.has(String(s['splitType'])));
     if (filtered.length === 0) return '';
 
-    // 7 méternél rövidebb gyaloglás → állás (csak ha engedélyezett)
-    const reclassified = mergeShortWalks ? filtered.map(s => {
-        if (String(s['splitType']) === 'rwdWalk' && (typeof s['totalDistance'] !== 'number' || (s['totalDistance'] as number) < 7)) {
-            return { ...s, splitType: 'rwdStand' };
-        }
-        return s;
-    }) : filtered;
+    // 🔹 pairing: active + rest blokkok
+    const paired: Record<string, unknown>[] = [];
+    let currentActive: Record<string, unknown> | null = null;
 
-    // Szomszédos rwdStand bejegyzések összevonása
-    const merged: Record<string, unknown>[] = [];
-    for (const split of reclassified) {
-        const prev = merged[merged.length - 1];
-        if (prev && String(prev['splitType']) === 'rwdStand' && String(split['splitType']) === 'rwdStand') {
-            const d1 = typeof prev['totalDistance'] === 'number' ? prev['totalDistance'] as number : 0;
-            const d2 = typeof split['totalDistance'] === 'number' ? split['totalDistance'] as number : 0;
-            const t1 = typeof prev['totalElapsedTime'] === 'number' ? prev['totalElapsedTime'] as number : 0;
-            const t2 = typeof split['totalElapsedTime'] === 'number' ? split['totalElapsedTime'] as number : 0;
-            const totalDist = d1 + d2;
-            const totalTime = t1 + t2;
-            merged[merged.length - 1] = {
-                ...prev,
-                totalDistance: totalDist,
-                totalElapsedTime: totalTime,
-                avgSpeed: totalTime > 0 ? totalDist / totalTime : 0,
-                totalAscent: (typeof prev['totalAscent'] === 'number' ? prev['totalAscent'] as number : 0) + (typeof split['totalAscent'] === 'number' ? split['totalAscent'] as number : 0),
-                totalDescent: (typeof prev['totalDescent'] === 'number' ? prev['totalDescent'] as number : 0) + (typeof split['totalDescent'] === 'number' ? split['totalDescent'] as number : 0),
-            };
+    for (const split of filtered) {
+        const type = String(split['splitType']);
+
+        if (type === 'intervalActive') {
+            currentActive = { active: split };
+        } else if (type === 'intervalRest' && currentActive) {
+            paired.push({ active: currentActive['active'], rest: split });
+            currentActive = null;
         } else {
-            merged.push({ ...split });
+            paired.push({ single: split });
         }
     }
 
+    
     const header = ['#', 'Típus', 'Táv (km)', 'Idő', 'Pace (min/km)', 'Emelkedés (m)', 'Süllyedés (m)'];
 
     let activeIdx = 0;
     let passiveIdx = 0;
-    const rows = merged.map((split) => {
+
+    const rows = paired.map((block) => {
+        // 🔹 ha van active + rest pár
+        if ('active' in block && 'rest' in block) {
+            const a = block['active'] as Record<string, unknown>;
+            const r = block['rest'] as Record<string, unknown>;
+
+            return [
+                `${++activeIdx}.`,
+                'Intervallum',
+                `${km(a['totalDistance'])} / ${km(r['totalDistance'])}`,
+                `${formatSeconds(a['totalElapsedTime'] as number)} + ${formatSeconds(r['totalElapsedTime'] as number)}`,
+                mpsToMinPerKm(a['avgSpeed']),
+                num(a['totalAscent'], 0),
+                num(a['totalDescent'], 0),
+            ];
+        }
+
+        // 🔹 single (warmup / cooldown)
+        const split = block['single'] as Record<string, unknown>;
         const type = String(split['splitType'] ?? '');
         const isActive = ACTIVE_SPLIT_TYPES.has(type);
         const label = SPLIT_TYPE_HU[type] ?? type;
@@ -392,12 +536,12 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
     });
 
     const lines = [
-        `--- Intervallumok / splitMesgs (${merged.length} bejegyzés, ${activeIdx} aktív) ---`,
+        `--- Intervallumok / splitMesgs (${filtered.length} bejegyzés, ${activeIdx} blokk) ---`,
         header.join(','),
         ...rows.map(r => r.join(',')),
     ];
 
-    // splitSummaryMesgs: tervezett vs teljesített összefoglaló, ha elérhető
+    // splitSummaryMesgs marad változatlan
     if (summaries && summaries.length > 0) {
         lines.push('');
         lines.push('--- Intervallum összefoglalók (splitSummaryMesgs) ---');
@@ -414,6 +558,21 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
         }
     }
 
+
+    const stopsText = extractStops(data, splits);
+    if (stopsText) {
+        lines.push('');
+        lines.push(stopsText);
+    }
+
+    const slowText = extractSlowSegments(data, splits);
+    if (slowText) {
+        lines.push('');
+        lines.push(slowText);
+    }
+
+
+
     return lines.join('\n');
 }
 
@@ -427,10 +586,9 @@ function teLabel(val: number): string {
 }
 
 function formatSeconds(secs: number): string {
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = Math.round(secs % 60);
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    const total = Math.round(secs);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
