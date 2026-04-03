@@ -85,3 +85,37 @@ A szkriptnek két extra Tampermonkey engedélyre van szüksége:
 > // @version  0.4
 > ```
 > A Tampermonkey csak akkor frissíti automatikusan a telepített szkriptet, ha a verziószám magasabb, mint az előző. Verzió emelés nélkül a módosítás nem érvényesül a böngészőben.
+
+---
+
+## GarminConnect.activities.user.js – Activities lista szinkron
+
+Ez egy külön userscript, ami az activities lista oldalon fut:
+
+- `@match https://connect.garmin.com/app/activities*`
+- DOM-ból kiolvassa az aktivitás adatokat (`activityId`, `name`, `date`, `type`)
+- elküldi a helyi API-ra:
+   - `POST /api/report_activities`
+- lekéri a NEW aktivitásokat:
+   - `GET /api/get_new_activities?limit=25`
+- egyszerre megnyitja a detail oldalakat:
+   - `https://connect.garmin.com/app/activity/{id}?auto_download=1&close_after_download=1`
+
+### UI
+
+A script az oldal jobb alsó sarkába betesz egy kis panelt:
+
+- státusz sor
+- gomb: `Riport + NEW letöltések`
+
+Az oldal megnyitásakor egyszer automatikusan lefut a riport küldés.
+
+### Szükséges fejléc
+
+```js
+// @grant   GM_xmlhttpRequest
+// @connect localhost
+// @connect 127.0.0.1
+```
+
+Ezek nélkül a script nem tud a local API-val kommunikálni.
