@@ -53,11 +53,6 @@
     // 1. lépés: SPA betöltés – a fogaskerék megjelenése jelzi, hogy a React app renderelt
     waitForElement('[class*="ActivitySettingsMenu_menuContainer"] [class*="Menu_menuBtn"]', (menuBtn) => {
         console.log('[GarminConnect] Fogaskerék gomb megtalálva.');
-        // 2. lépés: Térkép betöltés – a Leaflet canvas megjelenése jelzi, hogy minden adat megérkezett
-        console.log('[GarminConnect] Térkép canvas-t várjuk...');
-        waitForElement('canvas.leaflet-zoom-animated', () => {
-            console.log('[GarminConnect] Térkép canvas megtalálva, init indul.');
-            init(menuBtn);
-        }, 30000);
+        init(menuBtn);
     });
 })();
