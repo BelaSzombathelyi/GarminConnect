@@ -2,6 +2,8 @@ import { defineConfig, type Plugin, type ViteDevServer } from 'vite'
 import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
 import { resolve } from 'node:path'
+import { dirname, join } from 'node:path'
+import { readFile, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { processBuffer } from './server/fitPipeline'
 import { ActivityStatus, createActivityStore, type ActivityInput } from './server/activityStore'
@@ -9,7 +11,7 @@ import { startDownloadWatcher } from './server/downloadWatcher'
 
 const DB_FILE_PATH = resolve(process.cwd(), 'data', 'garmin-activities.sqlite')
 const DOWNLOADS_DIR = process.env.GARMIN_DOWNLOADS_DIR || resolve(process.env.HOME || '.', 'Downloads')
-const ARCHIVE_DIR = resolve(process.cwd(), 'downloads')
+const ARCHIVE_DIR = resolve(process.cwd(), 'data')
 
 const activityStore = createActivityStore(DB_FILE_PATH)
 let stopDownloadWatcher: (() => void) | null = null
@@ -131,7 +133,7 @@ function fitUploadPlugin(): Plugin {
                             fileName: `${activityId}.zip`,
                         }
                     },
-                    onZipReady: ({ fileName, activityId, archivedFileName }) => {
+                    onZipReady: async ({ fileName, activityId, archivedFileName, archivedPath }) => {
                         if (!activityId) {
                             console.warn('[downloads] Nem sikerült activity ID-t kinyerni:', fileName)
                             return
@@ -139,6 +141,22 @@ function fitUploadPlugin(): Plugin {
 
                         activityStore.markReceived(activityId, archivedFileName)
                         console.log(`[downloads] RECEIVED: ${activityId} (${archivedFileName})`)
+
+                        try {
+                            const buffer = await readFile(archivedPath)
+                            const { text, errors } = processBuffer(buffer, activityId)
+                            if (errors.length > 0) {
+                                console.warn(`[downloads] Dekódolási hibák (${activityId}):`, errors)
+                            }
+
+                            const txtPath = join(dirname(archivedPath), `${activityId}.txt`)
+                            await writeFile(txtPath, text, 'utf-8')
+
+                            activityStore.markProcessed(activityId)
+                            console.log(`[downloads] PROCESSED: ${activityId} (${txtPath})`)
+                        } catch (err) {
+                            console.error(`[downloads] Feldolgozási hiba (${activityId}):`, err)
+                        }
                     },
                     logger: console,
                 })

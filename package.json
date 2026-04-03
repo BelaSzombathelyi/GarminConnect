@@ -4,10 +4,11 @@
   "description": "## Áttekintés",
   "main": "index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "vite --config vite.config.ts",
+    "build": "vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts",
     "test": "vitest run",
+    "clean:data": "rm -rf data",
     "download:activities": "playwright test"
   },
   "repository": {

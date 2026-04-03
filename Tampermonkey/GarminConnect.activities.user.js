@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Garmin Connect Activities Sync
 // @namespace    https://connect.garmin.com/
-// @version      1.5
+// @version      1.6
 // @description  Activities lista riport + NEW aktivitások egyszerre megnyitása auto letöltéshez
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
@@ -161,35 +161,61 @@
         });
     }
 
-    async function openNewActivitiesSequentially(activities, statusEl) {
+    async function openNewActivitiesWithConcurrency(activities, statusEl, maxConcurrent = 2) {
         const ids = activities
             .map((a) => String(a.activityId || '').trim())
             .filter(Boolean);
 
-        for (let i = 0; i < ids.length; i += 1) {
-            const activityId = ids[i];
-            const current = i + 1;
-            const total = ids.length;
+        const total = ids.length;
+        let nextIndex = 0;
+        let completed = 0;
+        let aborted = false;
+        const inFlight = new Set();
 
-            if (statusEl) {
-                statusEl.textContent = `Megnyitás ${current}/${total}: ${activityId}`;
-            }
-
+        const openOne = async (activityId) => {
             const detailUrl = `https://connect.garmin.com/app/activity/${activityId}?auto_download=1&close_after_download=1`;
             const child = window.open(detailUrl, '_blank');
 
             if (!child) {
+                aborted = true;
                 console.warn('[Activities Sync] Popup blokkolva vagy nem nyitható:', activityId);
                 if (statusEl) {
                     statusEl.textContent = `Popup blokkolva: ${activityId}`;
                 }
-                break;
+                return;
             }
 
             console.log('[Activities Sync] Megnyitva új lapon:', activityId);
 
             const waitResult = await waitForActivitiesTabActive(child);
             console.log('[Activities Sync] Várakozás eredmény:', activityId, waitResult);
+
+            completed += 1;
+            if (statusEl) {
+                statusEl.textContent = `Kész ${completed}/${total}, fut: ${inFlight.size}`;
+            }
+        };
+
+        while ((nextIndex < total || inFlight.size > 0) && !aborted) {
+            while (nextIndex < total && inFlight.size < maxConcurrent && !aborted) {
+                const activityId = ids[nextIndex];
+                nextIndex += 1;
+
+                if (statusEl) {
+                    statusEl.textContent = `Megnyitás ${nextIndex}/${total}, fut: ${inFlight.size + 1}/${maxConcurrent}`;
+                }
+
+                const promise = openOne(activityId)
+                    .finally(() => {
+                        inFlight.delete(promise);
+                    });
+
+                inFlight.add(promise);
+            }
+
+            if (inFlight.size > 0) {
+                await Promise.race(inFlight);
+            }
         }
     }
 
@@ -244,9 +270,9 @@
                 if (newActivities.length === 0) {
                     status.textContent = 'Nincs NEW aktivitás.';
                 } else {
-                    status.textContent = `${newActivities.length} NEW aktivitás soros megnyitása...`;
-                    await openNewActivitiesSequentially(newActivities, status);
-                    status.textContent = `Soros megnyitás kész: ${newActivities.length} aktivitás.`;
+                    status.textContent = `${newActivities.length} NEW aktivitás megnyitása (max 2 párhuzamos lap)...`;
+                    await openNewActivitiesWithConcurrency(newActivities, status, 2);
+                    status.textContent = `Megnyitás kész: ${newActivities.length} aktivitás.`;
                 }
             } catch (err) {
                 console.error('[Activities Sync] Hiba:', err);

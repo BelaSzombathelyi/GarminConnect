@@ -17,7 +17,7 @@ interface ArchiveTarget {
 interface DownloadWatcherOptions {
     downloadsDir: string
     archiveDir: string
-    onZipReady: (payload: ZipReadyPayload) => void
+    onZipReady: (payload: ZipReadyPayload) => void | Promise<void>
     resolveArchiveTarget?: (context: { fileName: string; activityId: string | null }) => ArchiveTarget | Promise<ArchiveTarget>
     logger?: Pick<Console, 'log' | 'warn' | 'error'>
 }
@@ -40,17 +40,25 @@ function buildArchivedFileName(fileName: string, activityId: string | null): str
     return `${timestampPrefix}-${basename(fileName)}`
 }
 
-async function moveFile(sourcePath: string, targetPath: string): Promise<void> {
+async function moveFile(sourcePath: string, targetPath: string): Promise<boolean> {
     try {
         await rename(sourcePath, targetPath)
-        return
+        return true
     } catch (err) {
         const e = err as NodeJS.ErrnoException
+        if (e?.code === 'ENOENT') return false
         if (!e || e.code !== 'EXDEV') throw err
     }
 
-    await copyFile(sourcePath, targetPath)
-    await unlink(sourcePath)
+    try {
+        await copyFile(sourcePath, targetPath)
+        await unlink(sourcePath)
+        return true
+    } catch (err) {
+        const e = err as NodeJS.ErrnoException
+        if (e?.code === 'ENOENT') return false
+        throw err
+    }
 }
 
 async function waitForStableFile(filePath: string, retries = 8, delayMs = 1000): Promise<boolean> {
@@ -106,9 +114,13 @@ export function startDownloadWatcher({ downloadsDir, archiveDir, onZipReady, res
             mkdirSync(archiveTargetDir, { recursive: true })
 
             const archivedPath = join(archiveTargetDir, archivedFileName)
-            await moveFile(sourcePath, archivedPath)
+            const moved = await moveFile(sourcePath, archivedPath)
+            if (!moved) {
+                logger.warn('[downloads] Forrás ZIP már nem létezik (dupla watcher event), kihagyva:', fileName)
+                return
+            }
 
-            onZipReady({
+            await onZipReady({
                 fileName,
                 archivedFileName,
                 archivedPath,
