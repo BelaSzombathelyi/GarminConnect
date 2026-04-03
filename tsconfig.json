@@ -7,5 +7,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src", "server", "tests"]
+  "include": ["src", "server", "tests", "e2e/garmin-activities-download.spec.ts"]
 }
