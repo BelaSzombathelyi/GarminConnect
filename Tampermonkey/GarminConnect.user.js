@@ -1,73 +1,15 @@
 // ==UserScript==
 // @name         Garmin Connect Enhancer
 // @namespace    https://connect.garmin.com/
-// @version      0.4
-// @description  Garmin Connect oldalának bővítése egyedi funkciókkal
+// @version      1.0
+// @description  Garmin Connect activity FIT ZIP automatikus letöltése
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activity/*
-// @grant        GM_xmlhttpRequest
-// @connect      localhost
-// @connect      connectapi.garmin.com
+// @grant        none
 // ==/UserScript==
 
 (function () {
     'use strict';
-
-    const LOCAL_SERVER = 'http://localhost:5173/api/fit-upload';
-
-    // Az aktivitás ID kinyerése az URL-ből:
-    // https://connect.garmin.com/app/activity/12345678  →  "12345678"
-    function getActivityId() {
-        const match = window.location.pathname.match(/\/activity\/(\d+)/);
-        return match ? match[1] : null;
-    }
-
-    // A FIT fájl letöltése a Garmin API-ról, majd átküldése a helyi szerverre
-    function fetchAndForwardFit(activityId) {
-        // A modern Garmin Connect API host: connectapi.garmin.com (a DI_BACKENDS "gcapi" értéke)
-        const garminUrl = `https://connectapi.garmin.com/download-service/files/activity/${activityId}`;
-        console.log('[GarminConnect] FIT letöltése:', garminUrl);
-
-        // 1. lépés: FIT fájl lekérése a Garmin szerverről
-        // (GM_xmlhttpRequest nem kötött CORS-hoz, a böngésző session cookie-jai elküldésre kerülnek)
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: garminUrl,
-            responseType: 'arraybuffer',
-            anonymous: false,
-            onload: (response) => {
-                if (response.status !== 200) {
-                    console.error('[GarminConnect] FIT letöltési hiba:', response.status);
-                    return;
-                }
-                console.log('[GarminConnect] FIT letöltve, átküldés a helyi szerverre...');
-
-                // 2. lépés: bináris adat továbbítása a helyi Vite szerverre
-                GM_xmlhttpRequest({
-                    method: 'POST',
-                    url: LOCAL_SERVER,
-                    data: response.response,
-                    headers: {
-                        'Content-Type': 'application/octet-stream',
-                        'X-Activity-Id': activityId,
-                    },
-                    onload: (res) => {
-                        if (res.status === 200) {
-                            console.log('[GarminConnect] Sikeresen átküldve a helyi szerverre.');
-                        } else {
-                            console.error('[GarminConnect] Helyi szerver hiba:', res.status, res.responseText);
-                        }
-                    },
-                    onerror: () => {
-                        console.error('[GarminConnect] Helyi szerver nem elérhető:', LOCAL_SERVER);
-                    },
-                });
-            },
-            onerror: () => {
-                console.error('[GarminConnect] Nem sikerült letölteni a FIT fájlt.');
-            },
-        });
-    }
 
     function waitForElement(selector, callback, maxWait = 10000) {
         const interval = 200;
@@ -84,17 +26,38 @@
         }, interval);
     }
 
-    function init() {
-        const activityId = getActivityId();
-        if (!activityId) {
-            console.warn('[GarminConnect] Nem sikerült kiolvasni az aktivitás ID-t az URL-ből.');
-            return;
-        }
-        console.log('[GarminConnect] Aktivitás ID:', activityId);
-        fetchAndForwardFit(activityId);
+    function init(menuBtn) {
+        console.log('[GarminConnect] Fogaskerék kattintás...');
+        menuBtn.click();
+
+        // Megvárjuk a menü megjelenését, majd kattintunk a "Fájl exportálása" elemre
+        waitForElement('[class*="ActivitySettingsMenu_menuContainer"] [class*="Menu_menuItems"]', () => {
+            const menuItems = document.querySelectorAll('[class*="ActivitySettingsMenu_menuContainer"] [class*="Menu_menuItems"]');
+            const exportItem = Array.from(menuItems).find(
+                (el) => el.textContent.trim() === 'Fájl exportálása'
+            );
+
+            if (!exportItem) {
+                console.warn('[GarminConnect] "Fájl exportálása" menüpont nem található.');
+                menuBtn.click(); // menü bezárása
+                return;
+            }
+
+            console.log('[GarminConnect] "Fájl exportálása" kattintás...');
+            exportItem.click();
+        }, 5000);
     }
 
-    // Megvárjuk az oldal betöltését (SPA), majd elindítjuk a logikát
-    // A fogaskerék gomb megjelenése jelzi, hogy az aktivitás nézet készen van
-    waitForElement('[class*="Menu_menuBtn"]', init);
+    console.log('[GarminConnect] Script elindult, URL:', window.location.href);
+
+    // 1. lépés: SPA betöltés – a fogaskerék megjelenése jelzi, hogy a React app renderelt
+    waitForElement('[class*="ActivitySettingsMenu_menuContainer"] [class*="Menu_menuBtn"]', (menuBtn) => {
+        console.log('[GarminConnect] Fogaskerék gomb megtalálva.');
+        // 2. lépés: Térkép betöltés – a Leaflet canvas megjelenése jelzi, hogy minden adat megérkezett
+        console.log('[GarminConnect] Térkép canvas-t várjuk...');
+        waitForElement('canvas.leaflet-zoom-animated', () => {
+            console.log('[GarminConnect] Térkép canvas megtalálva, init indul.');
+            init(menuBtn);
+        }, 30000);
+    });
 })();

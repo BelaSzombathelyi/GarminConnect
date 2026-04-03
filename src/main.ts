@@ -44,5 +44,3 @@ fileInput.addEventListener('change', async () => {
     fileInput.value = '';
 });
 
-fetch('/api/ping');
-

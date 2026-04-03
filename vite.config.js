@@ -1,15 +1,39 @@
 import { defineConfig } from 'vite'
 import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
+import { processBuffer } from './server/fitPipeline'
 
 function fitUploadPlugin() {
     return {
         name: 'fit-upload',
         configureServer(server) {
-            server.middlewares.use('/api/ping', (req, res) => {
-                console.log('[GarminConnect] Frontend betöltve.');
-                res.statusCode = 200;
-                res.end();
+            server.middlewares.use('/api/process', async (req, res) => {
+                if (req.method !== 'POST') {
+                    res.statusCode = 405;
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const chunks = [];
+                for await (const chunk of req) {
+                    chunks.push(chunk);
+                }
+                const buffer = Buffer.concat(chunks);
+                const activityId = req.headers['x-activity-id'] ?? null;
+
+                try {
+                    const { text, errors } = processBuffer(buffer, activityId);
+                    if (errors.length > 0) {
+                        console.warn('[process] Dekódolási hibák:', errors);
+                    }
+                    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+                    res.statusCode = 200;
+                    res.end(text);
+                } catch (err) {
+                    res.statusCode = 422;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+                }
             });
 
             server.middlewares.use('/api/fit-upload', async (req, res) => {
@@ -70,5 +94,8 @@ function fitUploadPlugin() {
 }
 
 export default defineConfig({
-    plugins: [fitUploadPlugin()]
+    plugins: [fitUploadPlugin()],
+    test: {
+        environment: 'node',
+    },
 })
