@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Garmin Connect Activities Sync
 // @namespace    https://connect.garmin.com/
-// @version      1.6
+// @version      1.7
 // @description  Activities lista riport + NEW aktivitások egyszerre megnyitása auto letöltéshez
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
@@ -61,6 +61,42 @@
                 onerror: () => reject(new Error(`Hálózati hiba: ${url}`)),
             });
         });
+    }
+
+    function httpRequestArrayBuffer(method, url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method,
+                url,
+                responseType: 'arraybuffer',
+                onload: (response) => {
+                    if (response.status < 200 || response.status >= 300) {
+                        reject(new Error(`HTTP ${response.status} ${url}`));
+                        return;
+                    }
+
+                    resolve({
+                        data: response.response,
+                        contentType: response.responseHeaders?.match(/content-type:\s*([^\r\n;]+)/i)?.[1] || 'application/pdf',
+                    });
+                },
+                onerror: () => reject(new Error(`Hálózati hiba: ${url}`)),
+            });
+        });
+    }
+
+    async function downloadResultsPdf() {
+        const res = await httpRequestArrayBuffer('GET', `${API_BASE}/download_results_pdf`);
+        const blob = new Blob([res.data], { type: res.contentType || 'application/pdf' });
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+        a.href = objectUrl;
+        a.download = `download-results-${ts}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
     }
 
     function getActivityRows() {
@@ -256,6 +292,21 @@
         runBtn.style.padding = '8px 10px';
         runBtn.style.cursor = 'pointer';
         runBtn.style.fontWeight = '600';
+        runBtn.style.display = 'block';
+        runBtn.style.width = '100%';
+
+        const pdfBtn = document.createElement('button');
+        pdfBtn.textContent = 'Download Results PDF';
+        pdfBtn.style.border = 'none';
+        pdfBtn.style.borderRadius = '8px';
+        pdfBtn.style.background = '#2563eb';
+        pdfBtn.style.color = 'white';
+        pdfBtn.style.padding = '8px 10px';
+        pdfBtn.style.cursor = 'pointer';
+        pdfBtn.style.fontWeight = '600';
+        pdfBtn.style.display = 'block';
+        pdfBtn.style.width = '100%';
+        pdfBtn.style.marginTop = '8px';
 
         runBtn.addEventListener('click', async () => {
             runBtn.disabled = true;
@@ -283,9 +334,27 @@
             }
         });
 
+        pdfBtn.addEventListener('click', async () => {
+            pdfBtn.disabled = true;
+            pdfBtn.style.opacity = '0.7';
+            status.textContent = 'PDF készítése és letöltése...';
+
+            try {
+                await downloadResultsPdf();
+                status.textContent = 'PDF letöltve.';
+            } catch (err) {
+                console.error('[Activities Sync] PDF hiba:', err);
+                status.textContent = `PDF hiba: ${err instanceof Error ? err.message : String(err)}`;
+            } finally {
+                pdfBtn.disabled = false;
+                pdfBtn.style.opacity = '1';
+            }
+        });
+
         panel.appendChild(title);
         panel.appendChild(status);
         panel.appendChild(runBtn);
+        panel.appendChild(pdfBtn);
         document.body.appendChild(panel);
     }
 

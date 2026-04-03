@@ -1,9 +1,10 @@
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite'
 import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
+import PDFDocument from 'pdfkit'
 import { resolve } from 'node:path'
 import { dirname, join } from 'node:path'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { processBuffer } from './server/fitPipeline'
 import { ActivityStatus, createActivityStore, type ActivityInput } from './server/activityStore'
@@ -112,6 +113,124 @@ function handleOptions(req: IncomingMessage, res: ServerResponse): boolean {
     res.statusCode = 204
     res.end()
     return true
+}
+
+interface ResultTextEntry {
+    dateKey: string
+    activityId: string
+    filePath: string
+    text: string
+}
+
+async function collectTxtFilesRecursive(rootDir: string): Promise<string[]> {
+    const files: string[] = []
+
+    async function walk(currentDir: string): Promise<void> {
+        let entries
+        try {
+            entries = await readdir(currentDir, { withFileTypes: true })
+        } catch {
+            return
+        }
+
+        for (const entry of entries) {
+            const fullPath = join(currentDir, entry.name)
+            if (entry.isDirectory()) {
+                await walk(fullPath)
+                continue
+            }
+
+            if (entry.isFile() && entry.name.toLowerCase().endsWith('.txt')) {
+                files.push(fullPath)
+            }
+        }
+    }
+
+    await walk(rootDir)
+    return files
+}
+
+function extractDateAndIdFromPath(filePath: string): { dateKey: string; activityId: string } {
+    const normalized = filePath.replace(/\\/g, '/')
+    const pathMatch = normalized.match(/\/(\d{4}-\d{2})\/(\d{2})\/(\d+)\.txt$/)
+    if (pathMatch) {
+        return {
+            dateKey: `${pathMatch[1]}-${pathMatch[2]}`,
+            activityId: pathMatch[3],
+        }
+    }
+
+    const fileNameMatch = normalized.match(/\/(\d+)\.txt$/)
+    return {
+        dateKey: 'ismeretlen-datum',
+        activityId: fileNameMatch ? fileNameMatch[1] : 'ismeretlen-activity',
+    }
+}
+
+async function collectResultTextEntries(rootDir: string): Promise<ResultTextEntry[]> {
+    const txtFiles = await collectTxtFilesRecursive(rootDir)
+    const entries: ResultTextEntry[] = []
+
+    for (const filePath of txtFiles) {
+        const { dateKey, activityId } = extractDateAndIdFromPath(filePath)
+        const text = await readFile(filePath, 'utf-8')
+        entries.push({
+            dateKey,
+            activityId,
+            filePath,
+            text,
+        })
+    }
+
+    entries.sort((a, b) => {
+        if (a.dateKey !== b.dateKey) return a.dateKey.localeCompare(b.dateKey)
+        return a.activityId.localeCompare(b.activityId)
+    })
+
+    return entries
+}
+
+async function buildResultsPdf(entries: ResultTextEntry[]): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ margin: 50, autoFirstPage: true })
+        const chunks: Buffer[] = []
+
+        doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
+        doc.on('end', () => resolve(Buffer.concat(chunks)))
+        doc.on('error', reject)
+
+        doc.fontSize(18).text('Garmin Download Results', { underline: true })
+        doc.moveDown(0.5)
+        doc.fontSize(10).fillColor('gray').text(`Generated: ${new Date().toISOString()}`)
+        doc.moveDown()
+        doc.fillColor('black')
+
+        if (entries.length === 0) {
+            doc.fontSize(12).text('Nincs elerheto TXT eredmeny fajl a data mappaban.')
+            doc.end()
+            return
+        }
+
+        let currentDate = ''
+        for (const entry of entries) {
+            if (entry.dateKey !== currentDate) {
+                currentDate = entry.dateKey
+                doc.moveDown(0.8)
+                doc.fontSize(14).fillColor('black').text(`${currentDate}`, { underline: true })
+                doc.moveDown(0.3)
+            }
+
+            doc.fontSize(11).fillColor('black').text(`Activity: ${entry.activityId}`)
+            doc.fontSize(9).fillColor('gray').text(`Forras: ${entry.filePath}`)
+            doc.moveDown(0.2)
+            doc.fontSize(10).fillColor('black').text(entry.text || '(ures)', {
+                lineGap: 1,
+            })
+            doc.moveDown(0.8)
+        }
+
+        doc.end()
+    })
 }
 
 function fitUploadPlugin(): Plugin {
@@ -275,6 +394,35 @@ function fitUploadPlugin(): Plugin {
                     res.statusCode = 422
                     res.setHeader('Content-Type', 'application/json')
                     res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+                }
+            })
+
+            server.middlewares.use('/api/download_results_pdf', async (req, res) => {
+                if (handleOptions(req, res)) return
+                setCorsHeaders(res)
+
+                if (req.method !== 'GET') {
+                    res.statusCode = 405
+                    res.end('Method Not Allowed')
+                    return
+                }
+
+                try {
+                    const entries = await collectResultTextEntries(ARCHIVE_DIR)
+                    const pdfBuffer = await buildResultsPdf(entries)
+                    const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)
+
+                    res.statusCode = 200
+                    res.setHeader('Content-Type', 'application/pdf')
+                    res.setHeader('Content-Disposition', `attachment; filename="download-results-${stamp}.pdf"`)
+                    res.end(pdfBuffer)
+                } catch (err) {
+                    res.statusCode = 500
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                    res.end(JSON.stringify({
+                        ok: false,
+                        error: err instanceof Error ? err.message : String(err),
+                    }))
                 }
             })
 

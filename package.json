@@ -31,6 +31,8 @@
   },
   "dependencies": {
     "@garmin/fitsdk": "^21.195.0",
-    "adm-zip": "^0.5.16"
+    "@types/pdfkit": "^0.17.5",
+    "adm-zip": "^0.5.16",
+    "pdfkit": "^0.18.0"
   }
 }
