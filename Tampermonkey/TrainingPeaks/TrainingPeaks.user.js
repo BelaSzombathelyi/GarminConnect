@@ -329,6 +329,52 @@
     return Number(numeric);
   }
 
+  function getTotalHitsSnapshot() {
+    const totalHitsEl = document.querySelector(SELECTORS.totalHits);
+    const text = totalHitsEl?.textContent?.trim() || "";
+    const count = parseResultCount(text);
+
+    if (!totalHitsEl || count === null) {
+      return null;
+    }
+
+    return { count, text };
+  }
+
+  async function waitForNonZeroResultCount(timeoutMs = 20000, intervalMs = 300) {
+    const snapshot = await waitForCondition(
+      () => {
+        const current = getTotalHitsSnapshot();
+        return current && current.count > 0 ? current : null;
+      },
+      timeoutMs,
+      intervalMs,
+      "non-zero search results",
+    );
+
+    log(`Találatok szama (0 utan): ${snapshot.text}`);
+    return snapshot.count;
+  }
+
+  async function waitForResultCountChange(
+    previousCount,
+    timeoutMs = 10000,
+    intervalMs = 250,
+  ) {
+    const snapshot = await waitForCondition(
+      () => {
+        const current = getTotalHitsSnapshot();
+        return current && current.count !== previousCount ? current : null;
+      },
+      timeoutMs,
+      intervalMs,
+      "search result count change",
+    );
+
+    log(`Találatok szama valtozott: ${snapshot.text}`);
+    return snapshot.count;
+  }
+
   function waitForTotalHits(
     timeoutMs = 20000,
     intervalMs = 300,
@@ -865,16 +911,30 @@
       log("Search gomb kattintva");
 
       await ensureAdvancedSearchOpen();
+
+      let initialResultCount = 0;
+      try {
+        // Fo vezervonal: ha kezdetben 0 a talalat, varunk amig valtozik valamire.
+        initialResultCount = await waitForNonZeroResultCount(20000, 300);
+      } catch {
+        // Fallback: ha nem lett nem-zero, a jelenlegi ismert talalatszammal megyunk tovabb.
+        initialResultCount = await waitForTotalHits(15000);
+      }
+
+      log(`Kezdeti talalatszam elmentve: ${initialResultCount}`);
+
       await setEndDateToTodayIfNeeded(HANDLE_FUTURE_EVENTS);
 
-      const resultCount = await waitForTotalHits(15000);
-      log(`Advanced eredmenyek megjelentek, talalatok szama: ${resultCount}`);
-      log("Keresesi eredmenyek betoltodtek");
-
-      if (resultCount === 0) {
-        log("Nincs talalat, sorok logolasa kihagyva");
-        return;
+      let resultCount = initialResultCount;
+      try {
+        // Datum allitas utan max 10s-ig varunk, hogy valtozzon a talalatszam.
+        resultCount = await waitForResultCountChange(initialResultCount, 10000);
+      } catch {
+        log("Talalatszam 10s alatt nem valtozott, tovabblepes a sorokra");
       }
+
+      log(`Advanced eredmenyek aktualis talalatszama: ${resultCount}`);
+      log("Keresesi eredmenyek betoltodtek");
 
       await waitForRows(15000);
       log("Sorok betoltodtek (lazy load kesleltetesbol kilepve)");
