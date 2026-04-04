@@ -1,8 +1,7 @@
 Súly:          75.3 kg
 Magasság:      1.78 m
-Alvási idő:    20:05
+Elalvás időpontja: 20:05
 Ébredési idő:  05:40 (9 ó 35 p)
-Edzés kezdete: 2026. 03. 01. 8:30:28
 
 --- Edzés összefoglaló ---
 Sport profil:          Futás
@@ -10,6 +9,8 @@ Sport:                 running
 Alsport:               generic
 Kezdés:                2026. 03. 01. 8:30:28
 Befejezés:             2026. 03. 01. 15:22:09
+Össz. emelkedés:       215 m
+Össz. süllyedés:       214 m
 Kalória:               3594 kcal
 Metabolikus kalória:   591 kcal
 Átl. pulzus:           116 bpm
@@ -17,28 +18,28 @@ Max. pulzus:           134 bpm
 Átl. futókadencia:     162 lép/p
 Max. futókadencia:     218 lép/p
 Össz. lépés:           33055
-Átl. hőmérséklet:      16 °C
-Max. hőmérséklet:      23 °C
-Min. hőmérséklet:      11 °C
+Atl. kar homerseklet:  16 °C
+Max. kar homerseklet:  23 °C
+Min. kar homerseklet:  11 °C
 Átl. légzés:           28.5 l/p
 Max. légzés:           41.6 l/p
 Min. légzés:           14.3 l/p
-Átl. lépéshossz:       770.30 m
+Átl. lépéshossz:       770.30 mm
 Átl. talajérintés:     306 ms
 Talajérintés %:        42.5 %
 Talajérintés bal/jobb: 52.2 %
 Vert. arány:           8.7 %
-Közérzet:              50 %
-RPE:                   9/10 – Rendkívül nehéz
+Önértékelés/Közérzet:  Normál
+Önértékelés/RPE:       9/10 - Majdnem maxon vagyok. EX-AN
 Aerob edzéshatás:      3.8 / 5.0 – Fejlődés
 Anaerob edzéshatás:    0.0 / 5.0 – Nincs hatás
 Edzésterhelés (peak):  171.8
-Futás idő: 384:56
-Séta idő: 21:47
-Állás idő: 4:58
+Futás idő:            384:56
+Séta idő:             21:47
+Állás idő:            4:58
 
 körök (nem feltétlenül egységes km-ek) (összesen 100 kör)
-#,Táv (km),Pace (min/km),Emelkedés (m),Süllyedés (m),Kadencia (lép/p),Max kadencia,Lépéshossz (m),Vert. osz. (mm),Talajérintés (ms),Vert. arány (%),Átl. légzés (l/p),Max. légzés (l/p)
+#,Táv (km),Pace (min/km),Emelkedés (m),Süllyedés (m),Kadencia (lép/p),Max kadencia,Lépéshossz (mm),Vert. osz. (mm),Talajérintés (ms),Vert. arány (%),Átl. légzés (l/p),Max. légzés (l/p)
 1.,1,0:15,0,0,176,182,827.00,66.2,276,7.8,32.2,35.4
 2.,1,0:15,10,0,170,178,779.50,65.5,299,8.3,31.5,36.9
 3.,0.347,0:15,8,0,166,170,760.80,67.3,312,8.7,28.7,31.4
