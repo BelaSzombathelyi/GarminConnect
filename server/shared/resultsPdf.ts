@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit'
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 
 interface ResultTextEntry {
@@ -25,6 +26,30 @@ interface ParsedTextMeta {
     startIso: string | null
     dayKey: string | null
     startTimeLabel: string
+}
+
+function sanitizeForPdf(value: string): string {
+    const raw = String(value ?? '')
+
+    // Remove ASCII/C1 control chars except common whitespace controls.
+    return raw.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+}
+
+function resolvePdfFontPath(): string | null {
+    const candidates = [
+        '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+        '/System/Library/Fonts/Supplemental/Arial Unicode MS.ttf',
+        '/System/Library/Fonts/Supplemental/Times New Roman.ttf',
+        '/Library/Fonts/Arial Unicode.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+    ]
+
+    for (const fontPath of candidates) {
+        if (existsSync(fontPath)) return fontPath
+    }
+
+    return null
 }
 
 function pad2(value: number): string {
@@ -174,24 +199,30 @@ export async function buildResultsPdf(entries: ResultTextEntry[]): Promise<Buffe
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ margin: 50, autoFirstPage: true })
         const chunks: Buffer[] = []
+        const fontPath = resolvePdfFontPath()
 
         doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
         doc.on('end', () => resolve(Buffer.concat(chunks)))
         doc.on('error', reject)
 
-        doc.fontSize(18).text('Garmin Download Results', { underline: true })
+        // Embedded Unicode font keeps Hungarian accents readable in generated PDFs.
+        if (fontPath) {
+            doc.font(fontPath)
+        }
+
+        doc.fontSize(18).text(sanitizeForPdf('Garmin Download Results'), { underline: true })
         doc.moveDown(0.5)
-        doc.fontSize(10).fillColor('gray').text(`Generated: ${new Date().toISOString()}`)
+        doc.fontSize(10).fillColor('gray').text(sanitizeForPdf(`Generated: ${new Date().toISOString()}`))
         doc.moveDown()
         doc.fillColor('black')
 
         if (entries.length === 0) {
-            doc.fontSize(12).text('Nincs elerheto TXT eredmeny fajl a data mappaban.')
+            doc.fontSize(12).text(sanitizeForPdf('Nincs elerheto TXT eredmeny fajl a data mappaban.'))
             doc.end()
             return
         }
 
-        doc.fontSize(14).fillColor('black').text('Tartalomjegyzék', { underline: true })
+        doc.fontSize(14).fillColor('black').text(sanitizeForPdf('Tartalomjegyzék'), { underline: true })
         doc.moveDown(0.5)
 
         let currentMonthKey = ''
@@ -201,16 +232,16 @@ export async function buildResultsPdf(entries: ResultTextEntry[]): Promise<Buffe
                 currentMonthKey = entry.monthKey
                 currentDayKey = ''
                 doc.moveDown(0.4)
-                doc.fontSize(12).fillColor('black').text(`${currentMonthKey}`)
+                doc.fontSize(12).fillColor('black').text(sanitizeForPdf(`${currentMonthKey}`))
             }
 
             if (entry.dayKey !== currentDayKey) {
                 currentDayKey = entry.dayKey
-                doc.fontSize(10).fillColor('black').text(`  ${currentDayKey}`)
+                doc.fontSize(10).fillColor('black').text(sanitizeForPdf(`  ${currentDayKey}`))
             }
 
             doc.fontSize(10).fillColor('#1d4ed8').text(
-                `    ${entry.startTimeLabel} [${entry.activityTypeLabel}] #${entry.activityId}`,
+                sanitizeForPdf(`    ${entry.startTimeLabel} [${entry.activityTypeLabel}] #${entry.activityId}`),
                 { goTo: entry.pdfDestination },
             )
         }
@@ -222,16 +253,16 @@ export async function buildResultsPdf(entries: ResultTextEntry[]): Promise<Buffe
             if (entry.dayKey !== currentDate) {
                 currentDate = entry.dayKey
                 doc.moveDown(0.8)
-                doc.fontSize(14).fillColor('black').text(`${currentDate}`, { underline: true })
+                doc.fontSize(14).fillColor('black').text(sanitizeForPdf(`${currentDate}`), { underline: true })
                 doc.moveDown(0.3)
             }
 
             doc.fontSize(11).fillColor('black').text(
-                `Activity: ${entry.activityId} | Típus: ${entry.activityTypeLabel} | Kezdés: ${entry.startTimeLabel}`,
+                sanitizeForPdf(`Activity: ${entry.activityId} | Típus: ${entry.activityTypeLabel} | Kezdés: ${entry.startTimeLabel}`),
                 { destination: entry.pdfDestination },
             )
             doc.moveDown(0.2)
-            doc.fontSize(10).fillColor('black').text(entry.text || '(ures)', {
+            doc.fontSize(10).fillColor('black').text(sanitizeForPdf(entry.text || '(ures)'), {
                 lineGap: 1,
             })
             doc.moveDown(0.8)
