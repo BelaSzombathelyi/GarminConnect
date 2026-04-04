@@ -9,6 +9,7 @@ const TEST_FILES = [
     { name: 'Vivicitta',       file: 'Vivicitta.zip' },
     { name: 'BSzM 4',          file: 'BSzM 4.zip' },
     { name: 'VO2max interval', file: 'VO2 max - SUM 20p 4x5 min, 04_05.zip' },
+    { name: 'Solymár - 3fél óra terepen', file: 'Solymár - 3fél óra terepen.zip' },
 ]
 
 for (const { name, file } of TEST_FILES) {

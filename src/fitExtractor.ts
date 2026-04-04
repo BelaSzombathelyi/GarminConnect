@@ -13,6 +13,7 @@ export function buildTextOutput(data: FitUploadResponse, mergeShortWalks = false
         extractSession(data),
         extractLaps(data),
         extractSplits(data, mergeShortWalks),
+        extractTrailClimbInfo(data),
     ].filter(Boolean).join('\n\n');
 }
 
@@ -607,4 +608,78 @@ export function extractUserProfile(data: FitUploadResponse): string {
     ];
 
     return lines.join('\n');
+}
+
+function extractTrailClimbInfo(data: FitUploadResponse): string {
+    const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0]
+    if (!session) return ''
+
+    const sport = String(session['sport'] ?? '').toLowerCase()
+    const subSport = String(session['subSport'] ?? '').toLowerCase()
+    const isTrail = sport === 'running' && (subSport === 'trail' || subSport.includes('trail'))
+    if (!isTrail) return ''
+
+    const lines: string[] = ['--- Climb információk ---']
+
+    const summaries = data.messages['splitSummaryMesgs'] as Record<string, unknown>[] | undefined
+    if (summaries && summaries.length > 0) {
+        const ascent = summaries.find((s) => String(s['splitType']) === 'ascentSplit')
+        const descent = summaries.find((s) => String(s['splitType']) === 'descentSplit')
+
+        if (ascent) {
+            const count = typeof ascent['numSplits'] === 'number' ? ascent['numSplits'] : '–'
+            const dist = km(ascent['totalDistance'])
+            const gain = num(ascent['totalAscent'], 0)
+            const time = typeof ascent['totalTimerTime'] === 'number' ? formatSeconds(ascent['totalTimerTime'] as number) : '–'
+            lines.push(`Emelkedő szegmensek:   ${count} db | táv: ${dist} km | +szint: ${gain} m | idő: ${time}`)
+        }
+
+        if (descent) {
+            const count = typeof descent['numSplits'] === 'number' ? descent['numSplits'] : '–'
+            const dist = km(descent['totalDistance'])
+            const loss = num(descent['totalDescent'], 0)
+            const time = typeof descent['totalTimerTime'] === 'number' ? formatSeconds(descent['totalTimerTime'] as number) : '–'
+            lines.push(`Lejtő szegmensek:      ${count} db | táv: ${dist} km | -szint: ${loss} m | idő: ${time}`)
+        }
+    }
+
+    const climbMessageCounts = Object.entries(data.messages)
+        .filter(([key, items]) => /climb/i.test(key) && Array.isArray(items) && items.length > 0)
+        .map(([key, items]) => `${key}: ${items.length}`)
+
+    if (climbMessageCounts.length > 0) {
+        lines.push('FIT climb üzenetek:')
+        for (const item of climbMessageCounts) {
+            lines.push(`  - ${item}`)
+        }
+    }
+
+    const climbPro = data.messages['climbProMesgs'] as Record<string, unknown>[] | undefined
+    if (climbPro && climbPro.length > 0) {
+        lines.push('')
+        lines.push(`ClimbPro részletek (${climbPro.length} üzenet):`)
+        lines.push('#,Időpont,Climb#,Esemény,Kategória,Táv (km)')
+
+        const detailRows = climbPro
+            .slice()
+            .sort((a, b) => {
+                const ta = toDate(a['timestamp'])?.getTime() ?? 0
+                const tb = toDate(b['timestamp'])?.getTime() ?? 0
+                return ta - tb
+            })
+
+        for (let i = 0; i < detailRows.length; i++) {
+            const item = detailRows[i]
+            const ts = toDate(item['timestamp'])
+            const timeLabel = ts ? ts.toLocaleString('hu-HU') : '–'
+            const climbNo = typeof item['climbNumber'] === 'number' ? String(item['climbNumber']) : '–'
+            const event = typeof item['climbProEvent'] === 'string' ? item['climbProEvent'] : '–'
+            const category = typeof item['climbCategory'] === 'number' ? String(item['climbCategory']) : '–'
+            const distanceKm = typeof item['currentDist'] === 'number' ? km(item['currentDist']) : '–'
+
+            lines.push(`${i + 1},${timeLabel},${climbNo},${event},${category},${distanceKm}`)
+        }
+    }
+
+    return lines.length > 1 ? lines.join('\n') : ''
 }
