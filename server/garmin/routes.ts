@@ -95,7 +95,7 @@ async function cleanupIncompleteActivities(
 ): Promise<void> {
     const incomplete = activityStore.getAllNonProcessed()
     if (incomplete.length === 0) {
-        console.log('[cleanup] 0 félbehagyott rekord törölve (0 fájl)')
+        console.log('[cleanup] 0 félbehagyott rekord törölve')
         return
     }
 
@@ -105,8 +105,6 @@ async function cleanupIncompleteActivities(
         expectedFiles.add(`${id}.zip`)
         expectedFiles.add(`${id}.txt`)
     }
-
-    let deletedFiles = 0
 
     async function walkAndDelete(dir: string): Promise<void> {
         let entries
@@ -127,7 +125,6 @@ async function cleanupIncompleteActivities(
 
             try {
                 await unlink(fullPath)
-                deletedFiles++
             } catch {
                 // fájl nem létezik, nem baj
             }
@@ -137,7 +134,7 @@ async function cleanupIncompleteActivities(
     await walkAndDelete(archiveDir)
 
     activityStore.deleteActivities(ids)
-    console.log(`[cleanup] ${ids.length} félbehagyott rekord törölve (${deletedFiles} fájl)`)
+    console.log(`[cleanup] ${ids.length} félbehagyott rekord törölve`)
 }
 
 export function registerGarminRoutes(server: ViteDevServer, options: RegisterGarminRoutesOptions): void {

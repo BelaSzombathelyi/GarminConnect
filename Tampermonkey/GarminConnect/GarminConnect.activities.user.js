@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Garmin Connect Activities Sync
 // @namespace    https://connect.garmin.com/
-// @version      1.8
-// @description  Activities lista riport + NEW aktivitások egyszerre megnyitása auto letöltéshez
+// @version      1.9
+// @description  Activities lista riport + ÚJ aktivitások egyszerre megnyitása auto letöltéshez
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
 // @match        https://connect.garmin.com/app/activities?*
@@ -22,6 +22,8 @@
         visibleActivityIds: new Set(),
         lastVisibleSignature: '',
         lastReportedSignature: '',
+        lastRouteKey: '',
+        routePollTimer: null,
         autoReportTimer: null,
         runBtn: null,
         statusEl: null,
@@ -156,6 +158,32 @@
 
     function buildIdSignature(idSet) {
         return Array.from(idSet).sort().join(',');
+    }
+
+    function getRouteKey() {
+        return `${location.pathname}${location.search}`;
+    }
+
+    function resetListSyncStateForRouteChange() {
+        UI_STATE.knownReportedIds.clear();
+        UI_STATE.serverNewIds.clear();
+        UI_STATE.visibleActivityIds.clear();
+        UI_STATE.lastVisibleSignature = '';
+        UI_STATE.lastReportedSignature = '';
+
+        if (UI_STATE.autoReportTimer !== null) {
+            clearTimeout(UI_STATE.autoReportTimer);
+            UI_STATE.autoReportTimer = null;
+        }
+    }
+
+    function handleRouteChangeIfNeeded() {
+        const routeKey = getRouteKey();
+        if (routeKey === UI_STATE.lastRouteKey) return false;
+
+        UI_STATE.lastRouteKey = routeKey;
+        resetListSyncStateForRouteChange();
+        return true;
     }
 
     function syncVisibleActivityState() {
@@ -335,6 +363,7 @@
 
         UI_STATE.refreshTimer = setTimeout(() => {
             UI_STATE.refreshTimer = null;
+            handleRouteChangeIfNeeded();
             const snapshot = syncVisibleActivityState();
             refreshSyncButtonState(snapshot.activities.length);
             if (snapshot.changed) {
@@ -375,7 +404,7 @@
         runBtn.textContent = 'Letöltés';
         statusEl.textContent = syncPending > 0
             ? `Szinkronizálás... (${syncPending} sor ellenőrzése)`
-            : `Betöltve: ${loadedCount}, nincs NEW aktivitás`;
+            : `Betöltve: ${loadedCount}, nincs új aktivitás`;
     }
 
     function startActivityListDetection() {
@@ -383,8 +412,9 @@
             return;
         }
 
-        const firstRow = getActivityRows()[0];
-        const root = firstRow?.parentElement || document.body;
+        UI_STATE.lastRouteKey = getRouteKey();
+
+        const root = document.body;
 
         UI_STATE.observer = new MutationObserver(() => {
             scheduleUiRefresh();
@@ -398,6 +428,15 @@
         });
 
         window.addEventListener('scroll', scheduleUiRefresh, { passive: true });
+
+        if (UI_STATE.routePollTimer === null) {
+            UI_STATE.routePollTimer = setInterval(() => {
+                if (handleRouteChangeIfNeeded()) {
+                    scheduleUiRefresh();
+                }
+            }, 500);
+        }
+
         scheduleUiRefresh();
     }
 
@@ -484,10 +523,10 @@
 
                 const downloadIds = Array.from(UI_STATE.serverNewIds);
                 if (downloadIds.length === 0) {
-                    status.textContent = 'Nincs NEW aktivitás.';
+                    status.textContent = 'Nincs új aktivitás.';
                 } else {
                     UI_STATE.serverNewIds.clear();
-                    status.textContent = `${downloadIds.length} NEW aktivitás megnyitása (max 2 párhuzamos lap)...`;
+                    status.textContent = `${downloadIds.length} új aktivitás megnyitása (max 2 párhuzamos lap)...`;
                     const activities = downloadIds.map((id) => ({ activityId: id }));
                     await openNewActivitiesWithConcurrency(activities, status, 2);
                     status.textContent = `Megnyitás kész: ${downloadIds.length} aktivitás.`;
@@ -541,7 +580,7 @@
             UI_STATE.lastReportedSignature = buildIdSignature(buildActivityIdSet(initialActivities));
             const statusEl = document.getElementById('gc-sync-status');
             if (statusEl) {
-                statusEl.textContent = `Automatikus riport kész (NEW: ${UI_STATE.serverNewIds.size})`;
+                statusEl.textContent = `Automatikus riport kész (ÚJ: ${UI_STATE.serverNewIds.size})`;
             }
 
             scheduleUiRefresh();

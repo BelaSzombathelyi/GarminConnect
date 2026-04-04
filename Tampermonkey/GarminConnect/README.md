@@ -106,7 +106,7 @@ Ez egy külön userscript, ami az activities lista oldalon fut:
 A script az oldal jobb alsó sarkába betesz egy kis panelt:
 
 - státusz sor
-- gomb: `Riport + NEW letöltések`
+- gomb: `Újak letöltése`
 
 Az oldal megnyitásakor egyszer automatikusan lefut a riport küldés.
 
