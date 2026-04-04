@@ -95,6 +95,9 @@ export function createActivityStore(dbFilePath: string) {
         WHERE activity_id = ?
         LIMIT 1
     `)
+    const getStatusByIdStmt = db.prepare(`
+        SELECT status FROM activities WHERE activity_id = ? LIMIT 1
+    `)
     const markStatusStmt = db.prepare(`
         UPDATE activities
         SET status = ?, updated_at = ?, processed_datetime = ?
@@ -105,6 +108,12 @@ export function createActivityStore(dbFilePath: string) {
         SET status = ?, updated_at = ?, processed_datetime = NULL, download_file_name = ?
         WHERE activity_id = ?
     `)
+    const getAllNonProcessedStmt = db.prepare(`
+        SELECT activity_id AS activityId, date
+        FROM activities
+        WHERE status != ?
+    `)
+    const deleteByIdStmt = db.prepare('DELETE FROM activities WHERE activity_id = ?')
 
     return {
         upsertActivities(activities: ActivityInput[]) {
@@ -160,6 +169,13 @@ export function createActivityStore(dbFilePath: string) {
             return row ?? null
         },
 
+        filterDownloadable(activityIds: string[]): string[] {
+            return activityIds.filter((id) => {
+                const row = getStatusByIdStmt.get(id) as { status: string } | undefined
+                return !row || row.status !== ActivityStatus.PROCESSED
+            })
+        },
+
         markProcessed(activityId: string | number): void {
             markStatusStmt.run(ActivityStatus.PROCESSED, nowIso(), nowIso(), String(activityId))
         },
@@ -171,6 +187,23 @@ export function createActivityStore(dbFilePath: string) {
                 String(fileName ?? ''),
                 String(activityId),
             )
+        },
+
+        getAllNonProcessed(): Array<{ activityId: string; date: string }> {
+            return getAllNonProcessedStmt.all(ActivityStatus.PROCESSED) as Array<{ activityId: string; date: string }>
+        },
+
+        deleteActivities(ids: string[]): void {
+            db.exec('BEGIN')
+            try {
+                for (const id of ids) {
+                    deleteByIdStmt.run(id)
+                }
+                db.exec('COMMIT')
+            } catch (err) {
+                db.exec('ROLLBACK')
+                throw err
+            }
         },
     }
 }

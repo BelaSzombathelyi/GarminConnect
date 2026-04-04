@@ -1,6 +1,6 @@
 import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
-import { FitUploadResponse, buildTextOutput } from '../src/fitExtractor'
+import { FitUploadResponse, buildTextOutput } from '../../src/fitExtractor'
 
 export interface ProcessResult {
     text: string

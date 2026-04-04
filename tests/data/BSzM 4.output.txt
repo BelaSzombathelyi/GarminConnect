@@ -18,9 +18,9 @@ Max. pulzus:           134 bpm
 Átl. futókadencia:     162 lép/p
 Max. futókadencia:     218 lép/p
 Össz. lépés:           33055
-Atl. kar homerseklet:  16 °C
-Max. kar homerseklet:  23 °C
-Min. kar homerseklet:  11 °C
+Átl. kar hőmérséklet:  16 °C
+Max. kar hőmérséklet:  23 °C
+Min. kar hőmérséklet:  11 °C
 Átl. légzés:           28.5 l/p
 Max. légzés:           41.6 l/p
 Min. légzés:           14.3 l/p

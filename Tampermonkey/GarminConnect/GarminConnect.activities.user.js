@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Garmin Connect Activities Sync
 // @namespace    https://connect.garmin.com/
-// @version      1.7
+// @version      1.8
 // @description  Activities lista riport + NEW aktivitások egyszerre megnyitása auto letöltéshez
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
+// @match        https://connect.garmin.com/app/activities?*
 // @grant        GM_xmlhttpRequest
 // @connect      localhost
 // @connect      127.0.0.1
@@ -14,7 +15,19 @@
     'use strict';
 
     const API_BASE = 'http://localhost:5173/api';
-    const NEW_LIMIT = 25;
+    const UI_STATE = {
+        runInProgress: false,
+        knownReportedIds: new Set(),
+        serverNewIds: new Set(),
+        visibleActivityIds: new Set(),
+        lastVisibleSignature: '',
+        lastReportedSignature: '',
+        autoReportTimer: null,
+        runBtn: null,
+        statusEl: null,
+        observer: null,
+        refreshTimer: null,
+    };
 
     function waitForElement(selector, timeoutMs = 15000) {
         const pollMs = 250;
@@ -137,8 +150,75 @@
         return Array.from(uniqueById.values());
     }
 
-    async function reportActivities() {
+    function buildActivityIdSet(activities) {
+        return new Set(activities.map((a) => String(a.activityId || '').trim()).filter(Boolean));
+    }
+
+    function buildIdSignature(idSet) {
+        return Array.from(idSet).sort().join(',');
+    }
+
+    function syncVisibleActivityState() {
         const activities = collectActivitiesFromDom();
+        const idSet = buildActivityIdSet(activities);
+        const signature = buildIdSignature(idSet);
+        const changed = signature !== UI_STATE.lastVisibleSignature;
+
+        if (changed) {
+            UI_STATE.visibleActivityIds = idSet;
+            UI_STATE.lastVisibleSignature = signature;
+        }
+
+        return { activities, idSet, signature, changed };
+    }
+
+    function getPendingActivities() {
+        const activities = collectActivitiesFromDom();
+        return activities.filter((a) => !UI_STATE.knownReportedIds.has(String(a.activityId)));
+    }
+
+    function markActivitiesAsReported(activities) {
+        for (const activity of activities) {
+            UI_STATE.knownReportedIds.add(String(activity.activityId));
+        }
+    }
+
+    function applyReportResult(res) {
+        const ids = Array.isArray(res.newActivityIds) ? res.newActivityIds : [];
+        UI_STATE.serverNewIds = new Set(ids.map(String));
+    }
+
+    function scheduleAutoReport(force = false) {
+        if (UI_STATE.autoReportTimer !== null) return;
+        if (UI_STATE.runInProgress) return;
+
+        const snapshot = syncVisibleActivityState();
+        const hasUnreported = snapshot.activities.some((a) => !UI_STATE.knownReportedIds.has(String(a.activityId)));
+        const shouldReport = force || snapshot.changed || hasUnreported || snapshot.signature !== UI_STATE.lastReportedSignature;
+        if (!shouldReport || snapshot.activities.length === 0) return;
+
+        UI_STATE.autoReportTimer = setTimeout(async () => {
+            UI_STATE.autoReportTimer = null;
+            if (UI_STATE.runInProgress) return;
+
+            const latest = syncVisibleActivityState();
+            if (latest.activities.length === 0) return;
+
+            try {
+                const res = await reportActivities(latest.activities);
+                markActivitiesAsReported(latest.activities);
+                applyReportResult(res);
+                UI_STATE.lastReportedSignature = latest.signature;
+            } catch {
+                // silent – next scroll/refresh újrapróbálja
+            }
+
+            refreshSyncButtonState();
+        }, 1500);
+    }
+
+    async function reportActivities(activitiesOverride) {
+        const activities = Array.isArray(activitiesOverride) ? activitiesOverride : collectActivitiesFromDom();
         if (activities.length === 0) {
             throw new Error('Nem találtam activity sorokat az oldalon.');
         }
@@ -147,13 +227,6 @@
         const res = await httpRequest('POST', `${API_BASE}/report_activities`, payload);
         console.log('[Activities Sync] report_activities:', res);
         return res;
-    }
-
-    async function getNewActivities(limit = NEW_LIMIT) {
-        const res = await httpRequest('GET', `${API_BASE}/get_new_activities?limit=${encodeURIComponent(String(limit))}`);
-        const activities = Array.isArray(res.activities) ? res.activities : [];
-        console.log('[Activities Sync] get_new_activities:', activities.length);
-        return activities;
     }
 
     function waitForActivitiesTabActive(childWindowRef, timeoutMs = 120000) {
@@ -255,6 +328,79 @@
         }
     }
 
+    function scheduleUiRefresh() {
+        if (UI_STATE.refreshTimer !== null) {
+            clearTimeout(UI_STATE.refreshTimer);
+        }
+
+        UI_STATE.refreshTimer = setTimeout(() => {
+            UI_STATE.refreshTimer = null;
+            const snapshot = syncVisibleActivityState();
+            refreshSyncButtonState(snapshot.activities.length);
+            if (snapshot.changed) {
+                scheduleAutoReport(true);
+            } else {
+                scheduleAutoReport(false);
+            }
+        }, 200);
+    }
+
+    function refreshSyncButtonState(loadedCountOverride) {
+        const runBtn = UI_STATE.runBtn;
+        const statusEl = UI_STATE.statusEl;
+        if (!runBtn || !statusEl) {
+            return;
+        }
+
+        const loadedCount = Number.isFinite(loadedCountOverride) ? loadedCountOverride : collectActivitiesFromDom().length;
+        const newCount = UI_STATE.serverNewIds.size;
+
+        if (UI_STATE.runInProgress) {
+            runBtn.disabled = true;
+            runBtn.style.opacity = '0.7';
+            return;
+        }
+
+        if (newCount > 0) {
+            runBtn.disabled = false;
+            runBtn.style.opacity = '1';
+            runBtn.textContent = `Letöltés (${newCount})`;
+            statusEl.textContent = `Betöltve: ${loadedCount}, letöltésre vár: ${newCount}`;
+            return;
+        }
+
+        const syncPending = getPendingActivities().length;
+        runBtn.disabled = syncPending > 0 || true;
+        runBtn.style.opacity = '0.55';
+        runBtn.textContent = 'Letöltés';
+        statusEl.textContent = syncPending > 0
+            ? `Szinkronizálás... (${syncPending} sor ellenőrzése)`
+            : `Betöltve: ${loadedCount}, nincs NEW aktivitás`;
+    }
+
+    function startActivityListDetection() {
+        if (UI_STATE.observer) {
+            return;
+        }
+
+        const firstRow = getActivityRows()[0];
+        const root = firstRow?.parentElement || document.body;
+
+        UI_STATE.observer = new MutationObserver(() => {
+            scheduleUiRefresh();
+        });
+
+        UI_STATE.observer.observe(root, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+        });
+
+        window.addEventListener('scroll', scheduleUiRefresh, { passive: true });
+        scheduleUiRefresh();
+    }
+
     function ensureUi() {
         if (document.getElementById('gc-sync-panel')) return;
 
@@ -284,7 +430,7 @@
         status.style.maxWidth = '280px';
 
         const runBtn = document.createElement('button');
-        runBtn.textContent = 'Riport + NEW letöltések';
+        runBtn.textContent = 'Letöltés';
         runBtn.style.border = 'none';
         runBtn.style.borderRadius = '8px';
         runBtn.style.background = '#16a34a';
@@ -294,6 +440,9 @@
         runBtn.style.fontWeight = '600';
         runBtn.style.display = 'block';
         runBtn.style.width = '100%';
+
+        UI_STATE.runBtn = runBtn;
+        UI_STATE.statusEl = status;
 
         const pdfBtn = document.createElement('button');
         pdfBtn.textContent = 'Download Results PDF';
@@ -309,28 +458,46 @@
         pdfBtn.style.marginTop = '8px';
 
         runBtn.addEventListener('click', async () => {
+            if (UI_STATE.runInProgress) return;
+
+            if (UI_STATE.autoReportTimer !== null) {
+                clearTimeout(UI_STATE.autoReportTimer);
+                UI_STATE.autoReportTimer = null;
+            }
+
+            UI_STATE.runInProgress = true;
             runBtn.disabled = true;
             runBtn.style.opacity = '0.7';
-            status.textContent = 'Riport küldése...';
 
             try {
-                const reportResult = await reportActivities();
-                status.textContent = `Riport ok (új: ${reportResult.newCount ?? '?'}) - NEW lekérés...`;
+                // Kézi letöltés előtt mindig az aktuális ID-listát riportoljuk.
+                const current = syncVisibleActivityState();
+                const needsSync = current.signature !== UI_STATE.lastReportedSignature
+                    || current.activities.some((a) => !UI_STATE.knownReportedIds.has(String(a.activityId)));
+                if (needsSync && current.activities.length > 0) {
+                    status.textContent = `Riport küldése (${current.activities.length} sor)...`;
+                    const res = await reportActivities(current.activities);
+                    markActivitiesAsReported(current.activities);
+                    applyReportResult(res);
+                    UI_STATE.lastReportedSignature = current.signature;
+                }
 
-                const newActivities = await getNewActivities(NEW_LIMIT);
-                if (newActivities.length === 0) {
+                const downloadIds = Array.from(UI_STATE.serverNewIds);
+                if (downloadIds.length === 0) {
                     status.textContent = 'Nincs NEW aktivitás.';
                 } else {
-                    status.textContent = `${newActivities.length} NEW aktivitás megnyitása (max 2 párhuzamos lap)...`;
-                    await openNewActivitiesWithConcurrency(newActivities, status, 2);
-                    status.textContent = `Megnyitás kész: ${newActivities.length} aktivitás.`;
+                    UI_STATE.serverNewIds.clear();
+                    status.textContent = `${downloadIds.length} NEW aktivitás megnyitása (max 2 párhuzamos lap)...`;
+                    const activities = downloadIds.map((id) => ({ activityId: id }));
+                    await openNewActivitiesWithConcurrency(activities, status, 2);
+                    status.textContent = `Megnyitás kész: ${downloadIds.length} aktivitás.`;
                 }
             } catch (err) {
                 console.error('[Activities Sync] Hiba:', err);
                 status.textContent = `Hiba: ${err instanceof Error ? err.message : String(err)}`;
             } finally {
-                runBtn.disabled = false;
-                runBtn.style.opacity = '1';
+                UI_STATE.runInProgress = false;
+                scheduleUiRefresh();
             }
         });
 
@@ -356,19 +523,28 @@
         panel.appendChild(runBtn);
         panel.appendChild(pdfBtn);
         document.body.appendChild(panel);
+
+        refreshSyncButtonState();
     }
 
     async function bootstrap() {
         try {
             await waitForElement('[class*="ActivityListItem_listItem"]', 20000);
             ensureUi();
+            startActivityListDetection();
 
             // Oldal megnyitásakor automatikus riport frissítés
-            const result = await reportActivities();
+            const initialActivities = collectActivitiesFromDom();
+            const result = await reportActivities(initialActivities);
+            markActivitiesAsReported(initialActivities);
+            applyReportResult(result);
+            UI_STATE.lastReportedSignature = buildIdSignature(buildActivityIdSet(initialActivities));
             const statusEl = document.getElementById('gc-sync-status');
             if (statusEl) {
-                statusEl.textContent = `Automatikus riport kész (új: ${result.newCount ?? '?'})`;
+                statusEl.textContent = `Automatikus riport kész (NEW: ${UI_STATE.serverNewIds.size})`;
             }
+
+            scheduleUiRefresh();
         } catch (err) {
             console.error('[Activities Sync] Inicializációs hiba:', err);
         }

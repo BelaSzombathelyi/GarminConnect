@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { processBuffer } from '../server/fitPipeline'
+import { processBuffer } from '../server/garmin/fitPipeline'
 
 const DATA_DIR = join(import.meta.dirname, 'data')
 

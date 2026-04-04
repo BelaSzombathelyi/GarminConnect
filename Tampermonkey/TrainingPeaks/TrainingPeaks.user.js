@@ -1,16 +1,19 @@
 // ==UserScript==
 // @name         TrainingPeaks - Advanced Search Logger
 // @namespace    https://trainingpeaks.com/
-// @version      0.1.0
-// @description  Opens workout search and logs advanced search result rows to console.
+// @version      0.2.0
+// @description  Opens workout search and reports extracted workouts to localhost API.
 // @match        https://app.trainingpeaks.com/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      localhost
+// @connect      127.0.0.1
 // ==/UserScript==
 
 (function () {
   "use strict";
 
   const LOG_PREFIX = "[TP Search]";
+  const API_BASE = "http://localhost:5173/api";
   const MAX_ROWS_TO_PROCESS = 2;
   const HANDLE_FUTURE_EVENTS = false;
   const INCLUDE_FUTURE_ROWS = HANDLE_FUTURE_EVENTS;
@@ -32,6 +35,53 @@
 
   function log(...args) {
     console.log(LOG_PREFIX, ...args);
+  }
+
+  function httpRequest(method, url, data) {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== "function") {
+        reject(new Error("GM_xmlhttpRequest nem elerheto"));
+        return;
+      }
+
+      GM_xmlhttpRequest({
+        method,
+        url,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        data: data ? JSON.stringify(data) : undefined,
+        onload: (response) => {
+          if (response.status < 200 || response.status >= 300) {
+            reject(new Error(`HTTP ${response.status} ${url}: ${response.responseText}`));
+            return;
+          }
+
+          try {
+            resolve(response.responseText ? JSON.parse(response.responseText) : {});
+          } catch (err) {
+            reject(err);
+          }
+        },
+        onerror: () => reject(new Error(`Halozati hiba: ${url}`)),
+      });
+    });
+  }
+
+  async function reportWorkoutsToLocalApi(workouts) {
+    if (!Array.isArray(workouts) || workouts.length === 0) {
+      log("Nincs reportolhato workout");
+      return { ok: true, received: 0, inserted: 0, updated: 0 };
+    }
+
+    const payload = { workouts };
+    const res = await httpRequest(
+      "POST",
+      `${API_BASE}/trainingpeaks/report_workouts`,
+      payload,
+    );
+    log("report_workouts valasz", res);
+    return res;
   }
 
   function waitForElement(selector, timeoutMs = 10000, intervalMs = 200) {
@@ -549,6 +599,15 @@
     return fallback ? [fallback] : [];
   }
 
+  function getWorkoutStartDateText() {
+    const root = getWorkoutQuickViewRoot();
+    const dayName =
+      (root && root.querySelector(SELECTORS.workoutDetailDayName)) ||
+      document.querySelector(SELECTORS.workoutDetailDayName);
+
+    return normalizedText(dayName?.textContent);
+  }
+
   function findCloseControl() {
     const root = getWorkoutQuickViewRoot();
     const closeSelectors = [
@@ -802,6 +861,7 @@
 
   async function processWorkoutRows(maxRows = 1, includeFutureRows = true) {
     const rows = Array.from(document.querySelectorAll(SELECTORS.resultRows));
+    const collected = [];
     const eligibleRows = rows.filter((row) => {
       if (includeFutureRows) {
         return true;
@@ -849,6 +909,22 @@
 
       const description = extractWorkoutDescription();
       const comments = extractComments();
+      const workoutStart = getWorkoutStartDateText() || date;
+
+      collected.push({
+        name: title,
+        workoutStart,
+        date,
+        totalTime: textByCell(row, "totalTime"),
+        distance: textByCell(row, "distance"),
+        tss: textByCell(row, "tssActual"),
+        description,
+        comments,
+        source: "trainingpeaks",
+        raw: {
+          route: currentRouteSignature(),
+        },
+      });
 
       log(`Edzes reszletek #${index + 1}`, {
         title,
@@ -860,6 +936,8 @@
       await closeWorkoutDetail(routeBeforeOpen, 12000);
       log(`Sor bezarva #${index + 1}`);
     }
+
+    return collected;
   }
 
   async function ensureAdvancedSearchOpen() {
@@ -940,7 +1018,11 @@
       log("Sorok betoltodtek (lazy load kesleltetesbol kilepve)");
 
       logResultRows();
-      await processWorkoutRows(MAX_ROWS_TO_PROCESS, INCLUDE_FUTURE_ROWS);
+      const workouts = await processWorkoutRows(
+        MAX_ROWS_TO_PROCESS,
+        INCLUDE_FUTURE_ROWS,
+      );
+      await reportWorkoutsToLocalApi(workouts);
     } catch (error) {
       console.error(LOG_PREFIX, "Hiba:", error);
     }

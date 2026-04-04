@@ -322,9 +322,9 @@ export function extractSession(data: FitUploadResponse): string {
     if (typeof session['totalStrides'] === 'number') lines.push(`Össz. lépés:           ${session['totalStrides']}`);
 
     // Hőmérséklet
-    if (typeof session['avgTemperature'] === 'number') lines.push(`Atl. kar homerseklet:  ${session['avgTemperature']} °C`);
-    if (typeof session['maxTemperature'] === 'number') lines.push(`Max. kar homerseklet:  ${session['maxTemperature']} °C`);
-    if (typeof session['minTemperature'] === 'number') lines.push(`Min. kar homerseklet:  ${session['minTemperature']} °C`);
+    if (typeof session['avgTemperature'] === 'number') lines.push(`Átl. kar hőmérséklet:  ${session['avgTemperature']} °C`);
+    if (typeof session['maxTemperature'] === 'number') lines.push(`Max. kar hőmérséklet:  ${session['maxTemperature']} °C`);
+    if (typeof session['minTemperature'] === 'number') lines.push(`Min. kar hőmérséklet:  ${session['minTemperature']} °C`);
 
     // Légzés (rpm)
     if (typeof session['enhancedAvgRespirationRate'] === 'number') lines.push(`Átl. légzés:           ${session['enhancedAvgRespirationRate'].toFixed(1)} l/p`);
