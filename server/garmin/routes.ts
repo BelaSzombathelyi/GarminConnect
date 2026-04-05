@@ -357,4 +357,83 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
         res.statusCode = 200
         res.end(JSON.stringify({ activityId, messages, errors }))
     })
+
+    server.middlewares.use('/api/reprocess_all_activities', async (req, res) => {
+        if (req.method !== 'GET' && req.method !== 'POST') {
+            res.statusCode = 405
+            res.end('Method Not Allowed')
+            return
+        }
+
+        handleOptions(req, res)
+        setCorsHeaders(res)
+
+        try {
+            let reprocessedCount = 0;
+            let errorCount = 0;
+            const errors: string[] = [];
+
+            async function walkAndProcess(dir: string): Promise<void> {
+                let entries;
+                try {
+                    entries = await readdir(dir, { withFileTypes: true });
+                } catch {
+                    return;
+                }
+
+                for (const entry of entries) {
+                    const fullPath = join(dir, entry.name);
+                    if (entry.isDirectory()) {
+                        await walkAndProcess(fullPath);
+                        continue;
+                    }
+
+                    if (!entry.isFile() || !entry.name.endsWith('.zip')) continue;
+
+                    const idMatch = entry.name.match(/^(\d+)\.zip$/);
+                    if (!idMatch) continue;
+
+                    const activityId = idMatch[1];
+
+                    try {
+                        const buffer = await readFile(fullPath);
+                        const { text, errors: decodeErrors } = processBuffer(buffer, activityId);
+
+                        if (decodeErrors.length > 0) {
+                            console.warn(`[reprocess] Dekódolási hibák (${activityId}):`, decodeErrors);
+                        }
+
+                        const mdPath = join(dirname(fullPath), `${activityId}.md`);
+                        await writeFile(mdPath, text, 'utf-8');
+
+                        console.log(`[reprocess] FELDOLGOZVA: ${activityId} (${mdPath})`);
+                        reprocessedCount += 1;
+                    } catch (err) {
+                        errorCount += 1;
+                        const msg = err instanceof Error ? err.message : String(err);
+                        errors.push(`${activityId}: ${msg}`);
+                        console.error(`[reprocess] Hiba (${activityId}):`, err);
+                    }
+                }
+            }
+
+            await walkAndProcess(archiveDir);
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({
+                ok: true,
+                reprocessedCount,
+                errorCount,
+                errors: errors.length > 0 ? errors : undefined,
+            }));
+        } catch (err) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+            }));
+        }
+    })
 }

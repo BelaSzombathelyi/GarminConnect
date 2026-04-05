@@ -28,9 +28,29 @@ function secondsToHHMM(seconds: unknown): string {
     return `${h}:${String(m).padStart(2, '0')}`;
 }
 
+function buildMarkdownTable(rows: Array<[string, string]>): string {
+    if (rows.length === 0) return '';
+    const lines = [
+        '| Adat | Érték |',
+        '| :--- | ---: |',
+        ...rows.map(([key, val]) => `| ${key} | ${val} |`),
+    ];
+    return lines.join('\n');
+}
+
 function mpsToMinPerKm(speed: unknown): string {
     if (typeof speed !== 'number' || speed <= 0) return '–';
-    const secPerKm = 1000 / speed;
+    // Az FIT SDK az avgSpeed-et 0.01 m/s-es egységekben adja meg
+    const mps = speed / 100;
+    const secPerKm = 1000 / mps;
+    const mins = Math.floor(secPerKm / 60);
+    const secs = Math.round(secPerKm % 60);
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+function paceFromTimeDistance(elapsedTimeSeconds: unknown, distanceMeters: unknown): string {
+    if (typeof elapsedTimeSeconds !== 'number' || typeof distanceMeters !== 'number' || distanceMeters <= 0) return '–';
+    const secPerKm = (elapsedTimeSeconds * 1000) / distanceMeters;
     const mins = Math.floor(secPerKm / 60);
     const secs = Math.round(secPerKm % 60);
     return `${mins}:${String(secs).padStart(2, '0')}`;
@@ -281,89 +301,89 @@ export function extractSession(data: FitUploadResponse): string {
     const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0];
     if (!session) return '';
 
-    const lines: string[] = ['--- Edzés összefoglaló ---'];
+    const rows: Array<[string, string]> = [];
 
     // Sport
-    if (session['sportProfileName']) lines.push(`Sport profil:          ${session['sportProfileName']}`);
-    if (session['sport'])           lines.push(`Sport:                 ${session['sport']}`);
-    if (session['subSport'])        lines.push(`Alsport:               ${session['subSport']}`);
+    if (session['sportProfileName']) rows.push(['Sport profil', String(session['sportProfileName'])]);
+    if (session['sport']) rows.push(['Sport', String(session['sport'])]);
+    if (session['subSport']) rows.push(['Alsport', String(session['subSport'])]);
 
     // Időpontok
     const startDate = toDate(session['startTime']);
-    if (startDate) lines.push(`Kezdés:                ${startDate.toLocaleString('hu-HU')}`);
+    if (startDate) rows.push(['Kezdés', startDate.toLocaleString('hu-HU')]);
     const elapsed = typeof session['totalElapsedTime'] === 'number' ? session['totalElapsedTime'] as number : null;
     if (startDate && elapsed !== null) {
         const endDate = new Date(startDate.getTime() + elapsed * 1000);
-        lines.push(`Befejezés:             ${endDate.toLocaleString('hu-HU')}`);
+        rows.push(['Befejezés', endDate.toLocaleString('hu-HU')]);
     }
 
     // Szintemelkedés / szintsullyedes
-    if (typeof session['totalAscent'] === 'number')  lines.push(`Össz. emelkedés:       ${session['totalAscent']} m`);
-    if (typeof session['totalDescent'] === 'number') lines.push(`Össz. süllyedés:       ${session['totalDescent']} m`);
+    if (typeof session['totalAscent'] === 'number') rows.push(['Össz. emelkedés', `${session['totalAscent']} m`]);
+    if (typeof session['totalDescent'] === 'number') rows.push(['Össz. süllyedés', `${session['totalDescent']} m`]);
 
     // Kalória
-    if (typeof session['totalCalories'] === 'number')    lines.push(`Kalória:               ${session['totalCalories']} kcal`);
-    if (typeof session['metabolicCalories'] === 'number') lines.push(`Metabolikus kalória:   ${session['metabolicCalories']} kcal`);
+    if (typeof session['totalCalories'] === 'number') rows.push(['Kalória', `${session['totalCalories']} kcal`]);
+    if (typeof session['metabolicCalories'] === 'number') rows.push(['Metabolikus kalória', `${session['metabolicCalories']} kcal`]);
 
     // Pulzus
-    if (typeof session['avgHeartRate'] === 'number') lines.push(`Átl. pulzus:           ${session['avgHeartRate']} bpm`);
-    if (typeof session['maxHeartRate'] === 'number') lines.push(`Max. pulzus:           ${session['maxHeartRate']} bpm`);
+    if (typeof session['avgHeartRate'] === 'number') rows.push(['Átl. pulzus', `${session['avgHeartRate']} bpm`]);
+    if (typeof session['maxHeartRate'] === 'number') rows.push(['Max. pulzus', `${session['maxHeartRate']} bpm`]);
 
     // Kadencia / lépések
     if (typeof session['avgRunningCadence'] === 'number') {
-        lines.push(`Átl. futókadencia:     ${cadence(session['avgRunningCadence'])} lép/p`);
+        rows.push(['Átl. futókadencia', `${cadence(session['avgRunningCadence'])} lép/p`]);
     } else if (typeof session['avgCadence'] === 'number') {
-        lines.push(`Átl. kadencia:         ${cadence(session['avgCadence'])} lép/p`);
+        rows.push(['Átl. kadencia', `${cadence(session['avgCadence'])} lép/p`]);
     }
     if (typeof session['maxRunningCadence'] === 'number') {
-        lines.push(`Max. futókadencia:     ${cadence(session['maxRunningCadence'])} lép/p`);
+        rows.push(['Max. futókadencia', `${cadence(session['maxRunningCadence'])} lép/p`]);
     } else if (typeof session['maxCadence'] === 'number') {
-        lines.push(`Max. kadencia:         ${cadence(session['maxCadence'])} lép/p`);
+        rows.push(['Max. kadencia', `${cadence(session['maxCadence'])} lép/p`]);
     }
-    if (typeof session['totalStrides'] === 'number') lines.push(`Össz. lépés:           ${session['totalStrides']}`);
+    if (typeof session['totalStrides'] === 'number') rows.push(['Össz. lépés', String(session['totalStrides'])]);
 
     // Hőmérséklet
-    if (typeof session['avgTemperature'] === 'number') lines.push(`Átl. kar hőmérséklet:  ${session['avgTemperature']} °C`);
-    if (typeof session['maxTemperature'] === 'number') lines.push(`Max. kar hőmérséklet:  ${session['maxTemperature']} °C`);
-    if (typeof session['minTemperature'] === 'number') lines.push(`Min. kar hőmérséklet:  ${session['minTemperature']} °C`);
+    if (typeof session['avgTemperature'] === 'number') rows.push(['Átl. kar hőmérséklet', `${session['avgTemperature']} °C`]);
+    if (typeof session['maxTemperature'] === 'number') rows.push(['Max. kar hőmérséklet', `${session['maxTemperature']} °C`]);
+    if (typeof session['minTemperature'] === 'number') rows.push(['Min. kar hőmérséklet', `${session['minTemperature']} °C`]);
 
     // Légzés (rpm)
-    if (typeof session['enhancedAvgRespirationRate'] === 'number') lines.push(`Átl. légzés:           ${session['enhancedAvgRespirationRate'].toFixed(1)} l/p`);
-    if (typeof session['enhancedMaxRespirationRate'] === 'number') lines.push(`Max. légzés:           ${session['enhancedMaxRespirationRate'].toFixed(1)} l/p`);
-    if (typeof session['enhancedMinRespirationRate'] === 'number') lines.push(`Min. légzés:           ${session['enhancedMinRespirationRate'].toFixed(1)} l/p`);
+    if (typeof session['enhancedAvgRespirationRate'] === 'number') rows.push(['Átl. légzés', `${session['enhancedAvgRespirationRate'].toFixed(1)} l/p`]);
+    if (typeof session['enhancedMaxRespirationRate'] === 'number') rows.push(['Max. légzés', `${session['enhancedMaxRespirationRate'].toFixed(1)} l/p`]);
+    if (typeof session['enhancedMinRespirationRate'] === 'number') rows.push(['Min. légzés', `${session['enhancedMinRespirationRate'].toFixed(1)} l/p`]);
 
     // Futásdinamika
-    if (typeof session['avgStepLength'] === 'number')        lines.push(`Átl. lépéshossz:       ${stepLengthMm(session['avgStepLength'])} mm`);
-    if (typeof session['avgStanceTime'] === 'number')        lines.push(`Átl. talajérintés:     ${(session['avgStanceTime'] as number).toFixed(0)} ms`);
-    if (typeof session['avgStanceTimePercent'] === 'number') lines.push(`Talajérintés %:        ${(session['avgStanceTimePercent'] as number).toFixed(1)} %`);
-    if (typeof session['avgStanceTimeBalance'] === 'number') lines.push(`Talajérintés bal/jobb: ${(session['avgStanceTimeBalance'] as number).toFixed(1)} %`);
-    if (typeof session['avgVerticalRatio'] === 'number')     lines.push(`Vert. arány:           ${(session['avgVerticalRatio'] as number).toFixed(1)} %`);
+    if (typeof session['avgStepLength'] === 'number') rows.push(['Átl. lépéshossz', `${stepLengthMm(session['avgStepLength'])} mm`]);
+    if (typeof session['avgStanceTime'] === 'number') rows.push(['Átl. talajérintés', `${(session['avgStanceTime'] as number).toFixed(0)} ms`]);
+    if (typeof session['avgStanceTimePercent'] === 'number') rows.push(['Talajérintés %', `${(session['avgStanceTimePercent'] as number).toFixed(1)} %`]);
+    if (typeof session['avgStanceTimeBalance'] === 'number') rows.push(['Talajérintés bal/jobb', `${(session['avgStanceTimeBalance'] as number).toFixed(1)} %`]);
+    if (typeof session['avgVerticalRatio'] === 'number') rows.push(['Vert. arány', `${(session['avgVerticalRatio'] as number).toFixed(1)} %`]);
 
     // Önértékelés
     if (typeof session['workoutFeel'] === 'number') {
         const feel = session['workoutFeel'] as number;
-        lines.push(`Önértékelés/Közérzet:  ${workoutFeelLabel(feel)}`);
+        rows.push(['Önértékelés/Közérzet', workoutFeelLabel(feel)]);
     }
     if (typeof session['workoutRpe'] === 'number') {
         const raw = session['workoutRpe'] as number;
         const rpeVal = Math.min(10, Math.max(1, Math.round(raw / 10)));
-        lines.push(`Önértékelés/RPE:       ${rpeVal}/10 - ${workoutRpeLabel(rpeVal)}`);
+        rows.push(['Önértékelés/RPE', `${rpeVal}/10 - ${workoutRpeLabel(rpeVal)}`]);
     }
 
     // Edzésterhelés
     const aerobicTE = typeof session['totalTrainingEffect'] === 'number' ? session['totalTrainingEffect'] as number : null;
     const anaerobicTE = typeof session['totalAnaerobicTrainingEffect'] === 'number' ? session['totalAnaerobicTrainingEffect'] as number : null;
-    lines.push(`Aerob edzéshatás:      ${aerobicTE !== null ? aerobicTE.toFixed(1) + ' / 5.0 – ' + teLabel(aerobicTE) : '–'}`);
-    lines.push(`Anaerob edzéshatás:    ${anaerobicTE !== null ? anaerobicTE.toFixed(1) + ' / 5.0 – ' + teLabel(anaerobicTE) : '–'}`);
+    rows.push(['Aerob edzéshatás', `${aerobicTE !== null ? aerobicTE.toFixed(1) + ' / 5.0 – ' + teLabel(aerobicTE) : '–'}`]);
+    rows.push(['Anaerob edzéshatás', `${anaerobicTE !== null ? anaerobicTE.toFixed(1) + ' / 5.0 – ' + teLabel(anaerobicTE) : '–'}`]);
     if (typeof session['trainingStressScore'] === 'number') {
-        lines.push(`Training Stress Score: ${(session['trainingStressScore'] / 10).toFixed(1)}`);
+        rows.push(['Training Stress Score', `${(session['trainingStressScore'] / 10).toFixed(1)}`]);
     }
     if (typeof session['intensityFactor'] === 'number') {
-        lines.push(`Intenzitás faktor:     ${(session['intensityFactor'] / 1000).toFixed(2)}`);
+        rows.push(['Intenzitás faktor', `${(session['intensityFactor'] / 1000).toFixed(2)}`]);
     }
     const trainingLoad = typeof session['trainingLoadPeak'] === 'number' ? session['trainingLoadPeak'] as number : null;
     if (trainingLoad !== null && trainingLoad !== 0) {
-        lines.push(`Edzésterhelés (peak):  ${trainingLoad.toFixed(1)}`);
+        rows.push(['Edzésterhelés (peak)', `${trainingLoad.toFixed(1)}`]);
     }
 
     // Séta / futás / állás idők a splitSummaryMesgs-ből
@@ -373,7 +393,7 @@ export function extractSession(data: FitUploadResponse): string {
         for (const [key, label] of Object.entries(rwdTypes)) {
             const entry = summaries.find(s => String(s['splitType']) === key);
             if (entry && typeof entry['totalTimerTime'] === 'number') {
-                lines.push(`${label.padEnd(22, ' ')}${formatSeconds(entry['totalTimerTime'] as number)}`);
+                rows.push([label, formatSeconds(entry['totalTimerTime'] as number)]);
             }
         }
     }
@@ -384,9 +404,11 @@ export function extractSession(data: FitUploadResponse): string {
     if (workout) {
         const wktNameArr = Array.isArray(workout['wktName']) ? (workout['wktName'] as unknown[]).filter(s => typeof s === 'string' && (s as string).trim()) : null;
         const wktName = wktNameArr && wktNameArr.length > 0 ? (wktNameArr as string[]).join(' ') : (typeof workout['wktName'] === 'string' ? workout['wktName'] : '');
-        if (wktName) lines.push(`Edzés neve:            ${wktName}`);
-        if (typeof workout['numValidSteps'] === 'number') lines.push(`Lépések száma:         ${workout['numValidSteps']}`);
+        if (wktName) rows.push(['Edzés neve', wktName]);
+        if (typeof workout['numValidSteps'] === 'number') rows.push(['Lépések száma', String(workout['numValidSteps'])]);
     }
+
+    const lines: string[] = ['## Edzés összefoglaló', '', buildMarkdownTable(rows)];
 
     // Edzéslépések (workoutStepMesgs)
     const workoutSteps = data.messages['workoutStepMesgs'] as Record<string, unknown>[] | undefined;
@@ -427,7 +449,7 @@ export function extractSession(data: FitUploadResponse): string {
         }
     }
 
-    return lines.length > 1 ? lines.join('\n') : '';
+    return lines.join('\n');
 }
 
 export function extractSplits(data: FitUploadResponse, mergeShortWalks = false): string {
@@ -478,7 +500,7 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
                 'Intervallum',
                 `${km(a['totalDistance'])} / ${km(r['totalDistance'])}`,
                 `${formatSeconds(a['totalElapsedTime'] as number)} + ${formatSeconds(r['totalElapsedTime'] as number)}`,
-                mpsToMinPerKm(a['avgSpeed']),
+                paceFromTimeDistance(a['totalElapsedTime'], a['totalDistance']),
                 num(a['totalAscent'], 0),
                 num(a['totalDescent'], 0),
             ];
@@ -495,7 +517,7 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
             label,
             km(split['totalDistance']),
             typeof split['totalElapsedTime'] === 'number' ? formatSeconds(split['totalElapsedTime'] as number) : '–',
-            mpsToMinPerKm(split['avgSpeed']),
+            paceFromTimeDistance(split['totalElapsedTime'], split['totalDistance']),
             num(split['totalAscent'], 0),
             num(split['totalDescent'], 0),
         ];
@@ -571,7 +593,7 @@ export function extractLaps(data: FitUploadResponse): string {
     const rows = laps.map((lap, i) => [
         `${i + 1}`,
         km(lap['totalDistance']),
-        mpsToMinPerKm(lap['avgSpeed']),
+        paceFromTimeDistance(lap['totalElapsedTime'], lap['totalDistance']),
         num(lap['totalAscent'], 0),
         num(lap['totalDescent'], 0),
         cadence(lap['avgRunningCadence'] ?? lap['avgCadence']),
@@ -585,7 +607,8 @@ export function extractLaps(data: FitUploadResponse): string {
     ]);
 
     const lines = [
-        `## Körök (nem feltétlenül egységes km-ek) - **${laps.length} kör**`,
+        `## Körök - **${laps.length} darab**`,
+        'nem feltétlenül egységes km-ek',
         '',
         `| ${header.join(' | ')} |`,
         `| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |`,
@@ -596,27 +619,33 @@ export function extractLaps(data: FitUploadResponse): string {
 
 export function extractUserProfile(data: FitUploadResponse): string {
     const profile = (data.messages['userProfileMesgs'] as Record<string, unknown>[])?.[0];
-    if (!profile) return '(nincs userProfileMesgs adat)';
+    if (!profile) return '';
 
     const sleepSec = typeof profile['sleepTime'] === 'number' ? profile['sleepTime'] as number : null;
     const wakeSec  = typeof profile['wakeTime']  === 'number' ? profile['wakeTime']  as number : null;
-    let sleepDuration = '';
+    
+    const rows: Array<[string, string]> = [];
+    
+    if (typeof profile['weight'] === 'number') {
+        rows.push(['Súly', `${profile['weight']} kg`]);
+    }
+    if (typeof profile['height'] === 'number') {
+        rows.push(['Magasság', `${profile['height']} m`]);
+    }
+    
+    rows.push(['Elalvás időpontja', secondsToHHMM(profile['sleepTime'])]);
+    
+    let wakeTimeStr = secondsToHHMM(profile['wakeTime']);
     if (sleepSec !== null && wakeSec !== null) {
         const DAY = 24 * 3600;
         const dur = ((wakeSec - sleepSec) + DAY) % DAY;
         const dh = Math.floor(dur / 3600);
         const dm = Math.floor((dur % 3600) / 60);
-        sleepDuration = ` (${dh} ó ${String(dm).padStart(2, '0')} p)`;
+        wakeTimeStr += ` (${dh} ó ${String(dm).padStart(2, '0')} p)`;
     }
+    rows.push(['Ébredési idő', wakeTimeStr]);
 
-    const lines = [
-        `Súly:          ${typeof profile['weight'] === 'number' ? profile['weight'] + ' kg' : '–'}`,
-        `Magasság:      ${typeof profile['height'] === 'number' ? profile['height'] + ' m' : '–'}`,
-        `Elalvás időpontja: ${secondsToHHMM(profile['sleepTime'])}`,
-        `Ébredési idő:  ${secondsToHHMM(profile['wakeTime'])}${sleepDuration}`,
-    ];
-
-    return lines.join('\n');
+    return buildMarkdownTable(rows);
 }
 
 function extractTrailClimbInfo(data: FitUploadResponse): string {
@@ -628,27 +657,38 @@ function extractTrailClimbInfo(data: FitUploadResponse): string {
     const isTrail = sport === 'running' && (subSport === 'trail' || subSport.includes('trail'))
     if (!isTrail) return ''
 
-    const lines: string[] = ['--- Climb információk ---']
+    const lines: string[] = ['## Climb Info']
 
     const summaries = data.messages['splitSummaryMesgs'] as Record<string, unknown>[] | undefined
     if (summaries && summaries.length > 0) {
         const ascent = summaries.find((s) => String(s['splitType']) === 'ascentSplit')
         const descent = summaries.find((s) => String(s['splitType']) === 'descentSplit')
 
+        const segmentRows: Array<[string, string, string, string, string]> = []
+        
         if (ascent) {
-            const count = typeof ascent['numSplits'] === 'number' ? ascent['numSplits'] : '–'
+            const count = typeof ascent['numSplits'] === 'number' ? String(ascent['numSplits']) : '–'
             const dist = km(ascent['totalDistance'])
             const gain = num(ascent['totalAscent'], 0)
             const time = typeof ascent['totalTimerTime'] === 'number' ? formatSeconds(ascent['totalTimerTime'] as number) : '–'
-            lines.push(`Emelkedő szegmensek:   ${count} db | táv: ${dist} km | +szint: ${gain} m | idő: ${time}`)
+            segmentRows.push(['Ascent segments', count, dist, gain, time])
         }
 
         if (descent) {
-            const count = typeof descent['numSplits'] === 'number' ? descent['numSplits'] : '–'
+            const count = typeof descent['numSplits'] === 'number' ? String(descent['numSplits']) : '–'
             const dist = km(descent['totalDistance'])
             const loss = num(descent['totalDescent'], 0)
             const time = typeof descent['totalTimerTime'] === 'number' ? formatSeconds(descent['totalTimerTime'] as number) : '–'
-            lines.push(`Lejtő szegmensek:      ${count} db | táv: ${dist} km | -szint: ${loss} m | idő: ${time}`)
+            segmentRows.push(['Descent segments', count, dist, loss, time])
+        }
+
+        if (segmentRows.length > 0) {
+            lines.push('')
+            lines.push('| Type | Count | Distance (km) | Elevation (m) | Time |')
+            lines.push('| :--- | ---: | ---: | ---: | ---: |')
+            for (const row of segmentRows) {
+                lines.push(`| ${row.join(' | ')} |`)
+            }
         }
     }
 
@@ -657,17 +697,20 @@ function extractTrailClimbInfo(data: FitUploadResponse): string {
         .map(([key, items]) => `${key}: ${items.length}`)
 
     if (climbMessageCounts.length > 0) {
-        lines.push('FIT climb üzenetek:')
+        lines.push('')
+        lines.push('FIT climb messages:')
         for (const item of climbMessageCounts) {
-            lines.push(`  - ${item}`)
+            lines.push(`- ${item}`)
         }
     }
 
     const climbPro = data.messages['climbProMesgs'] as Record<string, unknown>[] | undefined
     if (climbPro && climbPro.length > 0) {
         lines.push('')
-        lines.push(`ClimbPro részletek (${climbPro.length} üzenet):`)
-        lines.push('#,Időpont,Climb#,Esemény,Kategória,Táv (km)')
+        lines.push(`### ClimbPro details (${climbPro.length} messages)`)
+        lines.push('')
+        lines.push('| # | Timestamp | Climb# | Event | Category | Distance (km) |')
+        lines.push('| :--- | :--- | ---: | :--- | :--- | ---: |')
 
         const detailRows = climbPro
             .slice()
@@ -686,7 +729,7 @@ function extractTrailClimbInfo(data: FitUploadResponse): string {
             const category = typeof item['climbCategory'] === 'number' ? String(item['climbCategory']) : '–'
             const distanceKm = typeof item['currentDist'] === 'number' ? km(item['currentDist']) : '–'
 
-            lines.push(`${i + 1},${timeLabel},${climbNo},${event},${category},${distanceKm}`)
+            lines.push(`| ${i + 1} | ${timeLabel} | ${climbNo} | ${event} | ${category} | ${distanceKm} |`)
         }
     }
 
