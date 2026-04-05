@@ -18,22 +18,22 @@
 | Össz. süllyedés | 214 m |
 | Kalória | 3594 kcal |
 | Metabolikus kalória | 591 kcal |
-| Átl. pulzus | 116 bpm |
-| Max. pulzus | 134 bpm |
-| Átl. futókadencia | 162 lép/p |
-| Max. futókadencia | 218 lép/p |
-| Össz. lépés | 33055 |
-| Átl. kar hőmérséklet | 16 °C |
-| Max. kar hőmérséklet | 23 °C |
-| Min. kar hőmérséklet | 11 °C |
-| Átl. légzés | 28.5 l/p |
-| Max. légzés | 41.6 l/p |
-| Min. légzés | 14.3 l/p |
-| Átl. lépéshossz | 770.30 mm |
-| Átl. talajérintés | 306 ms |
-| Talajérintés % | 42.5 % |
-| Talajérintés bal/jobb | 52.2 % |
-| Vert. arány | 8.7 % |
+| Avg. heart rate | 116 bpm |
+| Max. heart rate | 134 bpm |
+| Avg. running cadence | 162 steps/min |
+| Max. running cadence | 218 steps/min |
+| Total steps | 33055 |
+| Avg. arm temperature | 16 C |
+| Max. arm temperature | 23 C |
+| Min. arm temperature | 11 C |
+| Avg. respiration | 28.5 breaths/min |
+| Max. respiration | 41.6 breaths/min |
+| Min. respiration | 14.3 breaths/min |
+| Avg. step length | 770.30 mm |
+| Avg. ground contact time | 306 ms |
+| Ground contact time % | 42.5 % |
+| Ground contact balance | 52.2 % |
+| Vertical ratio | 8.7 % |
 | Önértékelés/Közérzet | Normál |
 | Önértékelés/RPE | 9/10 - Majdnem maxon vagyok. EX-AN |
 | Aerob edzéshatás | 3.8 / 5.0 – Fejlődés |

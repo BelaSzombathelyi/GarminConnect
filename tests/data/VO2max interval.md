@@ -18,22 +18,22 @@
 | Össz. süllyedés | 29 m |
 | Kalória | 938 kcal |
 | Metabolikus kalória | 96 kcal |
-| Átl. pulzus | 141 bpm |
-| Max. pulzus | 166 bpm |
-| Átl. futókadencia | 170 lép/p |
-| Max. futókadencia | 182 lép/p |
-| Össz. lépés | 5601 |
-| Átl. kar hőmérséklet | 15 °C |
-| Max. kar hőmérséklet | 30 °C |
-| Min. kar hőmérséklet | 12 °C |
-| Átl. légzés | 36.7 l/p |
-| Max. légzés | 48.2 l/p |
-| Min. légzés | 22.2 l/p |
-| Átl. lépéshossz | 1159.40 mm |
-| Átl. talajérintés | 226 ms |
-| Talajérintés % | 32.1 % |
-| Talajérintés bal/jobb | 53.0 % |
-| Vert. arány | 9.1 % |
+| Avg. heart rate | 141 bpm |
+| Max. heart rate | 166 bpm |
+| Avg. running cadence | 170 steps/min |
+| Max. running cadence | 182 steps/min |
+| Total steps | 5601 |
+| Avg. arm temperature | 15 C |
+| Max. arm temperature | 30 C |
+| Min. arm temperature | 12 C |
+| Avg. respiration | 36.7 breaths/min |
+| Max. respiration | 48.2 breaths/min |
+| Min. respiration | 22.2 breaths/min |
+| Avg. step length | 1159.40 mm |
+| Avg. ground contact time | 226 ms |
+| Ground contact time % | 32.1 % |
+| Ground contact balance | 53.0 % |
+| Vertical ratio | 9.1 % |
 | Önértékelés/Közérzet | Normál |
 | Önértékelés/RPE | 9/10 - Majdnem maxon vagyok. EX-AN |
 | Aerob edzéshatás | 3.9 / 5.0 – Fejlődés |
@@ -43,7 +43,7 @@
 | Séta idő: | 0:00 |
 | Állás idő: | 0:00 |
 | Edzés neve | VO2 max - SUM 20p 4*5 min, 04:05 |
-| Lépések száma | 9 |
+| workout steps | 9 |
 
 Edzéslépések:
   1.  Warm up  [warmup]  5:00  speed
@@ -70,7 +70,7 @@ nem feltétlenül egységes km-ek
 | 7 | 0.202 | 4:08 | 0 | 0 | 174 | 176 | 1409.00 | 111.7 | 210 | 7.7 | 35.8 | 37.3 |
 | 8 | 0.907 | 5:31 | 0 | 0 | 168 | 172 | 1084.30 | 104.2 | 238 | 9.4 | 33.7 | 36.9 |
 | 9 | 1 | 4:07 | 1 | 2 | 176 | 182 | 1359.40 | 110.6 | 187 | 7.9 | 41.8 | 45.2 |
-| 10 | 0.222 | 3:60 | 0 | 0 | 176 | 178 | 1354.10 | 112.8 | 177 | 8.2 | 44.7 | 45.2 |
+| 10 | 0.222 | 4:00 | 0 | 0 | 176 | 178 | 1354.10 | 112.8 | 177 | 8.2 | 44.7 | 45.2 |
 | 11 | 0.914 | 5:51 | 2 | 1 | 168 | 174 | 1100.60 | 108.0 | 220 | 9.7 | 35.4 | 44.7 |
 | 12 | 1 | 4:07 | 1 | 0 | 174 | 178 | 1368.40 | 115.6 | 186 | 8.2 | 40.0 | 45.6 |
 | 13 | 0.213 | 4:09 | 0 | 0 | 174 | 176 | 1376.50 | 115.0 | 188 | 8.1 | 42.8 | 45.1 |

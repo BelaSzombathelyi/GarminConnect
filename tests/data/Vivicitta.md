@@ -18,22 +18,22 @@
 | Össz. süllyedés | 60 m |
 | Kalória | 1445 kcal |
 | Metabolikus kalória | 129 kcal |
-| Átl. pulzus | 161 bpm |
-| Max. pulzus | 181 bpm |
-| Átl. futókadencia | 170 lép/p |
-| Max. futókadencia | 182 lép/p |
-| Össz. lépés | 7634 |
-| Átl. kar hőmérséklet | 18 °C |
-| Max. kar hőmérséklet | 22 °C |
-| Min. kar hőmérséklet | 15 °C |
-| Átl. légzés | 40.0 l/p |
-| Max. légzés | 45.4 l/p |
-| Min. légzés | 34.8 l/p |
-| Átl. lépéshossz | 1393.80 mm |
-| Átl. talajérintés | 213 ms |
-| Talajérintés % | 30.2 % |
-| Talajérintés bal/jobb | 48.6 % |
-| Vert. arány | 7.8 % |
+| Avg. heart rate | 161 bpm |
+| Max. heart rate | 181 bpm |
+| Avg. running cadence | 170 steps/min |
+| Max. running cadence | 182 steps/min |
+| Total steps | 7634 |
+| Avg. arm temperature | 18 C |
+| Max. arm temperature | 22 C |
+| Min. arm temperature | 15 C |
+| Avg. respiration | 40.0 breaths/min |
+| Max. respiration | 45.4 breaths/min |
+| Min. respiration | 34.8 breaths/min |
+| Avg. step length | 1393.80 mm |
+| Avg. ground contact time | 213 ms |
+| Ground contact time % | 30.2 % |
+| Ground contact balance | 48.6 % |
+| Vertical ratio | 7.8 % |
 | Önértékelés/Közérzet | Nagyon gyenge |
 | Önértékelés/RPE | 10/10 - Maximális, most hagyj békén. AN-SW |
 | Aerob edzéshatás | 5.0 / 5.0 – Megterhelés |
