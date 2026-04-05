@@ -14,9 +14,18 @@
 
   const LOG_PREFIX = "[TP Search]";
   const API_BASE = "http://localhost:5173/api";
-  const MAX_ROWS_TO_PROCESS = 2;
   const HANDLE_FUTURE_EVENTS = false;
   const INCLUDE_FUTURE_ROWS = HANDLE_FUTURE_EVENTS;
+  const UI_STATE = {
+    runInProgress: false,
+    visibleSignature: "",
+    lastServerCheckSignature: "",
+    pendingWorkoutKeys: new Set(),
+    refreshTimer: null,
+    observer: null,
+    syncBtn: null,
+    statusEl: null,
+  };
   const SELECTORS = {
     searchButton: ".workoutSearch",
     advancedResultsRoot: ".searchResults.workoutSearchResults",
@@ -32,6 +41,11 @@
     datepickerTodayCell:
       "td.ui-datepicker-today[data-handler='selectDay'] a.ui-state-default, td.ui-datepicker-today[data-handler='selectDay']",
   };
+  const WORKOUT_ID_PATTERNS = [
+    /\/fitness\/v\d+\/athletes\/\d+\/workouts\/(\d+)(?:[/?#]|$)/i,
+    /\/notification\/v\d+\/markworkoutread\/(\d+)(?:[/?#]|$)/i,
+    /\/workouts\/(\d+)(?:[/?#]|$)/i,
+  ];
 
   function log(...args) {
     console.log(LOG_PREFIX, ...args);
@@ -43,6 +57,12 @@
         reject(new Error("GM_xmlhttpRequest nem elerheto"));
         return;
       }
+
+      log("HTTP indul", {
+        method,
+        url,
+        workoutCount: Array.isArray(data?.workouts) ? data.workouts.length : 0,
+      });
 
       GM_xmlhttpRequest({
         method,
@@ -74,6 +94,12 @@
       return { ok: true, received: 0, inserted: 0, updated: 0 };
     }
 
+    log("report_workouts kuldes indul", {
+      count: workouts.length,
+      rowKeys: workouts.map((it) => it.rowKey).filter(Boolean),
+      workoutIds: workouts.map((it) => it?.raw?.workoutId).filter(Boolean),
+    });
+
     const payload = { workouts };
     const res = await httpRequest(
       "POST",
@@ -81,6 +107,44 @@
       payload,
     );
     log("report_workouts valasz", res);
+    return res;
+  }
+
+  const WORKOUT_TYPES = new Set([
+    "Bike", "Run", "Swim", "Strength", "Other", "Brick",
+    "Race", "Walk", "MtnBike", "XCSki", "Rowing", "Custom", "Crosstrain",
+  ]);
+
+  function getWorkoutTypeFromRow(row) {
+    for (const cls of row.className.split(/\s+/)) {
+      if (WORKOUT_TYPES.has(cls)) return cls;
+    }
+    return "";
+  }
+
+  function buildRowKey(workoutDay, workoutType, totalTime, tssValue, tssUnit) {
+    return [workoutDay, workoutType, totalTime, `${tssValue || ""}${tssUnit || ""}`]
+      .filter(Boolean)
+      .join("_");
+  }
+
+  async function getNewWorkoutKeysFromLocalApi(workouts) {
+    if (!Array.isArray(workouts) || workouts.length === 0) {
+      return { ok: true, received: 0, newWorkoutKeys: [] };
+    }
+
+    log("get_new_workouts kuldes indul", {
+      count: workouts.length,
+      rowKeys: workouts.map((it) => it.rowKey).filter(Boolean),
+    });
+
+    const payload = { workouts };
+    const res = await httpRequest(
+      "POST",
+      `${API_BASE}/trainingpeaks/get_new_workouts`,
+      payload,
+    );
+    log("get_new_workouts valasz", res);
     return res;
   }
 
@@ -155,17 +219,108 @@
     return (value || "").replace(/\s+/g, " ").trim();
   }
 
+  function extractWorkoutIdFromText(value) {
+    const text = String(value || "");
+    for (const pattern of WORKOUT_ID_PATTERNS) {
+      const match = text.match(pattern);
+      if (match?.[1]) {
+        return match[1];
+      }
+    }
+
+    return "";
+  }
+
+  function getWorkoutIdFromRoute() {
+    return extractWorkoutIdFromText(currentRouteSignature());
+  }
+
+  function getWorkoutIdFromNetworkEntries(maxAgeMs = 30000) {
+    if (typeof performance === "undefined" || typeof performance.getEntriesByType !== "function") {
+      return "";
+    }
+
+    const now = performance.now();
+    const resources = performance.getEntriesByType("resource");
+
+    for (let i = resources.length - 1; i >= 0; i -= 1) {
+      const entry = resources[i];
+      const ageMs = now - Number(entry.startTime || 0);
+      if (ageMs > maxAgeMs) {
+        break;
+      }
+
+      const id = extractWorkoutIdFromText(entry.name);
+      if (id) {
+        return id;
+      }
+    }
+
+    return "";
+  }
+
+  function getWorkoutIdFromDomContext(row) {
+    const candidates = [
+      row,
+      getWorkoutQuickViewRoot(),
+      document.querySelector(SELECTORS.workoutQuickViewRoot),
+      document,
+    ];
+
+    const attrNames = ["data-workout-id", "data-id", "data-key", "id", "href"];
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate.querySelectorAll !== "function") {
+        continue;
+      }
+
+      for (const attr of attrNames) {
+        const nodes = candidate.querySelectorAll(`[${attr}]`);
+        for (const node of nodes) {
+          const value = node.getAttribute(attr);
+          const id = extractWorkoutIdFromText(value);
+          if (id) {
+            return id;
+          }
+        }
+      }
+    }
+
+    return "";
+  }
+
+  async function resolveWorkoutId(row, timeoutMs = 5000) {
+    const immediateId = getWorkoutIdFromRoute() || getWorkoutIdFromDomContext(row) || getWorkoutIdFromNetworkEntries(60000);
+    if (immediateId) {
+      return immediateId;
+    }
+
+    try {
+      const id = await waitForCondition(
+        () => getWorkoutIdFromRoute() || getWorkoutIdFromDomContext(row) || getWorkoutIdFromNetworkEntries(60000),
+        timeoutMs,
+        150,
+        "workout id",
+      );
+      return String(id);
+    } catch {
+      return "";
+    }
+  }
+
   function getWorkoutQuickViewRoot() {
     const root = document.querySelector(SELECTORS.workoutQuickViewRoot);
     return root && isVisible(root) ? root : null;
   }
 
   function textByCell(row, className) {
-    return (
-      row
-        .querySelector(`td.${className} .value, td.${className}`)
-        ?.textContent?.trim() || ""
-    );
+    const cell = row.querySelector(`td.${className}`);
+    if (!cell) return "";
+    const valueEl = cell.querySelector(".value");
+    return (valueEl ?? cell)?.textContent?.trim() || "";
+  }
+
+  function cellPartText(row, cellClass, partClass) {
+    return row.querySelector(`td.${cellClass} .${partClass}`)?.textContent?.trim() || "";
   }
 
   function parseWorkoutDayToDate(dateText) {
@@ -574,6 +729,59 @@
     return "";
   }
 
+  function parseTrainingPeaksCommentDate(rawDate) {
+    const text = normalizedText(rawDate);
+    const match = text.match(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2})\s+([A-Za-z]+),\s+(\d{4})$/);
+    if (!match) {
+      return "";
+    }
+
+    const monthMap = {
+      January: "01",
+      February: "02",
+      March: "03",
+      April: "04",
+      May: "05",
+      June: "06",
+      July: "07",
+      August: "08",
+      September: "09",
+      October: "10",
+      November: "11",
+      December: "12",
+    };
+
+    const day = String(match[1]).padStart(2, "0");
+    const month = monthMap[match[2]] || "";
+    const year = match[3];
+    if (!month) {
+      return "";
+    }
+
+    return `${year}-${month}-${day}T00:00:00`;
+  }
+
+  function parseCommentText(rawComment) {
+    const text = normalizedText(rawComment);
+    const match = text.match(
+      /^(.*?)\s+((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{1,2}\s+[A-Za-z]+,\s+\d{4})\s+([\s\S]*)$/,
+    );
+
+    if (!match) {
+      return {
+        dateTime: "",
+        user: "",
+        text,
+      };
+    }
+
+    return {
+      user: normalizedText(match[1]),
+      dateTime: parseTrainingPeaksCommentDate(match[2]),
+      text: normalizedText(match[3]),
+    };
+  }
+
   function extractComments() {
     const root = getWorkoutQuickViewRoot() || document;
     const commentItemSelectors = [
@@ -591,12 +799,12 @@
       );
 
       if (nodes.length > 0) {
-        return nodes.map((el) => normalizedText(el.textContent));
+        return nodes.map((el) => parseCommentText(el.textContent));
       }
     }
 
     const fallback = findSectionTextByHeading(/^comments?$/i);
-    return fallback ? [fallback] : [];
+    return fallback ? [parseCommentText(fallback)] : [];
   }
 
   function getWorkoutStartDateText() {
@@ -907,22 +1115,32 @@
       await waitForWorkoutDetailData(15000);
       log(`Reszlet adatok betoltve #${index + 1}`);
 
+      const workoutId = await resolveWorkoutId(row, 4000);
       const description = extractWorkoutDescription();
       const comments = extractComments();
       const workoutStart = getWorkoutStartDateText() || date;
 
       collected.push({
-        name: title,
-        workoutStart,
-        date,
-        totalTime: textByCell(row, "totalTime"),
+          rowKey: buildRowKey(
+            date,
+            getWorkoutTypeFromRow(row),
+            cellPartText(row, "totalTime", "value"),
+            cellPartText(row, "tssActual", "value"),
+            cellPartText(row, "tssActual", "units"),
+          ),
+          name: title,
+          workoutStart,
+          workoutType: getWorkoutTypeFromRow(row),
+          totalTime: cellPartText(row, "totalTime", "value"),
         distance: textByCell(row, "distance"),
-        tss: textByCell(row, "tssActual"),
+        tssValue: cellPartText(row, "tssActual", "value"),
+        tssUnit: cellPartText(row, "tssActual", "units"),
         description,
         comments,
         source: "trainingpeaks",
         raw: {
           route: currentRouteSignature(),
+          workoutId,
         },
       });
 
@@ -967,17 +1185,304 @@
         row.querySelector("td.workoutDay")?.textContent?.trim() || "";
       const totalTime = textByCell(row, "totalTime");
       const distance = textByCell(row, "distance");
-      const tss = textByCell(row, "tssActual");
+      const tssValue = cellPartText(row, "tssActual", "value");
+      const tssUnit = cellPartText(row, "tssActual", "units");
 
       log(`Sor #${index + 1}`, {
         title,
         date,
         totalTime,
         distance,
-        tss,
+        tss: `${tssValue}${tssUnit}`,
         className: row.className,
       });
     });
+  }
+
+  function collectResultListWorkouts(includeFutureRows = true) {
+    const rows = Array.from(document.querySelectorAll(SELECTORS.resultRows));
+    const items = [];
+
+    for (const row of rows) {
+      const name = normalizedText(row.querySelector("td.title span")?.textContent);
+      const workoutStart = normalizedText(row.querySelector("td.workoutDay")?.textContent);
+      if (!name || !workoutStart) {
+        continue;
+      }
+
+      if (!includeFutureRows && isFutureWorkoutDate(workoutStart)) {
+        continue;
+      }
+
+      items.push({
+        row,
+        name,
+        workoutStart,
+          ...(() => {
+            const workoutType = getWorkoutTypeFromRow(row);
+            const totalTime = cellPartText(row, "totalTime", "value");
+            const tssValue = cellPartText(row, "tssActual", "value");
+            const tssUnit = cellPartText(row, "tssActual", "units");
+            const rowKey = buildRowKey(workoutStart, workoutType, totalTime, tssValue, tssUnit);
+            return { workoutType, totalTime, tssValue, tssUnit, rowKey, key: rowKey };
+          })(),
+      });
+    }
+
+    return items;
+  }
+
+  function buildVisibleSignature(items) {
+    return items.map((it) => it.key).sort().join("\n");
+  }
+
+  function refreshSyncButtonState(loadedCountOverride) {
+    const syncBtn = UI_STATE.syncBtn;
+    const statusEl = UI_STATE.statusEl;
+    if (!syncBtn || !statusEl) {
+      return;
+    }
+
+    const loadedCount = Number.isFinite(loadedCountOverride)
+      ? loadedCountOverride
+      : collectResultListWorkouts(INCLUDE_FUTURE_ROWS).length;
+    const pendingCount = UI_STATE.pendingWorkoutKeys.size;
+
+    if (UI_STATE.runInProgress) {
+      syncBtn.disabled = true;
+      syncBtn.style.opacity = "0.7";
+      syncBtn.textContent = "Sync folyamatban...";
+      return;
+    }
+
+    if (pendingCount > 0) {
+      syncBtn.disabled = false;
+      syncBtn.style.opacity = "1";
+      syncBtn.textContent = `Sync (${pendingCount})`;
+      statusEl.textContent = `Lista: ${loadedCount}, nem riportalt: ${pendingCount}`;
+      return;
+    }
+
+    syncBtn.disabled = true;
+    syncBtn.style.opacity = "0.55";
+    syncBtn.textContent = "Sync";
+    statusEl.textContent = `Lista: ${loadedCount}, minden riportalva`;
+  }
+
+  async function refreshPendingFromServer(force = false) {
+    const listItems = collectResultListWorkouts(INCLUDE_FUTURE_ROWS);
+    const signature = buildVisibleSignature(listItems);
+    const listVisible = Boolean(document.querySelector(SELECTORS.advancedResultsRoot));
+
+    if (!listVisible) {
+      UI_STATE.pendingWorkoutKeys = new Set();
+      UI_STATE.visibleSignature = "";
+      UI_STATE.lastServerCheckSignature = "";
+      refreshSyncButtonState(0);
+      return;
+    }
+
+    UI_STATE.visibleSignature = signature;
+    if (!force && signature === UI_STATE.lastServerCheckSignature) {
+      refreshSyncButtonState(listItems.length);
+      return;
+    }
+
+    try {
+      const lightweight = listItems.map((it) => ({
+        rowKey: it.rowKey,
+        name: it.name,
+        workoutStart: it.workoutStart,
+        source: "trainingpeaks",
+      }));
+
+      const res = await getNewWorkoutKeysFromLocalApi(lightweight);
+      const keys = Array.isArray(res.newWorkoutKeys) ? res.newWorkoutKeys : [];
+      UI_STATE.pendingWorkoutKeys = new Set(keys.map(String));
+      UI_STATE.lastServerCheckSignature = signature;
+      refreshSyncButtonState(listItems.length);
+    } catch (err) {
+      log("Nem sikerult frissiteni a pending workout listat", err);
+      const statusEl = UI_STATE.statusEl;
+      if (statusEl) {
+        statusEl.textContent = `Hiba lekerdezes kozben: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    }
+  }
+
+  function scheduleListRefresh(force = false) {
+    if (UI_STATE.refreshTimer !== null) {
+      clearTimeout(UI_STATE.refreshTimer);
+    }
+
+    UI_STATE.refreshTimer = setTimeout(() => {
+      UI_STATE.refreshTimer = null;
+      refreshPendingFromServer(force);
+    }, 350);
+  }
+
+  function startResultListObserver() {
+    if (UI_STATE.observer) {
+      return;
+    }
+
+    const root = document.querySelector(SELECTORS.advancedResultsRoot);
+    if (!root) {
+      return;
+    }
+
+    UI_STATE.observer = new MutationObserver(() => {
+      scheduleListRefresh(false);
+    });
+
+    UI_STATE.observer.observe(root, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+    });
+
+    scheduleListRefresh(true);
+  }
+
+  async function runSyncForPendingWorkouts() {
+    const pendingItems = collectResultListWorkouts(INCLUDE_FUTURE_ROWS)
+      .filter((it) => UI_STATE.pendingWorkoutKeys.has(it.key));
+
+    if (pendingItems.length === 0) {
+      const statusEl = UI_STATE.statusEl;
+      if (statusEl) {
+        statusEl.textContent = "Nincs uj workout riportalasra.";
+      }
+      return;
+    }
+
+    const workouts = [];
+    for (let i = 0; i < pendingItems.length; i += 1) {
+      const pending = pendingItems[i];
+      const liveRow = collectResultListWorkouts(INCLUDE_FUTURE_ROWS).find((it) => it.key === pending.key);
+      if (!liveRow) {
+        continue;
+      }
+
+      const row = liveRow.row;
+      const title = liveRow.name;
+      const date = liveRow.workoutStart;
+
+      const statusEl = UI_STATE.statusEl;
+      if (statusEl) {
+        statusEl.textContent = `Sync: ${i + 1}/${pendingItems.length} (${title})`;
+      }
+
+      const routeBeforeOpen = currentRouteSignature();
+      row.scrollIntoView({ block: "center", behavior: "instant" });
+      row.click();
+
+      await waitForWorkoutDetailOpen(routeBeforeOpen, 12000);
+      await waitForWorkoutDetailDateReady(12000);
+      await waitForWorkoutDetailData(15000);
+
+      const workoutId = await resolveWorkoutId(row, 4000);
+      const description = extractWorkoutDescription();
+      const comments = extractComments();
+      const workoutStart = getWorkoutStartDateText() || date;
+
+      workouts.push({
+          rowKey: liveRow.rowKey,
+          name: title,
+          workoutStart,
+          workoutType: liveRow.workoutType,
+          totalTime: liveRow.totalTime,
+        distance: textByCell(row, "distance"),
+        tssValue: cellPartText(row, "tssActual", "value"),
+        tssUnit: cellPartText(row, "tssActual", "units"),
+        description,
+        comments,
+        source: "trainingpeaks",
+        raw: {
+          route: currentRouteSignature(),
+          workoutId,
+        },
+      });
+
+      await closeWorkoutDetail(routeBeforeOpen, 12000);
+    }
+
+    if (workouts.length > 0) {
+      await reportWorkoutsToLocalApi(workouts);
+    }
+  }
+
+  function ensureUi() {
+    if (document.getElementById("tp-sync-panel")) {
+      return;
+    }
+
+    const panel = document.createElement("div");
+    panel.id = "tp-sync-panel";
+    panel.style.position = "fixed";
+    panel.style.right = "16px";
+    panel.style.bottom = "16px";
+    panel.style.zIndex = "99999";
+    panel.style.background = "#0f172a";
+    panel.style.color = "#fff";
+    panel.style.padding = "10px 12px";
+    panel.style.borderRadius = "10px";
+    panel.style.boxShadow = "0 8px 20px rgba(0,0,0,0.3)";
+    panel.style.fontFamily = "system-ui, sans-serif";
+    panel.style.fontSize = "13px";
+
+    const title = document.createElement("div");
+    title.textContent = "TP Sync";
+    title.style.fontWeight = "700";
+    title.style.marginBottom = "8px";
+
+    const status = document.createElement("div");
+    status.textContent = "Lista varasa...";
+    status.style.marginBottom = "8px";
+    status.style.maxWidth = "320px";
+
+    const syncBtn = document.createElement("button");
+    syncBtn.textContent = "Sync";
+    syncBtn.style.border = "none";
+    syncBtn.style.borderRadius = "8px";
+    syncBtn.style.background = "#16a34a";
+    syncBtn.style.color = "white";
+    syncBtn.style.padding = "8px 10px";
+    syncBtn.style.cursor = "pointer";
+    syncBtn.style.fontWeight = "600";
+    syncBtn.style.display = "block";
+    syncBtn.style.width = "100%";
+
+    syncBtn.addEventListener("click", async () => {
+      if (UI_STATE.runInProgress) {
+        return;
+      }
+
+      UI_STATE.runInProgress = true;
+      refreshSyncButtonState();
+
+      try {
+        await runSyncForPendingWorkouts();
+        await refreshPendingFromServer(true);
+      } catch (err) {
+        status.textContent = `Sync hiba: ${err instanceof Error ? err.message : String(err)}`;
+        log("Sync hiba", err);
+      } finally {
+        UI_STATE.runInProgress = false;
+        refreshSyncButtonState();
+      }
+    });
+
+    UI_STATE.syncBtn = syncBtn;
+    UI_STATE.statusEl = status;
+
+    panel.appendChild(title);
+    panel.appendChild(status);
+    panel.appendChild(syncBtn);
+    document.body.appendChild(panel);
+
+    refreshSyncButtonState();
   }
 
   async function main() {
@@ -1018,11 +1523,11 @@
       log("Sorok betoltodtek (lazy load kesleltetesbol kilepve)");
 
       logResultRows();
-      const workouts = await processWorkoutRows(
-        MAX_ROWS_TO_PROCESS,
-        INCLUDE_FUTURE_ROWS,
-      );
-      await reportWorkoutsToLocalApi(workouts);
+
+      ensureUi();
+      startResultListObserver();
+      await refreshPendingFromServer(true);
+      log("TP sync panel kesz, listafigyeles aktiv");
     } catch (error) {
       console.error(LOG_PREFIX, "Hiba:", error);
     }

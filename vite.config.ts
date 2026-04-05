@@ -21,6 +21,7 @@ function fitUploadPlugin(): Plugin {
 
             registerTrainingPeaksRoutes(server, {
                 dbFilePath: TRAININGPEAKS_DB_FILE_PATH,
+                dataDir: ARCHIVE_DIR,
             })
 
             registerSharedRoutes(server, {
