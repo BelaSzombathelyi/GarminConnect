@@ -10,15 +10,23 @@ const TEST_FILES = [
     { name: 'Vivicitta',       file: 'Vivicitta.zip' },
     { name: 'BSzM 4',          file: 'BSzM 4.zip' },
     { name: 'VO2max interval', file: 'VO2 max - SUM 20p 4x5 min, 04_05.zip' },
+    { name: 'Almádi fagyizás',         file: 'Alsoors-Almadai-fagyi-Alsoors.zip' },
     { name: 'Solymár - 3fél óra terepen', file: 'Solymár - 3fél óra terepen.zip' },
 ]
 
-const EXPORT_TEST_ACTIVITY_SLOTS = [
-    { id: '99000000001', dayKey: '2026-03-22' },
-    { id: '99000000002', dayKey: '2026-04-01' },
-    { id: '99000000003', dayKey: '2026-04-02' },
-    { id: '99000000004', dayKey: '2026-04-04' },
-]
+function buildExportSlot(idx: number, text: string): { id: string; dayKey: string } {
+    const id = String(99000000001 + idx)
+
+    const startFromTable = text.match(/^\|\s*Kezdés\s*\|\s*(\d{4})\.\s*(\d{2})\.\s*(\d{2})\./m)
+    if (!startFromTable) {
+        throw new Error('A forrás markdown nem tartalmaz kinyerhető "Kezdés" mezőt az export-fixture dátumhoz.')
+    }
+
+    return {
+        id,
+        dayKey: `${startFromTable[1]}-${startFromTable[2]}-${startFromTable[3]}`,
+    }
+}
 
 const EXPORT_FIXTURE_DIR = join(DATA_DIR, '_export-fixture')
 const EXPORT_OUTPUT_PATH = join(DATA_DIR, 'export-results.md')
@@ -59,9 +67,8 @@ for (const { name, file } of TEST_FILES) {
 
 describe('results export összefűzés', () => {
     it('a korábbi tesztek md kimeneteit másolva exportálhatóan összefűzi', async () => {
-        if (existsSync(EXPORT_FIXTURE_DIR)) {
-            rmSync(EXPORT_FIXTURE_DIR, { recursive: true, force: true })
-        }
+        rmSync(EXPORT_FIXTURE_DIR, { recursive: true, force: true })
+        mkdirSync(EXPORT_FIXTURE_DIR, { recursive: true })
 
         TEST_FILES.forEach(({ name }, idx) => {
             const sourcePath = join(DATA_DIR, `${name}.md`)
@@ -70,7 +77,7 @@ describe('results export összefűzés', () => {
             const text = readFileSync(sourcePath, 'utf8')
             expect(text.length).toBeGreaterThan(0)
 
-            const slot = EXPORT_TEST_ACTIVITY_SLOTS[idx]
+            const slot = buildExportSlot(idx, text)
             const monthKey = slot.dayKey.slice(0, 7)
             const day = slot.dayKey.slice(8, 10)
             const targetDir = join(EXPORT_FIXTURE_DIR, monthKey, day)
@@ -90,7 +97,7 @@ describe('results export összefűzés', () => {
         expect(outputText).toContain('### 2026-03')
         expect(outputText).toContain('### 2026-04')
         expect(outputText).toContain('### Activity: 99000000001')
-        expect(outputText).toContain('### Activity: 99000000004')
+        expect(outputText).toContain(`### Activity: ${String(99000000000 + TEST_FILES.length)}`)
         expect(outputText).toContain('#### Edzés összefoglaló')
         expect(outputText).not.toContain('ismeretlen idő • ismeretlen típus')
     })

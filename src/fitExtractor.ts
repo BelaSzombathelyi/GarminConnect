@@ -295,6 +295,77 @@ function extractSlowSegments(data: FitUploadResponse, _splits: Record<string, un
     return lines.join('\n');
 }
 
+function extractPauseEvents(data: FitUploadResponse): string {
+    const events = data.messages['eventMesgs'] as Record<string, unknown>[] | undefined;
+    const laps = data.messages['lapMesgs'] as Record<string, unknown>[] | undefined;
+    if (!events || events.length === 0) return '';
+
+    const timerEvents = events
+        .map((e) => ({
+            event: String(e['event'] ?? '').toLowerCase(),
+            eventType: String(e['eventType'] ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''),
+            timestamp: toDate(e['timestamp']),
+        }))
+        .filter((e) => e.event === 'timer' && e.timestamp instanceof Date)
+        .sort((a, b) => (a.timestamp?.getTime() ?? 0) - (b.timestamp?.getTime() ?? 0));
+
+    if (timerEvents.length === 0) return '';
+
+    const stopTypes = new Set(['stop', 'stopall', 'stopdisableall']);
+    const startTypes = new Set(['start', 'startall']);
+
+    const pauses: Array<{ start: Date; end: Date; durationSec: number; lapLabel: string }> = [];
+    let pauseStart: Date | null = null;
+
+    function findLapLabel(ts: number): string {
+        if (!laps || laps.length === 0) return '–';
+        const idx = laps.findIndex((l) => {
+            const start = toDate(l['startTime'])?.getTime();
+            const end = toDate(l['endTime'])?.getTime();
+            if (!start || !end) return false;
+            return ts >= start && ts <= end;
+        });
+        return idx >= 0 ? `${idx + 1}` : '–';
+    }
+
+    for (const e of timerEvents) {
+        if (!e.timestamp) continue;
+
+        if (stopTypes.has(e.eventType)) {
+            pauseStart = e.timestamp;
+            continue;
+        }
+
+        if (startTypes.has(e.eventType) && pauseStart) {
+            const durationSec = Math.max(0, Math.round((e.timestamp.getTime() - pauseStart.getTime()) / 1000));
+            if (durationSec >= 10) {
+                pauses.push({
+                    start: pauseStart,
+                    end: e.timestamp,
+                    durationSec,
+                    lapLabel: findLapLabel(pauseStart.getTime()),
+                });
+            }
+            pauseStart = null;
+        }
+    }
+
+    if (pauses.length === 0) return '';
+
+    const lines: string[] = [
+        '### Pause események (timer gomb)',
+        '',
+        '| # | Kezdés | Vége | Időtartam | Kör |',
+        '| :--- | :--- | :--- | ---: | ---: |',
+    ];
+
+    pauses.forEach((p, i) => {
+        lines.push(`| ${i + 1} | ${p.start.toLocaleString('hu-HU')} | ${p.end.toLocaleString('hu-HU')} | ${formatSeconds(p.durationSec)} | ${p.lapLabel} |`);
+    });
+
+    return lines.join('\n');
+}
+
 // ---------------------------------------------------------------------------
 // Public extract functions
 // ---------------------------------------------------------------------------
@@ -552,6 +623,12 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
         lines.push(`| ${summaryHeader.join(' | ')} |`);
         lines.push(`| :--- | ---: | ---: | ---: |`);
         summaryRows.forEach(r => lines.push(`| ${r.join(' | ')} |`));
+    }
+
+    const pauseText = extractPauseEvents(data);
+    if (pauseText) {
+        lines.push('');
+        lines.push(pauseText);
     }
 
     const stopsText = extractStops(data, splits);
