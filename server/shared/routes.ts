@@ -1,5 +1,5 @@
 import type { ViteDevServer } from 'vite'
-import { buildResultsPdf, collectResultTextEntries } from './resultsPdf'
+import { buildResultsMarkdown, collectResultTextEntries } from './resultsExporter'
 import { handleOptions, setCorsHeaders } from './http'
 
 export interface RegisterSharedRoutesOptions {
@@ -9,7 +9,7 @@ export interface RegisterSharedRoutesOptions {
 export function registerSharedRoutes(server: ViteDevServer, options: RegisterSharedRoutesOptions): void {
     const { archiveDir } = options
 
-    server.middlewares.use('/api/download_results_pdf', async (req, res) => {
+    server.middlewares.use('/api/download_results_markdown', async (req, res) => {
         if (handleOptions(req, res)) return
         setCorsHeaders(res)
 
@@ -21,13 +21,13 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
 
         try {
             const entries = await collectResultTextEntries(archiveDir)
-            const pdfBuffer = await buildResultsPdf(entries)
+            const markdownBuffer = await buildResultsMarkdown(entries)
             const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)
 
             res.statusCode = 200
-            res.setHeader('Content-Type', 'application/pdf')
-            res.setHeader('Content-Disposition', `attachment; filename="download-results-${stamp}.pdf"`)
-            res.end(pdfBuffer)
+            res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
+            res.setHeader('Content-Disposition', `attachment; filename="download-results-${stamp}.md"`)
+            res.end(markdownBuffer)
         } catch (err) {
             res.statusCode = 500
             res.setHeader('Content-Type', 'application/json; charset=utf-8')

@@ -18,7 +18,7 @@ for (const { name, file } of TEST_FILES) {
         const { text, errors } = processBuffer(buffer)
 
         // Golden-file: mindig felülíródik – git diff mutatja a változásokat
-        const outputPath = join(DATA_DIR, `${name}.output.txt`)
+        const outputPath = join(DATA_DIR, `${name}.md`)
         writeFileSync(outputPath, text, 'utf8')
 
         it('nem üres kimenetet ad', () => {

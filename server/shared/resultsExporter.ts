@@ -1,6 +1,4 @@
-import PDFDocument from 'pdfkit'
 import { join } from 'node:path'
-import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 
 interface ResultTextEntry {
@@ -16,7 +14,7 @@ interface ResultTextEntry {
     activityTypeLabel: string
     startIso: string | null
     startTimeLabel: string
-    pdfDestination: string
+    markdownId: string
 }
 
 interface ParsedTextMeta {
@@ -26,30 +24,6 @@ interface ParsedTextMeta {
     startIso: string | null
     dayKey: string | null
     startTimeLabel: string
-}
-
-function sanitizeForPdf(value: string): string {
-    const raw = String(value ?? '')
-
-    // Remove ASCII/C1 control chars except common whitespace controls.
-    return raw.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
-}
-
-function resolvePdfFontPath(): string | null {
-    const candidates = [
-        '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
-        '/System/Library/Fonts/Supplemental/Arial Unicode MS.ttf',
-        '/System/Library/Fonts/Supplemental/Times New Roman.ttf',
-        '/Library/Fonts/Arial Unicode.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/dejavu/DejaVuSans.ttf',
-    ]
-
-    for (const fontPath of candidates) {
-        if (existsSync(fontPath)) return fontPath
-    }
-
-    return null
 }
 
 function pad2(value: number): string {
@@ -118,7 +92,7 @@ function compareResultEntries(a: ResultTextEntry, b: ResultTextEntry): number {
     return a.activityId.localeCompare(b.activityId)
 }
 
-async function collectTxtFilesRecursive(rootDir: string): Promise<string[]> {
+async function collectMarkdownFilesRecursive(rootDir: string): Promise<string[]> {
     const files: string[] = []
 
     async function walk(currentDir: string): Promise<void> {
@@ -136,7 +110,7 @@ async function collectTxtFilesRecursive(rootDir: string): Promise<string[]> {
                 continue
             }
 
-            if (entry.isFile() && entry.name.toLowerCase().endsWith('.txt')) {
+            if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
                 files.push(fullPath)
             }
         }
@@ -148,7 +122,7 @@ async function collectTxtFilesRecursive(rootDir: string): Promise<string[]> {
 
 function extractDateAndIdFromPath(filePath: string): { dateKey: string; activityId: string } {
     const normalized = filePath.replace(/\\/g, '/')
-    const pathMatch = normalized.match(/\/(\d{4}-\d{2})\/(\d{2})\/(\d+)\.txt$/)
+    const pathMatch = normalized.match(/\/(\d{4}-\d{2})\/(\d{2})\/(\d+)\.md$/)
     if (pathMatch) {
         return {
             dateKey: `${pathMatch[1]}-${pathMatch[2]}`,
@@ -156,7 +130,7 @@ function extractDateAndIdFromPath(filePath: string): { dateKey: string; activity
         }
     }
 
-    const fileNameMatch = normalized.match(/\/(\d+)\.txt$/)
+    const fileNameMatch = normalized.match(/\/(\d+)\.md$/)
     return {
         dateKey: 'ismeretlen-datum',
         activityId: fileNameMatch ? fileNameMatch[1] : 'ismeretlen-activity',
@@ -164,10 +138,10 @@ function extractDateAndIdFromPath(filePath: string): { dateKey: string; activity
 }
 
 export async function collectResultTextEntries(rootDir: string): Promise<ResultTextEntry[]> {
-    const txtFiles = await collectTxtFilesRecursive(rootDir)
+    const mdFiles = await collectMarkdownFilesRecursive(rootDir)
     const entries: ResultTextEntry[] = []
 
-    for (const filePath of txtFiles) {
+    for (const filePath of mdFiles) {
         const { dateKey, activityId } = extractDateAndIdFromPath(filePath)
         const text = await readFile(filePath, 'utf-8')
         const meta = parseResultTextMeta(text)
@@ -186,7 +160,7 @@ export async function collectResultTextEntries(rootDir: string): Promise<ResultT
             activityTypeLabel: buildActivityTypeLabel(meta),
             startIso: meta.startIso,
             startTimeLabel: meta.startTimeLabel,
-            pdfDestination: `activity-${dayKey}-${activityId}`,
+            markdownId: `activity-${dayKey}-${activityId}`,
         })
     }
 
@@ -195,79 +169,63 @@ export async function collectResultTextEntries(rootDir: string): Promise<ResultT
     return entries
 }
 
-export async function buildResultsPdf(entries: ResultTextEntry[]): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ margin: 50, autoFirstPage: true })
-        const chunks: Buffer[] = []
-        const fontPath = resolvePdfFontPath()
+export async function buildResultsMarkdown(entries: ResultTextEntry[]): Promise<Buffer> {
+    const lines: string[] = []
 
-        doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
-        doc.on('end', () => resolve(Buffer.concat(chunks)))
-        doc.on('error', reject)
+    // Header
+    lines.push('# Garmin Download Results')
+    lines.push('')
+    lines.push(`Generated: ${new Date().toISOString()}`)
+    lines.push('')
 
-        // Embedded Unicode font keeps Hungarian accents readable in generated PDFs.
-        if (fontPath) {
-            doc.font(fontPath)
+    if (entries.length === 0) {
+        lines.push('Nincs elérhető TXT eredmény fájl a data mappában.')
+        return Buffer.from(lines.join('\n'), 'utf-8')
+    }
+
+    // Table of Contents
+    lines.push('## Tartalomjegyzék')
+    lines.push('')
+
+    let currentMonthKey = ''
+    let currentDayKey = ''
+    for (const entry of entries) {
+        if (entry.monthKey !== currentMonthKey) {
+            currentMonthKey = entry.monthKey
+            currentDayKey = ''
+            lines.push(`### ${currentMonthKey}`)
         }
 
-        doc.fontSize(18).text(sanitizeForPdf('Garmin Download Results'), { underline: true })
-        doc.moveDown(0.5)
-        doc.fontSize(10).fillColor('gray').text(sanitizeForPdf(`Generated: ${new Date().toISOString()}`))
-        doc.moveDown()
-        doc.fillColor('black')
-
-        if (entries.length === 0) {
-            doc.fontSize(12).text(sanitizeForPdf('Nincs elerheto TXT eredmeny fajl a data mappaban.'))
-            doc.end()
-            return
+        if (entry.dayKey !== currentDayKey) {
+            currentDayKey = entry.dayKey
+            lines.push(`- **${currentDayKey}**`)
         }
 
-        doc.fontSize(14).fillColor('black').text(sanitizeForPdf('Tartalomjegyzék'), { underline: true })
-        doc.moveDown(0.5)
+        lines.push(`  - [${entry.startTimeLabel} • ${entry.activityTypeLabel} • #${entry.activityId}](#${entry.markdownId})`)
+    }
 
-        let currentMonthKey = ''
-        let currentDayKey = ''
-        for (const entry of entries) {
-            if (entry.monthKey !== currentMonthKey) {
-                currentMonthKey = entry.monthKey
-                currentDayKey = ''
-                doc.moveDown(0.4)
-                doc.fontSize(12).fillColor('black').text(sanitizeForPdf(`${currentMonthKey}`))
-            }
+    lines.push('')
+    lines.push('---')
+    lines.push('')
 
-            if (entry.dayKey !== currentDayKey) {
-                currentDayKey = entry.dayKey
-                doc.fontSize(10).fillColor('black').text(sanitizeForPdf(`  ${currentDayKey}`))
-            }
-
-            doc.fontSize(10).fillColor('#1d4ed8').text(
-                sanitizeForPdf(`    ${entry.startTimeLabel} [${entry.activityTypeLabel}] #${entry.activityId}`),
-                { goTo: entry.pdfDestination },
-            )
+    // Activities
+    let currentDate = ''
+    for (const entry of entries) {
+        if (entry.dayKey !== currentDate) {
+            currentDate = entry.dayKey
+            lines.push(`## ${currentDate}`)
+            lines.push('')
         }
 
-        doc.addPage()
+        lines.push(`### Activity: ${entry.activityId} {#${entry.markdownId}}`)
+        lines.push('')
+        lines.push(`**Típus:** ${entry.activityTypeLabel} | **Kezdés:** ${entry.startTimeLabel}`)
+        lines.push('')
+        lines.push('```')
+        lines.push(entry.text || '(üres)')
+        lines.push('```')
+        lines.push('')
+    }
 
-        let currentDate = ''
-        for (const entry of entries) {
-            if (entry.dayKey !== currentDate) {
-                currentDate = entry.dayKey
-                doc.moveDown(0.8)
-                doc.fontSize(14).fillColor('black').text(sanitizeForPdf(`${currentDate}`), { underline: true })
-                doc.moveDown(0.3)
-            }
-
-            doc.fontSize(11).fillColor('black').text(
-                sanitizeForPdf(`Activity: ${entry.activityId} | Típus: ${entry.activityTypeLabel} | Kezdés: ${entry.startTimeLabel}`),
-                { destination: entry.pdfDestination },
-            )
-            doc.moveDown(0.2)
-            doc.fontSize(10).fillColor('black').text(sanitizeForPdf(entry.text || '(ures)'), {
-                lineGap: 1,
-            })
-            doc.moveDown(0.8)
-        }
-
-        doc.end()
-    })
+    return Buffer.from(lines.join('\n'), 'utf-8')
 }

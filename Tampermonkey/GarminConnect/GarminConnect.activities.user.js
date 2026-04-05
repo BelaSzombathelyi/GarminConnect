@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Garmin Connect Activities Sync
 // @namespace    https://connect.garmin.com/
-// @version      1.9
+// @version      2.0
 // @description  Activities lista riport + ÚJ aktivitások egyszerre megnyitása auto letöltéshez
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
@@ -100,14 +100,14 @@
         });
     }
 
-    async function downloadResultsPdf() {
-        const res = await httpRequestArrayBuffer('GET', `${API_BASE}/download_results_pdf`);
-        const blob = new Blob([res.data], { type: res.contentType || 'application/pdf' });
+    async function downloadResultsMarkdown() {
+        const res = await httpRequestArrayBuffer('GET', `${API_BASE}/download_results_markdown`);
+        const blob = new Blob([res.data], { type: res.contentType || 'text/markdown' });
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         const ts = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
         a.href = objectUrl;
-        a.download = `download-results-${ts}.pdf`;
+        a.download = `download-results-${ts}.md`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -484,7 +484,7 @@
         UI_STATE.statusEl = status;
 
         const pdfBtn = document.createElement('button');
-        pdfBtn.textContent = 'Download Results PDF';
+        pdfBtn.textContent = 'Export';
         pdfBtn.style.border = 'none';
         pdfBtn.style.borderRadius = '8px';
         pdfBtn.style.background = '#2563eb';
@@ -543,14 +543,14 @@
         pdfBtn.addEventListener('click', async () => {
             pdfBtn.disabled = true;
             pdfBtn.style.opacity = '0.7';
-            status.textContent = 'PDF készítése és letöltése...';
+            status.textContent = 'Exportálás...';
 
             try {
-                await downloadResultsPdf();
-                status.textContent = 'PDF letöltve.';
+                await downloadResultsMarkdown();
+                status.textContent = 'Exportálva.';
             } catch (err) {
-                console.error('[Activities Sync] PDF hiba:', err);
-                status.textContent = `PDF hiba: ${err instanceof Error ? err.message : String(err)}`;
+                console.error('[Activities Sync] Export hiba:', err);
+                status.textContent = `Hiba: ${err instanceof Error ? err.message : String(err)}`;
             } finally {
                 pdfBtn.disabled = false;
                 pdfBtn.style.opacity = '1';

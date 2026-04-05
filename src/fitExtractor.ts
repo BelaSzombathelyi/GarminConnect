@@ -25,7 +25,7 @@ function secondsToHHMM(seconds: unknown): string {
     if (typeof seconds !== 'number') return '–';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    return `${h}:${String(m).padStart(2, '0')}`;
 }
 
 function mpsToMinPerKm(speed: unknown): string {
@@ -474,7 +474,7 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
             const r = block['rest'] as Record<string, unknown>;
 
             return [
-                `${++activeIdx}.`,
+                `${++activeIdx}`,
                 'Intervallum',
                 `${km(a['totalDistance'])} / ${km(r['totalDistance'])}`,
                 `${formatSeconds(a['totalElapsedTime'] as number)} + ${formatSeconds(r['totalElapsedTime'] as number)}`,
@@ -488,7 +488,7 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
         const type = String(split['splitType'] ?? '');
         const isActive = ACTIVE_SPLIT_TYPES.has(type);
         const label = SPLIT_TYPE_HU[type] ?? type;
-        const idx = isActive ? `${++activeIdx}.` : `(${++passiveIdx})`;
+        const idx = isActive ? `${++activeIdx}` : `${++passiveIdx}`;
 
         return [
             idx,
@@ -502,25 +502,32 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
     });
 
     const lines = [
-        `--- Intervallumok / splitMesgs (${filtered.length} bejegyzés, ${activeIdx} blokk) ---`,
-        header.join(','),
-        ...rows.map(r => r.join(',')),
+        `### Intervallumok - **${filtered.length} bejegyzés, ${activeIdx} blokk**`,
+        '',
+        `| ${header.join(' | ')} |`,
+        `| :--- | :--- | ---: | ---: | ---: | ---: | ---: |`,
+        ...rows.map(r => `| ${r.join(' | ')} |`),
     ];
 
     if (summaries && summaries.length > 0) {
         lines.push('');
-        lines.push('--- Intervallum összefoglalók (splitSummaryMesgs) ---');
-        lines.push('Típus,Darab,Össz táv (km),Össz idő');
+        lines.push('### Intervallum összefoglalók');
+        lines.push('');
+        const summaryHeader = ['Típus', 'Darab', 'Össz táv (km)', 'Össz idő'];
+        const summaryRows: string[][] = [];
         const NOISE_TYPES = new Set(['rwdWalk', 'rwdStand']);
         for (const s of summaries) {
             const type = String(s['splitType'] ?? '');
             if (NOISE_TYPES.has(type) && typeof s['totalTimerTime'] === 'number' && (s['totalTimerTime'] as number) < 30) continue;
             const label = SPLIT_TYPE_HU[type] ?? type;
-            const count = typeof s['numSplits'] === 'number' ? s['numSplits'] : '–';
+            const count = typeof s['numSplits'] === 'number' ? String(s['numSplits']) : '–';
             const dist = km(s['totalDistance']);
             const time = typeof s['totalTimerTime'] === 'number' ? formatSeconds(s['totalTimerTime'] as number) : '–';
-            lines.push(`${label},${count},${dist},${time}`);
+            summaryRows.push([label, count, dist, time]);
         }
+        lines.push(`| ${summaryHeader.join(' | ')} |`);
+        lines.push(`| :--- | ---: | ---: | ---: |`);
+        summaryRows.forEach(r => lines.push(`| ${r.join(' | ')} |`));
     }
 
     const stopsText = extractStops(data, splits);
@@ -562,7 +569,7 @@ export function extractLaps(data: FitUploadResponse): string {
     ];
 
     const rows = laps.map((lap, i) => [
-        `${i + 1}.`,
+        `${i + 1}`,
         km(lap['totalDistance']),
         mpsToMinPerKm(lap['avgSpeed']),
         num(lap['totalAscent'], 0),
@@ -578,9 +585,11 @@ export function extractLaps(data: FitUploadResponse): string {
     ]);
 
     const lines = [
-        `körök (nem feltétlenül egységes km-ek) (összesen ${laps.length} kör)`,
-        header.join(','),
-        ...rows.map(r => r.join(',')),
+        `## Körök (nem feltétlenül egységes km-ek) - **${laps.length} kör**`,
+        '',
+        `| ${header.join(' | ')} |`,
+        `| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |`,
+        ...rows.map(r => `| ${r.join(' | ')} |`),
     ];
     return lines.join('\n');
 }

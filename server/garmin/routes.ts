@@ -103,7 +103,7 @@ async function cleanupIncompleteActivities(
     const expectedFiles = new Set<string>()
     for (const id of ids) {
         expectedFiles.add(`${id}.zip`)
-        expectedFiles.add(`${id}.txt`)
+        expectedFiles.add(`${id}.md`)
     }
 
     async function walkAndDelete(dir: string): Promise<void> {
@@ -176,11 +176,11 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
                         console.warn(`[downloads] Dekódolási hibák (${activityId}):`, errors)
                     }
 
-                    const txtPath = join(dirname(archivedPath), `${activityId}.txt`)
-                    await writeFile(txtPath, text, 'utf-8')
+                    const mdPath = join(dirname(archivedPath), `${activityId}.md`)
+                    await writeFile(mdPath, text, 'utf-8')
 
                     activityStore.markProcessed(activityId)
-                    console.log(`[downloads] PROCESSED: ${activityId} (${txtPath})`)
+                    console.log(`[downloads] PROCESSED: ${activityId} (${mdPath})`)
                 } catch (err) {
                     console.error(`[downloads] Feldolgozási hiba (${activityId}):`, err)
                 }
