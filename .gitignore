@@ -12,4 +12,5 @@ node_modules/
 data/
 !tests/data/
 !tests/data/*
+tests/data/_export-fixture/
 /dist
