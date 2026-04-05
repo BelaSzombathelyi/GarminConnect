@@ -1,10 +1,10 @@
 import { DatabaseSync } from 'node:sqlite'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 export interface TrainingPeaksComment {
     text: string
-    dateTime?: string
+    date?: string
     user?: string
 }
 
@@ -23,7 +23,6 @@ export interface TrainingPeaksWorkoutInput {
     tssUnit?: string
     description?: string
     comments?: (string | TrainingPeaksComment)[]
-    source?: string
     raw?: Record<string, unknown>
 }
 
@@ -38,7 +37,6 @@ interface NormalizedWorkout {
     tssUnit: string
     workoutId: string
     filePath: string
-    source: string
 }
 
 function nowIso(): string {
@@ -60,28 +58,38 @@ function parseTss(item: TrainingPeaksWorkoutInput): { tssValue: string; tssUnit:
     return { tssValue: combined, tssUnit: '' }
 }
 
-// workoutStart formátumok: "5/4/26" (D/M/YY), "5/4/2026" → "2026-04/05"
+// workoutStart formátumok: "5/4/26" (D/M/YY), "5/4/2026", "2026-04-05", "2026-04-05T16:54:49",
+// illetve timezone-os ISO változatok. A tárolási útvonal mindig csak nap szintig megy.
 function workoutStartToFolderParts(workoutStart: string): { yearMonth: string; day: string } | null {
-    const match = workoutStart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
-    if (!match) return null
-    const day = match[1].padStart(2, '0')
-    const month = match[2].padStart(2, '0')
-    let year = Number(match[3])
+    const value = String(workoutStart ?? '').trim()
+    const isoDateMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/)
+    if (isoDateMatch) {
+        return {
+            yearMonth: `${isoDateMatch[1]}-${isoDateMatch[2]}`,
+            day: isoDateMatch[3],
+        }
+    }
+
+    const slashDateMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
+    if (!slashDateMatch) return null
+    const day = slashDateMatch[1].padStart(2, '0')
+    const month = slashDateMatch[2].padStart(2, '0')
+    let year = Number(slashDateMatch[3])
     if (year < 100) year += 2000
     return { yearMonth: `${year}-${month}`, day }
 }
 
 function normalizeComments(raw: TrainingPeaksWorkoutInput['comments']): TrainingPeaksComment[] {
     if (!Array.isArray(raw)) return []
-    return raw.map((c) => {
-        if (typeof c === 'string') return { text: c, dateTime: '', user: '' }
-        const comment = c as TrainingPeaksComment & { author?: string; date?: string }
+    const mapped = raw.map((c) => {
+        if (typeof c === 'string') return { text: c, date: '', user: '' }
+        const comment = c as TrainingPeaksComment & { author?: string; dateTime?: string }
         return {
             text: String(comment.text ?? ''),
-            dateTime: comment.dateTime
-                ? String(comment.dateTime)
-                : comment.date
-                  ? String(comment.date)
+            date: comment.date
+                ? String(comment.date)
+                : comment.dateTime
+                  ? String(comment.dateTime)
                   : '',
             user: comment.user
                 ? String(comment.user)
@@ -90,11 +98,71 @@ function normalizeComments(raw: TrainingPeaksWorkoutInput['comments']): Training
                   : '',
         }
     })
+
+    return mapped.filter((c) => {
+        const text = String(c.text ?? '').trim()
+        if (!text) return false
+        if (/^has comments$/i.test(text)) return false
+        return true
+    })
 }
 
 // Csak a rowKey-t vonja ki – lightweight check-ekhez (nincs workoutId szükséges)
 function extractRowKey(item: TrainingPeaksWorkoutInput): string | null {
     return String(item.rowKey ?? '').trim() || null
+}
+
+function rowKeyToWorkoutDay(rowKey: string): string {
+    const idx = rowKey.indexOf('_')
+    return idx >= 0 ? rowKey.slice(0, idx).trim() : rowKey.trim()
+}
+
+// Lokális ISO datetime stringet ms-be alakítja (éjfél = T00:00:00).
+function localIsoToMs(isoStr: string): number | null {
+    const m = isoStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?/)
+    if (!m) return null
+    return new Date(
+        Number(m[1]),
+        Number(m[2]) - 1,
+        Number(m[3]),
+        Number(m[4] ?? 0),
+        Number(m[5] ?? 0),
+        Number(m[6] ?? 0),
+    ).getTime()
+}
+
+function msToLocalIso(ms: number): string {
+    const d = new Date(ms)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+function normalizeWorkoutStartDateTime(value: string): string | null {
+    const input = String(value ?? '').trim()
+    if (!input) return null
+
+    // Már pontos datetime esetén megtartjuk az eredeti értéket.
+    if (/^\d{4}-\d{2}-\d{2}T/.test(input)) {
+        return input
+    }
+
+    // ISO dátum -> éjfélre normalizált datetime.
+    const isoDateMatch = input.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (isoDateMatch) {
+        return `${isoDateMatch[1]}-${isoDateMatch[2]}-${isoDateMatch[3]}T00:00:00`
+    }
+
+    // D/M/YY vagy D/M/YYYY -> ISO datetime 00:00:00.
+    const slashDateMatch = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
+    if (slashDateMatch) {
+        const day = slashDateMatch[1].padStart(2, '0')
+        const month = slashDateMatch[2].padStart(2, '0')
+        let year = Number(slashDateMatch[3])
+        if (year < 100) year += 2000
+        return `${year}-${month}-${day}T00:00:00`
+    }
+
+    return null
 }
 
 // Teljes normalizálás – csak akkor fut, ha workoutId is megvan
@@ -108,15 +176,17 @@ function normalizeWorkout(item: TrainingPeaksWorkoutInput): NormalizedWorkout | 
 
     const { tssValue, tssUnit } = parseTss(item)
 
-    const folderParts = workoutStartToFolderParts(workoutStart)
-    const filePath = folderParts
-        ? join('TrainingPeaks', folderParts.yearMonth, folderParts.day, `${workoutId}.json`)
-        : join('TrainingPeaks', `${workoutId}.json`)
+    const workoutDayFromRowKey = rowKeyToWorkoutDay(rowKey)
+    const normalizedWorkoutStart =
+        normalizeWorkoutStartDateTime(workoutStart) ??
+        normalizeWorkoutStartDateTime(workoutDayFromRowKey) ??
+        workoutStart
+    const filePath = buildRelativeWorkoutPath(normalizedWorkoutStart, workoutId)
 
     return {
         rowKey,
         name,
-        workoutStart,
+        workoutStart: normalizedWorkoutStart,
         workoutType: String(item.workoutType ?? '').trim(),
         totalTime: String(item.totalTime ?? '').trim(),
         distance: String(item.distance ?? '').trim(),
@@ -124,8 +194,14 @@ function normalizeWorkout(item: TrainingPeaksWorkoutInput): NormalizedWorkout | 
         tssUnit,
         workoutId,
         filePath,
-        source: String(item.source ?? 'trainingpeaks').trim() || 'trainingpeaks',
     }
+}
+
+function buildRelativeWorkoutPath(workoutStart: string, workoutId: string): string {
+    const folderParts = workoutStartToFolderParts(workoutStart)
+    return folderParts
+        ? join('TrainingPeaks', folderParts.yearMonth, folderParts.day, `${workoutId}.json`)
+        : join('TrainingPeaks', `${workoutId}.json`)
 }
 
 function buildFullJson(item: TrainingPeaksWorkoutInput, normalized: NormalizedWorkout): Record<string, unknown> {
@@ -141,8 +217,7 @@ function buildFullJson(item: TrainingPeaksWorkoutInput, normalized: NormalizedWo
         tssUnit: normalized.tssUnit,
         description: String(item.description ?? '').trim(),
         comments: normalizeComments(item.comments),
-        source: normalized.source,
-        raw: item.raw ?? null,
+        source: 'trainingpeaks',
         savedAt: nowIso(),
     }
 }
@@ -151,6 +226,7 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
     mkdirSync(dirname(dbFilePath), { recursive: true })
 
     const db = new DatabaseSync(dbFilePath)
+
     const schemaSql = `
         CREATE TABLE IF NOT EXISTS trainingpeaks_workouts (
             row_key TEXT NOT NULL PRIMARY KEY,
@@ -158,12 +234,10 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
             name TEXT NOT NULL,
             workout_start TEXT NOT NULL,
             workout_type TEXT NOT NULL DEFAULT '',
-            source TEXT NOT NULL DEFAULT 'trainingpeaks',
             total_time TEXT NOT NULL DEFAULT '',
             distance TEXT NOT NULL DEFAULT '',
             tss_value TEXT NOT NULL DEFAULT '',
             tss_unit TEXT NOT NULL DEFAULT '',
-            file_path TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -172,27 +246,34 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
     `
     db.exec(schemaSql)
 
+    // Migráció: garmin_activity_id oszlop hozzáadása, ha még nem létezik.
+    try {
+        db.exec(`ALTER TABLE trainingpeaks_workouts ADD COLUMN garmin_activity_id TEXT NOT NULL DEFAULT ''`)
+    } catch {
+        // Már létezik – rendben.
+    }
+
     const selectByRowKeyStmt = db.prepare(`
         SELECT row_key FROM trainingpeaks_workouts WHERE row_key = ? LIMIT 1
     `)
 
     const selectByWorkoutIdStmt = db.prepare(`
-        SELECT row_key, file_path FROM trainingpeaks_workouts WHERE workout_id = ? LIMIT 1
+        SELECT row_key, workout_start, workout_id FROM trainingpeaks_workouts WHERE workout_id = ? LIMIT 1
     `)
 
     const deleteByRowKeyStmt = db.prepare(`DELETE FROM trainingpeaks_workouts WHERE row_key = ?`)
 
     const insertStmt = db.prepare(`
         INSERT INTO trainingpeaks_workouts
-            (row_key, workout_id, name, workout_start, workout_type, source,
-             total_time, distance, tss_value, tss_unit, file_path, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (row_key, workout_id, name, workout_start, workout_type,
+             total_time, distance, tss_value, tss_unit, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     const updateStmt = db.prepare(`
         UPDATE trainingpeaks_workouts
-        SET workout_id = ?, name = ?, workout_start = ?, workout_type = ?, source = ?,
-            total_time = ?, distance = ?, tss_value = ?, tss_unit = ?, file_path = ?, updated_at = ?
+        SET workout_id = ?, name = ?, workout_start = ?, workout_type = ?,
+            total_time = ?, distance = ?, tss_value = ?, tss_unit = ?, updated_at = ?
         WHERE row_key = ?
     `)
 
@@ -219,14 +300,18 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
             try {
                 for (const { item, normalized } of pairs) {
                     const existingByWorkoutId = selectByWorkoutIdStmt.get(normalized.workoutId) as
-                        | { row_key: string; file_path: string }
+                        | { row_key: string; workout_start: string; workout_id: string }
                         | undefined
 
                     if (existingByWorkoutId && existingByWorkoutId.row_key !== normalized.rowKey) {
                         deleteByRowKeyStmt.run(existingByWorkoutId.row_key)
 
-                        if (existingByWorkoutId.file_path && existingByWorkoutId.file_path !== normalized.filePath) {
-                            const staleFilePath = join(dataDir, existingByWorkoutId.file_path)
+                        const previousPath = buildRelativeWorkoutPath(
+                            existingByWorkoutId.workout_start,
+                            existingByWorkoutId.workout_id,
+                        )
+                        if (previousPath && previousPath !== normalized.filePath) {
+                            const staleFilePath = join(dataDir, previousPath)
                             if (existsSync(staleFilePath)) {
                                 rmSync(staleFilePath, { force: true })
                             }
@@ -239,10 +324,10 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
                     if (!existing) {
                         insertStmt.run(
                             normalized.rowKey, normalized.workoutId, normalized.name,
-                            normalized.workoutStart, normalized.workoutType, normalized.source,
+                            normalized.workoutStart, normalized.workoutType,
                             normalized.totalTime, normalized.distance,
                             normalized.tssValue, normalized.tssUnit,
-                            normalized.filePath, timestamp, timestamp,
+                            timestamp, timestamp,
                         )
                         console.info('[trainingpeaks] uj workout erkezett', {
                             rowKey: normalized.rowKey,
@@ -256,10 +341,10 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
 
                     updateStmt.run(
                         normalized.workoutId, normalized.name,
-                        normalized.workoutStart, normalized.workoutType, normalized.source,
+                        normalized.workoutStart, normalized.workoutType,
                         normalized.totalTime, normalized.distance,
                         normalized.tssValue, normalized.tssUnit,
-                        normalized.filePath, timestamp,
+                        timestamp,
                         normalized.rowKey,
                     )
                     updated += 1
@@ -288,9 +373,38 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
 
         getAllForCleanup(): Array<{ rowKey: string; filePath: string }> {
             const rows = db.prepare(`
-                SELECT row_key, file_path FROM trainingpeaks_workouts
-            `).all() as Array<{ row_key: string; file_path: string }>
-            return rows.map((r) => ({ rowKey: r.row_key, filePath: r.file_path }))
+                SELECT row_key, workout_start, workout_id FROM trainingpeaks_workouts
+            `).all() as Array<{ row_key: string; workout_start: string; workout_id: string }>
+            return rows.map((r) => ({
+                rowKey: r.row_key,
+                filePath: buildRelativeWorkoutPath(r.workout_start, r.workout_id),
+            }))
+        },
+
+        getAllForMaintenance(): Array<{ rowKey: string; workoutId: string; workoutStart: string; filePath: string }> {
+            const rows = db.prepare(`
+                SELECT row_key, workout_id, workout_start
+                FROM trainingpeaks_workouts
+            `).all() as Array<{
+                row_key: string
+                workout_id: string
+                workout_start: string
+            }>
+
+            return rows.map((r) => ({
+                rowKey: r.row_key,
+                workoutId: r.workout_id,
+                workoutStart: r.workout_start,
+                filePath: buildRelativeWorkoutPath(r.workout_start, r.workout_id),
+            }))
+        },
+
+        updateRecordLocation(rowKey: string, workoutStart: string, filePath: string) {
+            db.prepare(`
+                UPDATE trainingpeaks_workouts
+                SET workout_start = ?, updated_at = ?
+                WHERE row_key = ?
+            `).run(workoutStart, nowIso(), rowKey)
         },
 
         deleteByRowKeys(rowKeys: string[]): number {
@@ -315,6 +429,76 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
             `)
             db.exec(schemaSql)
             return { ok: true, resetAt: nowIso() }
+        },
+
+        /**
+         * Garmin FIT startTime alapján megkeresi a legközelebbi TP edzést (±toleranceSec másodpercen belül).
+         * Visszaadja a JSON fájl tartalmát, ha van egyezés.
+         */
+        findByDateTimeNear(
+            isoDateTime: string,
+            toleranceSec = 60,
+        ): { workoutId: string; filePath: string; fileContent: Record<string, unknown> } | null {
+            const refMs = localIsoToMs(isoDateTime)
+            if (refMs === null) return null
+
+            const lower = msToLocalIso(refMs - toleranceSec * 1000)
+            const upper = msToLocalIso(refMs + toleranceSec * 1000)
+
+            const rows = db.prepare(`
+                SELECT workout_id, workout_start
+                FROM trainingpeaks_workouts
+                WHERE workout_start >= ? AND workout_start <= ?
+            `).all(lower, upper) as Array<{ workout_id: string; workout_start: string }>
+
+            if (rows.length === 0) return null
+
+            // Legközelebbi kiválasztása
+            let best = rows[0]
+            let bestDiff = Math.abs((localIsoToMs(best.workout_start) ?? Infinity) - refMs)
+            for (const row of rows.slice(1)) {
+                const diff = Math.abs((localIsoToMs(row.workout_start) ?? Infinity) - refMs)
+                if (diff < bestDiff) { best = row; bestDiff = diff }
+            }
+
+            const filePath = buildRelativeWorkoutPath(best.workout_start, best.workout_id)
+            const absPath = join(dataDir, filePath)
+            if (!existsSync(absPath)) return null
+
+            try {
+                const fileContent = JSON.parse(readFileSync(absPath, 'utf-8')) as Record<string, unknown>
+                return { workoutId: best.workout_id, filePath, fileContent }
+            } catch {
+                return null
+            }
+        },
+
+        /**
+         * Bejegyzi a Garmin aktivitás ID-t a TP rekordhoz (DB + JSON fájl).
+         */
+        linkGarminActivity(workoutId: string, garminActivityId: string): boolean {
+            const row = db.prepare(
+                `SELECT row_key, workout_start FROM trainingpeaks_workouts WHERE workout_id = ? LIMIT 1`,
+            ).get(workoutId) as { row_key: string; workout_start: string } | undefined
+            if (!row) return false
+
+            db.prepare(
+                `UPDATE trainingpeaks_workouts SET garmin_activity_id = ?, updated_at = ? WHERE workout_id = ?`,
+            ).run(garminActivityId, nowIso(), workoutId)
+
+            const filePath = buildRelativeWorkoutPath(row.workout_start, workoutId)
+            const absPath = join(dataDir, filePath)
+            if (existsSync(absPath)) {
+                try {
+                    const content = JSON.parse(readFileSync(absPath, 'utf-8')) as Record<string, unknown>
+                    content.garminActivityId = garminActivityId
+                    writeFileSync(absPath, JSON.stringify(content, null, 2), 'utf-8')
+                } catch {
+                    // Nem kritikus: DB frissítés megtörtént.
+                }
+            }
+
+            return true
         },
     }
 }

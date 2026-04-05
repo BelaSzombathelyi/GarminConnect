@@ -34,6 +34,7 @@
       ".searchResults.workoutSearchResults tbody tr.workoutSearchResult",
     totalHits: ".totalHits",
     workoutDetailDayName: "#dayName",
+    workoutDetailStartTimeInput: "#startTimeInput",
     workoutDetailCloseIcon: "#closeIcon",
     workoutQuickViewRoot: "#workOutQuickView",
     endDateInput:
@@ -345,6 +346,47 @@
     }
 
     return parsed;
+  }
+
+  function resolveWorkoutStartDate(detailDateText, listDateText) {
+    const detail = normalizedText(detailDateText);
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})?$/.test(detail)) {
+      return detail;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(detail)) {
+      return detail;
+    }
+
+    if (detail && parseWorkoutDayToDate(detail)) {
+      return detail;
+    }
+
+    const listDate = normalizedText(listDateText);
+    if (listDate && parseWorkoutDayToDate(listDate)) {
+      return listDate;
+    }
+
+    return detail || listDate;
+  }
+
+  function getWorkoutStartDateTimeValue() {
+    const root = getWorkoutQuickViewRoot();
+    const startTimeInput =
+      (root && root.querySelector(SELECTORS.workoutDetailStartTimeInput)) ||
+      document.querySelector(SELECTORS.workoutDetailStartTimeInput);
+
+    const candidates = [
+      normalizedText(startTimeInput?.value || ""),
+      normalizedText(startTimeInput?.getAttribute("value") || ""),
+      normalizedText(startTimeInput?.getAttribute("datetime") || ""),
+    ];
+
+    return (
+      candidates.find((value) =>
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})?$/.test(value),
+      ) || ""
+    );
   }
 
   function formatDateForTrainingPeaks(date) {
@@ -692,6 +734,8 @@
   function extractWorkoutDescription() {
     const root = getWorkoutQuickViewRoot() || document;
     const directSelectors = [
+      "#descriptionInput",
+      "#descriptionPrintable",
       "textarea.description",
       "textarea[name='description']",
       "textarea[data-cy='description']",
@@ -715,6 +759,7 @@
       if (el && isVisible(el) && text) {
         if (
           text.length > 500 ||
+          /^Enter a new comment$/i.test(text) ||
           /Save\s*&\s*Close|Pre-activity Comments|Post-activity Comments|Back to SearchView/i.test(
             text,
           )
@@ -758,7 +803,7 @@
       return "";
     }
 
-    return `${year}-${month}-${day}T00:00:00`;
+    return `${year}-${month}-${day}`;
   }
 
   function parseCommentText(rawComment) {
@@ -769,7 +814,7 @@
 
     if (!match) {
       return {
-        dateTime: "",
+        date: "",
         user: "",
         text,
       };
@@ -777,9 +822,17 @@
 
     return {
       user: normalizedText(match[1]),
-      dateTime: parseTrainingPeaksCommentDate(match[2]),
+      date: parseTrainingPeaksCommentDate(match[2]),
       text: normalizedText(match[3]),
     };
+  }
+
+  function isMeaningfulComment(comment) {
+    if (!comment || typeof comment !== "object") return false;
+    const text = normalizedText(comment.text);
+    if (!text) return false;
+    if (/^Has comments$/i.test(text)) return false;
+    return true;
   }
 
   function extractComments() {
@@ -799,16 +852,27 @@
       );
 
       if (nodes.length > 0) {
-        return nodes.map((el) => parseCommentText(el.textContent));
+        const comments = nodes
+          .map((el) => parseCommentText(el.textContent))
+          .filter(isMeaningfulComment);
+        return comments;
       }
     }
 
     const fallback = findSectionTextByHeading(/^comments?$/i);
-    return fallback ? [parseCommentText(fallback)] : [];
+    if (!fallback) return [];
+    const parsed = parseCommentText(fallback);
+    return isMeaningfulComment(parsed) ? [parsed] : [];
   }
 
   function getWorkoutStartDateText() {
+    const startTimeValue = getWorkoutStartDateTimeValue();
+    if (startTimeValue) {
+      return startTimeValue;
+    }
+
     const root = getWorkoutQuickViewRoot();
+
     const dayName =
       (root && root.querySelector(SELECTORS.workoutDetailDayName)) ||
       document.querySelector(SELECTORS.workoutDetailDayName);
@@ -918,6 +982,11 @@
   async function waitForWorkoutDetailDateReady(timeoutMs = 12000) {
     await waitForCondition(
       () => {
+        const startDateTime = getWorkoutStartDateTimeValue();
+        if (startDateTime) {
+          return true;
+        }
+
         const root = getWorkoutQuickViewRoot();
         const dayName =
           (root && root.querySelector(SELECTORS.workoutDetailDayName)) ||
@@ -927,7 +996,7 @@
       },
       timeoutMs,
       200,
-      "workout detail dayName",
+      "workout detail datetime/dayName",
     );
 
     // A dayName megjelenese utan az ablak meg tolthet adatokat.
@@ -1118,7 +1187,7 @@
       const workoutId = await resolveWorkoutId(row, 4000);
       const description = extractWorkoutDescription();
       const comments = extractComments();
-      const workoutStart = getWorkoutStartDateText() || date;
+      const workoutStart = resolveWorkoutStartDate(getWorkoutStartDateText(), date);
 
       collected.push({
           rowKey: buildRowKey(
@@ -1385,7 +1454,7 @@
       const workoutId = await resolveWorkoutId(row, 4000);
       const description = extractWorkoutDescription();
       const comments = extractComments();
-      const workoutStart = getWorkoutStartDateText() || date;
+      const workoutStart = resolveWorkoutStartDate(getWorkoutStartDateText(), date);
 
       workouts.push({
           rowKey: liveRow.rowKey,

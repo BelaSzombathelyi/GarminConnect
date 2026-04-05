@@ -5,7 +5,13 @@ import { FitUploadResponse, buildTextOutput } from '../../src/fitExtractor'
 export interface ProcessResult {
     text: string
     activityId: string | null
+    startTimeIso: string | null
     errors: string[]
+}
+
+function toLocalIso(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 export function processBuffer(buffer: Buffer, activityId: string | null = null): ProcessResult {
@@ -36,5 +42,18 @@ export function processBuffer(buffer: Buffer, activityId: string | null = null):
     }
 
     const text = buildTextOutput(data)
-    return { text, activityId, errors: errors.map(String) }
+
+    // Kezdési időpont kinyerése (lokális idő) a TP egyeztetéshez
+    let startTimeIso: string | null = null
+    const sessionMesgs = data.messages['sessionMesgs'] as Record<string, unknown>[] | undefined
+    const session = sessionMesgs?.[0]
+    if (session?.['startTime']) {
+        const val = session['startTime']
+        let d: Date | null = null
+        if (val instanceof Date) d = val
+        else if (typeof val === 'number') d = new Date(val * 1000)
+        if (d) startTimeIso = toLocalIso(d)
+    }
+
+    return { text, activityId, startTimeIso, errors: errors.map(String) }
 }

@@ -1,0 +1,638 @@
+<div id="workOutQuickView">
+    <div class="workoutAnalysisModal"></div>
+    <div class="workoutAnalysisUpgradeModal"></div>
+    <div class="QVHeader">
+
+        <div class="closeAndSettings cf">
+            <div class="settingsIcon">
+              <div></div>
+            </div>
+            <div id="menuIcon">
+              <div></div>
+            </div>
+            <div id="expandIcon" class="">
+              <div></div>
+            </div>
+            <div id="collapseIcon">
+              <div></div>
+            </div>
+            <div id="closeIcon">
+              <div></div>
+            </div>
+        </div>
+
+        <div class="QVHeaderItemsContain cf">
+            <div class="dateAndTime">
+                <span id="date" title="Select Date" data-tooltipclass="below">
+                    <span id="dayName">Saturday</span>
+                    <span id="calendarDate">4 April, 2026</span>
+                </span>
+
+                <input title="Select Time" data-tooltipclass="below" type="text" id="startTimeInput" value="2026-04-04T10:11:25" placeholder="Enter Time" tabindex="-1" autocomplete="off" class="ui-timepicker-input">
+                <div class="recurringServiceContainer"><div><div class="recurringBuilder" tabindex="0" data_cy="recurringBuilder"><span class="recurringBuilderLabel">Does not repeat</span><div class="recurringBuilderArrowIcon"></div></div></div></div>
+            </div>
+
+            <div class="performanceData">
+<div class="fitness CTL" title="CTL"><span class="label">Fitness</span> <span class="value">79</span></div>
+<div class="fatigue ATL" title="ATL"><span class="label">Fatigue</span> <span class="value">94</span></div>
+<div class="form TSB" title="TSB"><span class="label">Form</span> <span class="value">3</span></div>
+</div>
+
+
+            <div class="workoutBarView">
+              <div class="statusIcons">
+                  <div class="lockIcon statusIcon hide" title="This workout is locked."></div>
+
+                  <div class="hiddenIcon statusIcon hide" title="This workout is hidden"></div>
+              </div>
+
+            <div><div class="workout Run" style="height: auto;"><div class="workoutComplianceStatus planned complete fullyCompliant past"><div class="titleContainer"><div class="input-wrapper"><input type="text" placeholder="Untitled Workout" tabindex="1" maxlength="500" class="title workoutTitle input-wrapper__input" data-tooltip="Click to set title" value="3,5 óra terepen"></div></div><div class="workoutIconAndKeyStats"><div aria-label="Change workout type" class="" data-mui-internal-clone-element="true"><div class="MuiBox-root css-j7qwjs"><button class="MuiButtonBase-root MuiIconButton-root MuiIconButton-sizeSmall workoutTypeSelectButton workoutAndSubTypeSelectButton css-1n3ugob-MuiButtonBase-root-MuiIconButton-root" tabindex="0" type="button"><div class="MuiBox-root css-0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M23.7387 18.6255C23.3887 18.1355 22.5937 17.7505 21.8937 17.4105C21.6437 17.2905 21.4237 17.1805 21.2737 17.0905C19.7737 16.1505 19.1237 15.3405 18.0637 13.9905C17.7137 13.5605 17.3337 13.0705 16.8637 12.5205C15.0637 10.3805 13.6037 5.43046 13.4737 4.71046C13.2837 3.70046 12.5137 3.58046 12.1937 3.53046C12.0837 3.51046 11.9237 3.51046 10.8337 3.56046C9.76374 3.60046 7.43374 3.68046 6.59374 3.61046C6.59374 3.51046 6.60374 3.40046 6.61374 3.28046C6.69374 2.03046 6.71374 1.41046 6.26374 1.19046C5.58375 0.850458 5.33374 1.30046 4.69374 2.43046C4.13374 3.42046 2.62374 4.77046 2.62374 4.77046L1.97374 5.43046C1.86374 5.57046 1.70374 5.72046 1.53374 5.88046C0.783745 6.59046 -0.466255 7.79046 0.183745 9.50046C0.573745 10.5405 1.26374 11.1005 2.12374 11.8205C3.04374 12.5905 4.19374 13.5405 5.59374 15.5205C8.15374 19.1605 9.10374 19.6305 10.8437 20.4905L11.3537 20.7505C13.2837 21.7305 16.9337 22.9205 19.3237 22.9205C19.6537 22.9205 19.9637 22.9005 20.2437 22.8505C21.1637 22.6805 23.9137 22.1805 23.9837 19.5605C24.0237 19.3205 23.9887 18.9855 23.7387 18.6255ZM3.25874 5.55046C3.32874 5.49046 4.93374 4.07046 5.60374 2.88046C5.61375 2.85046 5.63374 2.83046 5.64374 2.80046C5.64374 2.96046 5.62374 3.11046 5.61374 3.22046C5.58374 3.66046 5.57374 3.89046 5.59374 4.05046C5.66374 4.63046 5.85374 4.75046 10.8737 4.56046C11.4837 4.54046 11.9437 4.52046 12.0737 4.53046C12.3237 4.57046 12.4337 4.59046 12.4937 4.90046C12.5337 5.12046 12.8137 6.16046 13.2637 7.48046L11.6737 8.14046C11.4837 8.22046 11.3637 8.41046 11.3637 8.60046C11.3637 8.66046 11.3737 8.73046 11.4037 8.79046C11.4837 8.98046 11.6737 9.10046 11.8637 9.10046C11.9237 9.10046 11.9937 9.09046 12.0537 9.06046L13.5937 8.42046C13.7037 8.70046 13.8137 8.99046 13.9337 9.27046L12.6737 9.80046C12.4237 9.91046 12.2937 10.2005 12.4037 10.4505C12.4837 10.6405 12.6737 10.7605 12.8637 10.7605C12.9237 10.7605 12.9937 10.7505 13.0537 10.7205L14.3237 10.1905C14.4437 10.4505 14.5637 10.7105 14.6937 10.9705L13.6837 11.3905C13.4337 11.5005 13.3137 11.7905 13.4137 12.0405C13.4937 12.2305 13.6837 12.3505 13.8737 12.3505C13.9337 12.3505 14.0037 12.3405 14.0637 12.3105L15.1737 11.8505C15.3337 12.1305 15.5037 12.3905 15.6837 12.6405L14.6037 13.1205C14.3537 13.2305 14.2437 13.5305 14.3537 13.7805C14.4337 13.9705 14.6237 14.0805 14.8137 14.0805C14.8837 14.0805 14.9537 14.0705 15.0237 14.0405L16.3237 13.4605C16.6737 13.8905 16.9937 14.2805 17.2637 14.6305C18.3637 16.0105 19.0837 16.9205 20.7237 17.9505C20.8837 18.0505 21.1437 18.1805 21.4337 18.3205C21.9137 18.5505 22.7037 18.9305 22.9037 19.2105C22.9537 19.2705 22.9737 19.3305 22.9737 19.3605C22.9737 19.3805 22.9737 19.3905 22.9737 19.4105C22.9337 19.4805 22.6637 19.8605 20.8137 20.2105C19.1037 20.5305 14.3037 19.1405 12.3737 18.1105L11.9037 17.8605C10.4137 17.0905 9.67374 16.7005 7.48374 13.4505C5.96374 11.2005 4.88374 10.1805 4.01374 9.36046C3.45374 8.84046 3.02374 8.43046 2.62374 7.83046C2.16374 7.13046 2.42374 6.49046 2.74374 6.07046C2.95374 5.79046 3.19874 5.60046 3.25874 5.55046Z" fill="#45ae01"></path></svg></div><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><mask id="69c8fb4185c386440495a314cf08bdc1" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20" style="mask-type: alpha;"><rect width="20" height="20" fill="var(--semanticlayer-colors-action-active)"></rect></mask><g mask="url(#69c8fb4185c386440495a314cf08bdc1)"><path d="M9.64163 11.3535L7.07559 8.786C7.04031 8.75058 7.01247 8.711 6.99205 8.66725C6.97163 8.62364 6.96143 8.57975 6.96143 8.53558C6.96143 8.44739 6.99212 8.37079 7.05351 8.30579C7.1149 8.24093 7.1958 8.2085 7.29622 8.2085H12.7033C12.8037 8.2085 12.8846 8.24239 12.946 8.31016C13.0074 8.3778 13.0381 8.45676 13.0381 8.54704C13.0381 8.55857 13 8.63801 12.9237 8.78537L10.3579 11.3535C10.3115 11.4 10.2561 11.4372 10.1916 11.465C10.1272 11.4927 10.0632 11.5066 9.99976 11.5066C9.93629 11.5066 9.87233 11.4927 9.80788 11.465C9.74344 11.4372 9.68802 11.4 9.64163 11.3535Z" fill="var(--semanticlayer-colors-action-active)"></path></g></svg></button></div></div><div class="keyStats activityTitleText "><div class="duration"><span class="MuiTypography-root MuiTypography-body2 value css-1njazd1-MuiTypography-root">3:18:21</span><span class="complianceIndicator NailedIt"></span></div><div class="distance"><span class="MuiTypography-root MuiTypography-body2 value css-1njazd1-MuiTypography-root">30.2</span><span class="MuiTypography-root MuiTypography-caption units css-e8qqm1-MuiTypography-root"> km</span></div><div class="tss"><span class="MuiTypography-root MuiTypography-body2 value css-1njazd1-MuiTypography-root">220</span><span class="MuiTypography-root MuiTypography-caption units css-e8qqm1-MuiTypography-root"> rTSS</span></div></div><div class="PRCommentRPEContainer"><div class="PRContainer"><div class="PRBorderBox" data-mui-internal-clone-element="true"><div class="personalRecordIcon"></div><div class="countValue"><span class="countValueX">x</span>6</div></div></div><div class="rpeFeedbackContainer" data-tooltip="RPE: 6 - Harder&lt;br/&gt;Feeling: Normal"><div class="rpeBorderBox"><div class="normal rpeEmojiIcon"></div><div><span class="rpEffortRating">6</span></div></div></div><div class="commentContainer" data-tooltip="1 Comment"><div class="commentIcon hasComments"></div><span class="commentCounter"><span class="countValueX">x</span>1</span></div></div></div><div class="MuiStack-root css-1e10k1d-MuiStack-root"><h6 class="MuiTypography-root MuiTypography-subtitle2 MuiTypography-noWrap css-kxyji2-MuiTypography-root">Trail Run</h6></div></div></div></div></div>
+            <div class="actionButtonsContainer"><div><div class="MuiStack-root css-607fnh-MuiStack-root"><div id="qvFilesButton" aria-label="Upload/download/delete files or recalculate workout statistics." class="" data-mui-internal-clone-element="true" style=""><button class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-colorPrimary MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-colorPrimary css-ozg9s1-MuiButtonBase-root-MuiButton-root" tabindex="0" type="button"><span class="MuiButton-icon MuiButton-startIcon MuiButton-iconSizeMedium css-1v1j2p3-MuiButton-startIcon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><mask id="Mask-FileCopy203ae1a4ea3e957365791d8eaf835b77b7" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20" style="mask-type: alpha;"><rect width="20" height="20" fill="var(--semanticlayer-colors-primary-main)"></rect></mask><g mask="url(#Mask-FileCopy203ae1a4ea3e957365791d8eaf835b77b7)"><path d="M15.2436 15.5832H6.75654C6.39112 15.5832 6.07647 15.4512 5.81258 15.1873C5.54869 14.9234 5.41675 14.6088 5.41675 14.2434V2.7563C5.41675 2.39088 5.54869 2.07623 5.81258 1.81234C6.07647 1.54845 6.39112 1.4165 6.75654 1.4165H12.6476C12.8237 1.4165 12.9933 1.44859 13.1563 1.51275C13.3192 1.57678 13.4691 1.6772 13.6059 1.814L16.1859 4.394C16.3227 4.53081 16.4231 4.68067 16.4872 4.84359C16.5513 5.00664 16.5834 5.17623 16.5834 5.35234V14.2434C16.5834 14.6088 16.4515 14.9234 16.1876 15.1873C15.9237 15.4512 15.609 15.5832 15.2436 15.5832ZM15.5001 5.58317H13.3013C13.053 5.58317 12.8435 5.49782 12.6728 5.32713C12.5021 5.15644 12.4167 4.94692 12.4167 4.69859V2.49984H6.75654C6.69237 2.49984 6.63362 2.52657 6.58029 2.58005C6.52682 2.63338 6.50008 2.69213 6.50008 2.7563V14.2434C6.50008 14.3075 6.52682 14.3663 6.58029 14.4196C6.63362 14.4731 6.69237 14.4998 6.75654 14.4998H15.2436C15.3078 14.4998 15.3665 14.4731 15.4199 14.4196C15.4733 14.3663 15.5001 14.3075 15.5001 14.2434V5.58317ZM3.75654 18.5832C3.39112 18.5832 3.07647 18.4512 2.81258 18.1873C2.54869 17.9234 2.41675 17.6088 2.41675 17.2434V6.95817C2.41675 6.80442 2.46821 6.67574 2.57112 6.57213C2.6739 6.46838 2.80154 6.4165 2.95404 6.4165C3.10654 6.4165 3.23564 6.46838 3.34133 6.57213C3.44716 6.67574 3.50008 6.80442 3.50008 6.95817V17.2434C3.50008 17.3075 3.52682 17.3663 3.58029 17.4196C3.63362 17.4731 3.69237 17.4998 3.75654 17.4998H12.0417C12.1955 17.4998 12.3242 17.5512 12.4278 17.654C12.5315 17.7569 12.5834 17.8846 12.5834 18.0371C12.5834 18.1896 12.5315 18.3187 12.4278 18.4244C12.3242 18.5303 12.1955 18.5832 12.0417 18.5832H3.75654Z" fill="var(--semanticlayer-colors-primary-main)"></path></g></svg></span>Files<span class="MuiTouchRipple-root css-r3djoj-MuiTouchRipple-root"></span></button></div><div id="qvUploadButton" aria-label="A file from a connected device or your computer" class="" data-mui-internal-clone-element="true" style="display: none;"><button class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-colorPrimary MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-colorPrimary css-ozg9s1-MuiButtonBase-root-MuiButton-root" tabindex="0" type="button"><span class="MuiButton-icon MuiButton-startIcon MuiButton-iconSizeMedium css-1v1j2p3-MuiButton-startIcon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><mask id="Mask-Upload20c2d05e44b2986e1f320b40af9f5437ba" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20" style="mask-type: alpha;"><rect width="20" height="20" fill="var(--semanticlayer-colors-primary-main)"></rect></mask><g mask="url(#Mask-Upload20c2d05e44b2986e1f320b40af9f5437ba)"><path d="M5.75058 15.5831C5.37517 15.5831 5.05899 15.4536 4.80204 15.1946C4.5451 14.9356 4.41663 14.6185 4.41663 14.2433V13.5254C4.41663 13.3717 4.46808 13.243 4.571 13.1394C4.67378 13.0356 4.80142 12.9838 4.95392 12.9838C5.10642 12.9838 5.23551 13.0356 5.34121 13.1394C5.44704 13.243 5.49996 13.3717 5.49996 13.5254V14.2433C5.49996 14.3075 5.5267 14.3663 5.58017 14.4196C5.6335 14.4731 5.69225 14.4998 5.75642 14.4998H14.2435C14.3077 14.4998 14.3664 14.4731 14.4198 14.4196C14.4732 14.3663 14.5 14.3075 14.5 14.2433V13.5254C14.5 13.3717 14.5513 13.243 14.6541 13.1394C14.757 13.0356 14.8848 12.9838 15.0373 12.9838C15.1898 12.9838 15.3188 13.0356 15.4245 13.1394C15.5304 13.243 15.5833 13.3717 15.5833 13.5254V14.2433C15.5833 14.6185 15.4537 14.9356 15.1945 15.1946C14.9354 15.4536 14.6181 15.5831 14.2427 15.5831H5.75058ZM9.45829 5.49021L7.75163 7.19688C7.64149 7.30688 7.51517 7.36459 7.37267 7.37001C7.23003 7.37528 7.09767 7.32022 6.97558 7.2048C6.86156 7.08952 6.80586 6.96056 6.8085 6.81792C6.81114 6.67528 6.87017 6.54626 6.98558 6.43084L9.53517 3.88126C9.60489 3.81709 9.67815 3.76903 9.75496 3.73709C9.83176 3.70501 9.91482 3.68896 10.0041 3.68896C10.0934 3.68896 10.1765 3.70501 10.2533 3.73709C10.3301 3.76903 10.4006 3.81709 10.4648 3.88126L13.0143 6.43084C13.1243 6.54084 13.182 6.66508 13.1875 6.80355C13.1927 6.94188 13.1384 7.06869 13.0243 7.18397C12.9023 7.29938 12.7713 7.35577 12.6314 7.35313C12.4914 7.35049 12.3637 7.29147 12.2483 7.17605L10.5416 5.49021V12.2819C10.5416 12.4356 10.4902 12.5643 10.3873 12.6679C10.2845 12.7717 10.1568 12.8235 10.0043 12.8235C9.85183 12.8235 9.72274 12.7717 9.61704 12.6679C9.51121 12.5643 9.45829 12.4356 9.45829 12.2819V5.49021Z" fill="var(--semanticlayer-colors-primary-main)"></path></g></svg></span>Upload</button></div><div id="qvUploadButtonDisabled" class="" data-mui-internal-clone-element="true" style="display: none;"><button class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-colorPrimary Mui-disabled MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-colorPrimary css-ozg9s1-MuiButtonBase-root-MuiButton-root" tabindex="-1" type="button" disabled=""><span class="MuiButton-icon MuiButton-startIcon MuiButton-iconSizeMedium css-1v1j2p3-MuiButton-startIcon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><mask id="Mask-Upload20b5ac69be57632d589f826cff6ef01266" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20" style="mask-type: alpha;"><rect width="20" height="20" fill="var(--semanticlayer-colors-action-disabled)"></rect></mask><g mask="url(#Mask-Upload20b5ac69be57632d589f826cff6ef01266)"><path d="M5.75058 15.5831C5.37517 15.5831 5.05899 15.4536 4.80204 15.1946C4.5451 14.9356 4.41663 14.6185 4.41663 14.2433V13.5254C4.41663 13.3717 4.46808 13.243 4.571 13.1394C4.67378 13.0356 4.80142 12.9838 4.95392 12.9838C5.10642 12.9838 5.23551 13.0356 5.34121 13.1394C5.44704 13.243 5.49996 13.3717 5.49996 13.5254V14.2433C5.49996 14.3075 5.5267 14.3663 5.58017 14.4196C5.6335 14.4731 5.69225 14.4998 5.75642 14.4998H14.2435C14.3077 14.4998 14.3664 14.4731 14.4198 14.4196C14.4732 14.3663 14.5 14.3075 14.5 14.2433V13.5254C14.5 13.3717 14.5513 13.243 14.6541 13.1394C14.757 13.0356 14.8848 12.9838 15.0373 12.9838C15.1898 12.9838 15.3188 13.0356 15.4245 13.1394C15.5304 13.243 15.5833 13.3717 15.5833 13.5254V14.2433C15.5833 14.6185 15.4537 14.9356 15.1945 15.1946C14.9354 15.4536 14.6181 15.5831 14.2427 15.5831H5.75058ZM9.45829 5.49021L7.75163 7.19688C7.64149 7.30688 7.51517 7.36459 7.37267 7.37001C7.23003 7.37528 7.09767 7.32022 6.97558 7.2048C6.86156 7.08952 6.80586 6.96056 6.8085 6.81792C6.81114 6.67528 6.87017 6.54626 6.98558 6.43084L9.53517 3.88126C9.60489 3.81709 9.67815 3.76903 9.75496 3.73709C9.83176 3.70501 9.91482 3.68896 10.0041 3.68896C10.0934 3.68896 10.1765 3.70501 10.2533 3.73709C10.3301 3.76903 10.4006 3.81709 10.4648 3.88126L13.0143 6.43084C13.1243 6.54084 13.182 6.66508 13.1875 6.80355C13.1927 6.94188 13.1384 7.06869 13.0243 7.18397C12.9023 7.29938 12.7713 7.35577 12.6314 7.35313C12.4914 7.35049 12.3637 7.29147 12.2483 7.17605L10.5416 5.49021V12.2819C10.5416 12.4356 10.4902 12.5643 10.3873 12.6679C10.2845 12.7717 10.1568 12.8235 10.0043 12.8235C9.85183 12.8235 9.72274 12.7717 9.61704 12.6679C9.51121 12.5643 9.45829 12.4356 9.45829 12.2819V5.49021Z" fill="var(--semanticlayer-colors-action-disabled)"></path></g></svg></span>Upload</button></div><button class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary css-1utc6o8-MuiButtonBase-root-MuiButton-root" tabindex="0" type="button" id="qvLegacyAnalyzeButton" style="display: inline-block;">Analyze<span class="MuiTouchRipple-root css-r3djoj-MuiTouchRipple-root"></span></button><button class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary Mui-disabled MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary css-8umb82-MuiButtonBase-root-MuiButton-root" tabindex="-1" type="button" disabled="" id="qvLegacyAnalyzeButtonDisabled" style="display: none;">Analyze</button><button class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-colorPrimary MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-colorPrimary css-t5jx6e-MuiButtonBase-root-MuiButton-root" tabindex="0" type="button" id="qvSummaryButton" style="display: none;">Summary</button><div id="qvWorkoutAnalysisButton" aria-label="" class="" data-mui-internal-clone-element="true" style=""><button class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary css-aebez3-MuiButtonBase-root-MuiButton-root" tabindex="0" type="button">Analyze 360<span class="MuiTouchRipple-root css-r3djoj-MuiTouchRipple-root"></span></button></div><div id="qvWorkoutAnalysisButtonError" aria-label="Unable to fetch chart data." class="" data-mui-internal-clone-element="true" style="display: none;"><button class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedError MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorError MuiButton-root MuiButton-contained MuiButton-containedError MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorError css-vxnghs-MuiButtonBase-root-MuiButton-root" tabindex="0" type="button">Analyze 360</button></div><div id="qvWorkoutAnalysisButtonLoading" aria-label="" class="" data-mui-internal-clone-element="true" style="display: none;"><button class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary Mui-disabled MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary css-1fjwbma-MuiButtonBase-root-MuiButton-root" tabindex="-1" type="button" disabled=""><div class="MuiBox-root css-l2blva"><span class="MuiCircularProgress-root MuiCircularProgress-indeterminate MuiCircularProgress-colorInherit css-yn35gm-MuiCircularProgress-root" role="progressbar" style="width: 40px; height: 40px;"><svg class="MuiCircularProgress-svg css-54pwck-MuiCircularProgress-svg" viewBox="22 22 44 44"><circle class="MuiCircularProgress-circle MuiCircularProgress-circleIndeterminate css-19t5dcl-MuiCircularProgress-circle" cx="44" cy="44" r="20.2" fill="none" stroke-width="3.6"></circle></svg></span></div></button></div><div id="qvWorkoutAnalysisButtonDisabled" aria-label="" class="" data-mui-internal-clone-element="true" style="display: none;"><button class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary Mui-disabled MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeMedium MuiButton-containedSizeMedium MuiButton-colorPrimary css-1fjwbma-MuiButtonBase-root-MuiButton-root" tabindex="-1" type="button" disabled="">Analyze 360</button></div><div id="qvTpvWorkoutButton" aria-label="Complete your workout using TrainingPeaks Virtual" class="" data-mui-internal-clone-element="true" style="display: none;"><button class="MuiButtonBase-root MuiButton-root MuiButton-text MuiButton-textPrimary MuiButton-sizeMedium MuiButton-textSizeMedium MuiButton-colorPrimary MuiButton-root MuiButton-text MuiButton-textPrimary MuiButton-sizeMedium MuiButton-textSizeMedium MuiButton-colorPrimary css-1kv3be8-MuiButtonBase-root-MuiButton-root" tabindex="0" type="button"><span class="MuiButton-icon MuiButton-startIcon MuiButton-iconSizeMedium css-1v1j2p3-MuiButton-startIcon"><svg width="23" height="24" viewBox="0 0 23 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.66662 5.73351H2.4165L0 11.3463H4.26068L6.66662 5.73351Z" fill="var(--semanticlayer-colors-primary-contrastText)"></path><path d="M18.7394 4.35915L14.104 14.9552H18.3539L23 4.35915H18.7394Z" fill="var(--semanticlayer-colors-primary-contrastText)"></path><path d="M14.031 0.75H9.78108L2.27072 17.9664H6.53127L14.031 0.75Z" fill="var(--semanticlayer-colors-primary-contrastText)"></path><path d="M12.8748 5.73351L5.375 22.9494H9.62509L17.1354 5.73351H12.8748Z" fill="var(--semanticlayer-colors-primary-contrastText)"></path><path d="M16.7386 21.8744L15.187 17.4624H13.7063L15.9363 23.6766H17.4877L19.7178 17.4624H18.2633L16.7386 21.8744Z" fill="var(--semanticlayer-colors-primary-contrastText)"></path><path d="M13.704 17.4589H15.1853L16.7367 21.8723L18.262 17.4589H19.7168L17.4865 23.675H15.9345L13.704 17.4589Z" fill="var(--semanticlayer-colors-primary-contrastText)"></path></svg></span>Virtual</button></div></div></div></div>
+            <div class="expandedViewsButtons">
+                <div class="icons">
+                    <div class="addChart" title="Charts Library"><div></div></div>
+                    <div id="comment" title="Comment"><div></div></div>
+                    <div class="elevationCorrection" title="Elevation Correction"><div></div></div>
+                </div>
+            </div>
+            
+
+            <div class="workoutStructureTemplatesRegion"></div>
+
+            <div class="workoutStructureControlRegion"></div>
+
+            <input id="fileUploadInput" style="display: none" type="file" accept=".csv, .fit, .gpx, .gz, .hrm, .hst, .pwpb, .pwx, .sdf, .srm, .tcx, .txt, .wko, .xlsx, .xml">
+            
+            <!-- @TODO: this is temporary, however, this header isn't responsive, so it doesn't matter -->
+            <div class="workoutLabels" style="display:flex;margin-top:55px"></div>
+
+        </div>
+        
+
+        <div class="workoutStructureGraphRegion"><div><div class="workoutStructureViewerGraph"><div class="chartPlaceholder" style="padding: 0px;"><canvas class="flot-base" width="1328" height="116" style="direction: ltr; position: absolute; left: 0px; top: 0px; width: 664px; height: 58px;"></canvas><canvas class="flot-overlay" width="1328" height="116" style="direction: ltr; position: absolute; left: 0px; top: 0px; width: 664px; height: 58px;"></canvas></div><div class="downloadIconContainer" data-tooltip="Export Workout File" data-tooltip-alignment="above"><div class="downloadIcon"></div></div></div></div></div>
+        <div class="workoutStructureGraphEditorRegion"></div>
+    </div>
+    <div class="dreamSeasonAlertContainer"></div>
+    <div id="quickViewContent">
+        <div class="tabNavigation">
+            <div class="summaryTab tabSelected" title="Summary">
+                <div></div>
+            </div>
+            <div class="mapGraphTab" title="Map and Graph">
+                <div></div>
+            </div>
+            <div class="heartrateTab" title="Heart Rate">
+                <div></div>
+            </div>
+            <div class="powerTab" title="Power">
+                <div></div>
+            </div>
+            <div class="paceTab" title="Pace">
+                <div></div>
+            </div>
+            <div class="speedTab" title="Speed" style="display: none;">
+                <div></div>
+            </div>
+        </div>
+        <div class="tabContent tabContentRegion"><div class="summary ready">
+<div class="summary">
+    <div class="stats">
+        <div class="personalRecordsContainer"><div><div style="position: relative;"><h3 class="subheadBold peakPerformanceHeader">Peak Performances (x6)</h3><div class="peakPerformances"><div class="personalRecord"><div class="prIcon three year"></div><div class="prInfo"><div class="prValue"><span class="prFormattedValue">0:01:29</span></div><div class="prDetails"><div class="prType"><span class="prDuration">400 m</span>&nbsp;<span class="speedValue"><span><span class="prFormattedValue">03:43</span><span class="prUnit"> min/km</span></span></span></div><div class="timeframe">2026</div></div></div></div><div class="personalRecord"><div class="prIcon three year"></div><div class="prInfo"><div class="prValue"><span class="prFormattedValue">0:03:12</span></div><div class="prDetails"><div class="prType"><span class="prDuration">800 m</span>&nbsp;<span class="speedValue"><span><span class="prFormattedValue">04:00</span><span class="prUnit"> min/km</span></span></span></div><div class="timeframe">2026</div></div></div></div><div class="personalRecord"><div class="prIcon three year"></div><div class="prInfo"><div class="prValue"><span class="prFormattedValue">0:04:02</span></div><div class="prDetails"><div class="prType"><span class="prDuration">1 km</span>&nbsp;<span class="speedValue"><span><span class="prFormattedValue">04:02</span><span class="prUnit"> min/km</span></span></span></div><div class="timeframe">2026</div></div></div></div></div><div class="showHidePeaks"><span>+ 3 more...</span></div></div></div></div>
+        <div class="columnLabelsPlannedCompleted cf row">
+            <ul class="columnHeader twoCol">
+                <li><h3 class="subheadBold">Planned</h3></li>
+                <li><h3 class="subheadBold">Completed</h3></li>
+            </ul>
+        </div>
+        <!-- planned and completed fields load dynamically here-->
+        <div id="workoutPlannedCompletedStats">
+            <div class="workoutStatsRow durationStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label class="durationFieldLabel complianceQvField primaryComplianceField" title="Compliance Priority: 1" data-tooltipclass="below">Duration</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="totalTimePlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="totalTimeCompletedField" class="numberInput primaryComplianceField isFullyCompliant" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>h:m:s</label>
+                </div>
+            </div><div class="workoutStatsRow distanceStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label class="distanceFieldLabel complianceQvField" title="Compliance Priority: 3" data-tooltipclass="below">Distance</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="distancePlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="distanceCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel distanceUnits clickable">
+                    <label class="distanceLabel">km</label>
+                    <div class="unitsSelector distanceUnitsSelector"></div>
+                </div>
+            </div><div class="workoutStatsRow averagePaceStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>Average Pace</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="averagePacePlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="averagePaceCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label class="pace">min/km</label>
+                </div>
+            </div><div class="workoutStatsRow caloriesStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>Calories</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="caloriesPlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="caloriesCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>kcal</label>
+                </div>
+            </div><div class="workoutStatsRow IFStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>IF</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="ifPlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="ifCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>IF</label>
+                </div>
+            </div><div class="workoutStatsRow elevationGainStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>Elevation Gain</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="elevationGainPlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="elevationGainCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label class="elevation">m</label>
+                </div>
+            </div><div class="workoutStatsRow TSSStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label class="tssFieldLabel complianceQvField" title="Compliance Priority: 2" data-tooltipclass="below">TSS</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="tssPlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="tssCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel tssType clickable">
+                    <label class="tss">rTSS</label>
+                    <div class="unitsSelector tssTypeSelector"></div>
+                </div>
+            </div><div class="workoutStatsRow elevationLossStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>Elevation Loss</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="elevationLossPlannedField" disabled="disabled" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="elevationLossCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label class="elevation">m</label>
+                </div>
+            </div><div class="workoutStatsRow energyStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>Work</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="energyPlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="energyCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>kJ</label>
+                </div>
+            </div><div id="workoutStatsAnchor" style="display:none;"></div>
+            
+
+            
+
+            <div class="workoutStatsRow hide normalizedPaceStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>Normalized Pace</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="normalizedPacePlannedField" disabled="disabled" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="normalizedPaceCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label class="pace">min/km</label>
+                </div>
+            </div>
+
+            
+
+            <div class="workoutStatsRow hide averageSpeedStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>Average Speed</label>
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="averageSpeedPlannedField" class="numberInput" tabindex="2">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="averageSpeedCompletedField" class="numberInput" tabindex="3">
+                </div>
+
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label class="speed">kph</label>
+                </div>
+            </div>
+
+            
+            
+            
+            <div class="workoutStatsRow hide fatCaloriesStatsRow">
+              <div class="workoutStatsColumn workoutStatsLabel">
+                  <label>Fat Calories</label>
+              </div>
+              <div class="workoutStatsColumn workoutStatsPlanned">
+                  <input type="text" id="fatCaloriesPlannedField" class="numberInput" tabindex="2">
+              </div>
+              <div class="workoutStatsColumn workoutStatsCompleted">
+                  <input type="text" id="fatCaloriesCompletedField" class="numberInput" tabindex="3">
+              </div>
+              <div class="workoutStatsColumn workoutStatsUnitLabel">
+                  <label>kcal</label>
+              </div>
+            </div>
+          
+            <div class="workoutStatsRow hide carbCaloriesStatsRow">
+                <div class="workoutStatsColumn workoutStatsLabel">
+                    <label>Carb Calories</label>
+                </div>
+                <div class="workoutStatsColumn workoutStatsPlanned">
+                    <input type="text" id="carbCaloriesPlannedField" class="numberInput" tabindex="2">
+                </div>
+                <div class="workoutStatsColumn workoutStatsCompleted">
+                    <input type="text" id="carbCaloriesCompletedField" class="numberInput" tabindex="3">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>kcal</label>
+                </div>
+            </div>
+            
+
+            
+
+            
+
+            
+            <div class="workoutStatsRow hide normalizedPowerStatsRow">
+	            <div class="workoutStatsColumn workoutStatsLabel">
+		            <label>Normalized Power</label>
+	            </div>
+	            <div class="workoutStatsColumn workoutStatsPlanned">
+		            <input type="text" id="normalizedPowerPlanned" disabled="disabled" class="numberInput" tabindex="2">
+	            </div>
+	            <div class="workoutStatsColumn workoutStatsCompleted">
+		            <input type="text" id="normalizedPowerCompleted" class="numberInput" tabindex="3">
+	            </div>
+	            <div class="workoutStatsColumn workoutStatsUnitLabel">
+		            <label>W</label>
+	            </div>
+            </div>
+            
+
+            
+        </div>
+        
+        
+               <div class="missingWeightAlertContainer" style="display: none;"></div>
+        
+        
+        <div class="columnLabelsMinMaxAvg cf row">
+            <ul class="columnHeader threeCol">
+                <li><h3 class="subheadBold">Min</h3></li>
+                <li><h3 class="subheadBold">Avg</h3></li>
+                <li><h3 class="subheadBold">Max</h3></li>
+            </ul>
+        </div>
+        <div id="workoutMinMaxAvgStats">
+            <div class="workoutStatsRow paceSummaryRow">
+                <div class="workoutStatsColumn workoutStatsMinMaxAvgLabel">
+                    <label>Pace</label>
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMin">
+                    <input type="text" id="paceMinField" disabled="disabled" class="alwaysDisabled numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsAvg">
+                    <input type="text" id="paceAvgField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMax">
+                    <input type="text" id="paceMaxField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label class="pace">min/km</label>
+                </div>
+            </div><div class="workoutStatsRow heartRateSummaryRow">
+                <div class="workoutStatsColumn workoutStatsMinMaxAvgLabel">
+                    <label>Heart Rate</label>
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMin">
+                    <input type="text" id="hrMinField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsAvg">
+                    <input type="text" id="hrAvgField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMax">
+                    <input type="text" id="hrMaxField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>bpm</label>
+                </div>
+            </div><div id="workoutSummaryAnchor"></div>
+            <div class="workoutStatsRow hide powerSummaryRow">
+                <div class="workoutStatsColumn workoutStatsMinMaxAvgLabel">
+                    <label>Power</label>
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMin">
+                    <input type="text" id="powerMinField" disabled="disabled" class="alwaysDisabled numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsAvg">
+                    <input type="text" id="powerAvgField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMax">
+                    <input type="text" id="powerMaxField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>W</label>
+                </div>
+            </div>
+            <div class="workoutStatsRow hide torqueSummaryRow">
+                <div class="workoutStatsColumn workoutStatsMinMaxAvgLabel">
+                    <label>Torque</label>
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMin">
+                    <input type="text" id="torqueMinField" disabled="disabled" class="alwaysDisabled numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsAvg">
+                    <input type="text" id="torqueAvgField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMax">
+                    <input type="text" id="torqueMaxField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>Nm</label>
+                </div>
+            </div>
+            <div class="workoutStatsRow hide elevationSummaryRow">
+                <div class="workoutStatsColumn workoutStatsMinMaxAvgLabel">
+                    <label>Elevation</label>
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMin">
+                    <input type="text" id="elevationMinField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsAvg">
+                    <input type="text" id="elevationAvgField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMax">
+                    <input type="text" id="elevationMaxField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label class="elevation">m</label>
+                </div>
+            </div>
+            <div class="workoutStatsRow hide cadenceSummaryRow">
+                <div class="workoutStatsColumn workoutStatsMinMaxAvgLabel">
+                    <label>Cadence</label>
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMin">
+                    <input type="text" id="cadenceMinField" disabled="disabled" class="alwaysDisabled numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsAvg">
+                    <input type="text" id="cadenceAvgField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMax">
+                    <input type="text" id="cadenceMaxField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>rpm</label>
+                </div>
+            </div>
+            <div class="workoutStatsRow hide speedSummaryRow">
+                <div class="workoutStatsColumn workoutStatsMinMaxAvgLabel">
+                    <label>Speed</label>
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMin">
+                    <input type="text" id="speedMinField" disabled="disabled" class="alwaysDisabled numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsAvg">
+                    <input type="text" id="speedAvgField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMax">
+                    <input type="text" id="speedMaxField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label class="speed">kph</label>
+                </div>
+            </div>
+            
+            
+            <div class="workoutStatsRow hide temperatureSummaryRow">
+                <div class="workoutStatsColumn workoutStatsMinMaxAvgLabel">
+                    <label>Temperature</label>
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMin">
+                    <input type="text" id="tempMinField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsAvg">
+                    <input type="text" id="tempAvgField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumnMinMaxAvg workoutStatsMax">
+                    <input type="text" id="tempMaxField" class="numberInput" tabindex="4">
+                </div>
+                <div class="workoutStatsColumn workoutStatsUnitLabel">
+                    <label>C</label>
+                </div>
+            </div>
+        </div>
+        <div class="nutritionContainer"></div>
+        <div class="equipment"><div class="workoutEquipment"><h3 class="subheadBold">Equipment</h3>
+
+<div class="equipmentRow">
+    <div class="bikeBlock" style="display: none;">
+        <label>Bike</label>
+        <select name="equipmentBikeId" class="bikeSelector tpSelect">
+            <option value="">Select Bike</option>
+            
+        </select>
+    </div>
+</div>
+
+<div class="equipmentRow">
+    <label>Shoes</label>
+    <select name="equipmentShoeId" class="shoeSelector tpSelect">
+        <option value="">Select Shoe</option>
+        
+    </select>
+</div>
+
+<div class="equipmentRow">
+    <div class="poolLengthBlock" style="display: none;"><label>Pools</label><select name="equipmentPoolLengthId" class="poolLengthSelector tpSelect"><option value="">Default</option><option value="DEFAULT-25Y">25 Yards Pool</option><option value="DEFAULT-25M">25 Meters Pool</option><option value="DEFAULT-50M">50 Meters Pool</option></select></div>
+</div></div></div>
+    </div>
+
+    <div class="rightColumn">
+        <div class="workoutStructureToggleContainer" style="display: none;">
+            <span class="workoutStructureToggle exercises">View Exercises</span>
+            <span class="workoutStructureToggle intervals">View Intervals</span>
+        </div>
+
+        <div id="commentsContainer"><div><div class="comments">
+    <div>
+        <h3 class="subheadBold description">Description</h3>
+        
+        <div class="attachmentsFilePickerContainer"><div><div class="filepicker" title="Attach files"><div class="trigger"></div><input multiple="" class="fileinput hide" type="file" accept="application/pdf, .pdf, image/gif, image/png, image/jpg, .png, .gif, .jpg, .jpeg, .csv, .fit, .gpx, .zip, .gz, .hrm, .hst, .pwpb, .pwx, .sdf, .srm, .tcx, .txt, .wko, .doc, .docx, .xls, .xlsx, .xml"></div></div></div>
+        <div class="attachmentsContainer"><div><ul class="files empty"></ul></div></div>
+        
+        <div id="descriptionInput" class="textEditorWithLinks tpInput descriptionInputTextEditorWithLinks editableWithLinks" contenteditable="true">Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.</div>
+        <div id="descriptionPrintable">Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.</div>
+        
+        <div class="rpeContainer"><div><div><h3 class="subheadBold">How did you feel?</h3><div class="emojiSelector greatToBrutal"><div class="emojiScale"><div class="emoji unselectedEmoji"></div><div class="emoji unselectedEmoji"></div><div class="emoji selectedEmoji"></div><div class="emoji unselectedEmoji"></div><div class="emoji unselectedEmoji"></div></div><div class="emojiTextContainer"><div class="text">Very Weak</div><div class="text">Normal</div><div class="text">Very Strong</div></div></div><h3 class="subheadBold underline"></h3><div class="rpeInputContainer"><h3 class="subheadBold">Rating of Perceived Exertion (RPE)<div class="tomahawkButton info infoIconContainer rpeInfoIcon" data_cy="tomahawkButton"><div class="infoIcon"></div></div></h3><h3 class="subheadBold centered rpeTitle">Harder</h3><h3 class="subhead centered rpeDescription">Noticeably challenging, requires more focus.</h3><div class="slider singleSliderContainer"><div class="sliderAndLabelContainer"><div class="floatingLabelContainer"><label class="floatingLabel" style="left: calc(52.5% - 0.425px);">6</label></div><input class="singleRangeSliderWithGradient singleRangeSlider" type="range" min="0" max="10" step="1" value="6"></div></div></div></div></div></div>
+        
+    </div>
+
+    
+
+    
+
+    <div id="preActivityComments">
+        <h3 class="subheadBold">Pre-activity Comments</h3>
+        <div id="preActivityCommentsInput" class="activityComments textEditorWithLinks tpInput preActivityCommentsInputTextEditorWithLinks editableWithLinks" contenteditable="true"></div>
+        <div id="preActivityCommentsPrintable"></div>
+    </div>
+    <div class="postActivityCommentsContainer">
+        <h3 class="subheadBold">Post-activity Comments</h3>
+        <div class="workoutComments" id="postActivityCommentsList"><div class="workoutCommentsCollection"><div class="comment"><div class="commentHeader">
+    <span class="name">Szombathelyi Bela</span>
+    <span class="date"><span class="weekdayName">Sat</span> 4 April, 2026</span>
+</div>
+<div class="commentBody">Terepfutó cipő csere -&gt; ugyan olyanra.
+A régi 11 hónapot és 1000km-ert élt meg.
+
+Ugyan az az útvonal volt mint múlt héten csak a start nem Óbuda hanem Solymár lett.
+
+Vittem botot, felfeléken használtam is. 4 zselé, 3 dekás marcipán szelet, 2 l víz.
+
+Lefeléket jobban meg futottam mint múlt héten. Persze van ezen az útvonalon 3-4 kisebb szakasz ahol nem lehet fékezni szinte lefelé mert túl meredek, ott a múltkor is gyors voltam.
+
+Talán picit alul frissítettem, és utána meg túl ettem magam, de aztán estére minden jó volt.</div>
+<div class="deleteButton"></div>
+</div></div></div>
+        <div name="postActivityCommentsInput" class="activityComments textEditorWithLinks tpInput postActivityCommentsInputTextEditorWithLinks editableWithLinks" placeholder="Enter a new comment" id="postActivityCommentsInput" contenteditable="true"><div class="placeholder">Enter a new comment</div></div>
+        <div id="postActivityCommentsPrintable"></div>
+    </div>
+    <div class="notificationsUpgradeMessageContainer"></div>
+    
+    
+    <div class="privateNotesContainer">
+        <h3 class="subheadBold">Private Notes</h3>
+        <div id="privateNotesInput" class="activityComments textEditorWithLinks tpInput privateNotesInputTextEditorWithLinks editableWithLinks" placeholder="Use this space for personal thoughts and observations — these notes won't be shared with anyone." contenteditable="true"><div class="placeholder">Use this space for personal thoughts and observations — these notes won't be shared with anyone.</div></div>
+        <div class="privateNotesCharCounter">
+            <span id="privateNotesCharCount">0</span> / 2000
+        </div>
+        <div id="privateCommentsPrintable"></div>
+    </div>
+    
+    
+</div> </div></div>
+        <div class="otherThanCommentsContainer">
+            <div class="workoutStructureTextContainer"><div class="workoutStructureText"><h3 class="subheadBold workoutStructureTextHeader">Workout Details</h3><ol class="stepList"><li class="step active"><p class="stepName">Active</p><span class="lengthAndIntensity">3:30:00 @ 114-150 bpm</span><br><span class="zoneLabel">E1-Fatmax-E2</span><br></li></ol></div></div>
+            <div class="workoutTagsContainer" style="display: block;"><div style="height: 100%;"><div class="tagsEditor"><h3 class="subheadBold tagsHeader">Tags</h3><div class="addContainer"><div class="addTag" data-tooltip="" data-tooltip-alignment="above"></div></div><div class="tagItem"><span class="tagName">Running</span><div class="removeTag" data-tagindex="0" data-tooltip="Remove tag"><div class="removeTagIcon"></div></div></div><div class="tagItem"><span class="tagName">RunningTrail</span><div class="removeTag" data-tagindex="1" data-tooltip="Remove tag"><div class="removeTagIcon"></div></div></div></div></div></div>
+        </div>
+    </div>
+
+    <div id="workoutStructure"></div>
+</div></div></div>
+        <div class="workoutStructureDetailsRegion"></div>
+    </div>
+
+    <div id="quickViewExpandedContent" style="display:none;"></div>
+
+    <div class="quickviewFooter">
+
+
+        <div class="quickviewFooterLeftContainer">
+            <div class="autoCalculate" style="display: none;">
+                <label><input type="checkbox" class="autoCalculateCheckbox"> <span class="autoCalculateLabel" title="Automatically calculate planned duration, TSS, IF, distance, and pace">Automatically calculate planned values</span></label>
+            </div>
+            <div class="share disabled">
+                <div class="publicCheckboxContainer">
+                    <label><input type="checkbox" class="publicCheckbox"> <span class="publicLabel" title="Share your completed workout">Public</span></label>
+                </div>
+                <div class="shareIcons cf">
+                    <div class="twitterIcon disabled" title="Share your completed workout on Twitter"></div>
+                    <div class="facebookIcon disabled" title="Share your completed workout on Facebook"></div>
+                    <div class="linkIcon disabled" title="Share a link to your completed workout"></div>
+                    <a class="emailLink disabled"><div class="emailIcon disabled" title="Share your completed workout by email"></div></a>
+                </div>
+            </div>
+        </div>
+
+
+
+        <div class="saveCloseButtons">
+            <button id="delete" class="tpSecondaryButton">Delete</button>
+            <button id="discard" class="tpSecondaryButton">Cancel</button>
+            <button id="save" class="tpSecondaryButton" aria-label="Save">Save</button>
+            <button id="close" class="tpPrimaryButton" data_cy="Save&amp;Close">Save &amp; Close</button>
+        </div>
+    </div>
+</div>

@@ -7,11 +7,13 @@ import { ActivityStatus, createActivityStore, type ActivityInput } from './activ
 import { startDownloadWatcher } from './downloadWatcher'
 import { processBuffer } from './fitPipeline'
 import { handleOptions, readJsonBody, setCorsHeaders } from '../shared/http'
+import type { createTrainingPeaksWorkoutStore } from '../trainingpeaks/workoutStore'
 
 export interface RegisterGarminRoutesOptions {
     dbFilePath: string
     downloadsDir: string
     archiveDir: string
+    tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>
 }
 
 let stopDownloadWatcher: (() => void) | null = null
@@ -23,6 +25,51 @@ function pad2(value: number): string {
 function localTodayIso(): string {
     const now = new Date()
     return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
+}
+
+function buildTpSection(tp: Record<string, unknown>): string {
+    const lines: string[] = []
+    lines.push('## TrainingPeaks')
+    lines.push('')
+
+    const rows: [string, string][] = []
+    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
+    const tssValue = String(tp.tssValue ?? '').trim()
+    const tssUnit = String(tp.tssUnit ?? '').trim()
+    if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
+    if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
+    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
+
+    if (rows.length > 0) {
+        lines.push('| Adat | Érték |')
+        lines.push('| :--- | ---: |')
+        for (const [k, v] of rows) lines.push(`| ${k} | ${v} |`)
+    }
+
+    const description = String(tp.description ?? '').trim()
+    if (description) {
+        lines.push('')
+        lines.push('### Leírás')
+        lines.push('')
+        lines.push(description)
+    }
+
+    const comments = Array.isArray(tp.comments)
+        ? (tp.comments as Array<{ text: string; date?: string; user?: string }>)
+        : []
+    if (comments.length > 0) {
+        lines.push('')
+        lines.push('### Kommentek')
+        for (const c of comments) {
+            lines.push('')
+            const meta = [c.date, c.user].filter(Boolean).join(' — ')
+            if (meta) lines.push(`**${meta}**`)
+            lines.push('')
+            lines.push(c.text)
+        }
+    }
+
+    return lines.join('\n')
 }
 
 function normalizeMonthToken(raw: string): string {
@@ -138,12 +185,32 @@ async function cleanupIncompleteActivities(
 }
 
 export function registerGarminRoutes(server: ViteDevServer, options: RegisterGarminRoutesOptions): void {
-    const { dbFilePath, downloadsDir, archiveDir } = options
+    const { dbFilePath, downloadsDir, archiveDir, tpStore } = options
     const activityStore = createActivityStore(dbFilePath)
 
     cleanupIncompleteActivities(activityStore, archiveDir).catch((err) =>
         console.error('[cleanup] Hiba az indításkori takarításban:', err)
     )
+
+    // Startup migráció: régi lokál-formátumú dátumok átalakítása ISO-ra (YYYY-MM-DDT00:00:00).
+    // A pontos időpont csak ZIP feldolgozáskor kerül bele, ez csak a napot menősíti.
+    ;(async () => {
+        try {
+            const toMigrate = activityStore.getAllForDateMigration()
+            if (toMigrate.length === 0) return
+            let migrated = 0
+            for (const { activityId, date } of toMigrate) {
+                const iso = parseActivityDateToIso(date)
+                if (iso) {
+                    activityStore.updateDate(activityId, `${iso}T00:00:00`)
+                    migrated++
+                }
+            }
+            console.log(`[garmin-migration] ${migrated}/${toMigrate.length} date mező konvertálva ISO formátumra`)
+        } catch (err) {
+            console.error('[garmin-migration] Hiba:', err)
+        }
+    })()
 
     if (!stopDownloadWatcher) {
         stopDownloadWatcher = startDownloadWatcher({
@@ -171,14 +238,27 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
 
                 try {
                     const buffer = await readFile(archivedPath)
-                    const { text, errors } = processBuffer(buffer, activityId)
+                    const { text, startTimeIso, errors } = processBuffer(buffer, activityId)
                     if (errors.length > 0) {
                         console.warn(`[downloads] Dekódolási hibák (${activityId}):`, errors)
                     }
 
-                    const mdPath = join(dirname(archivedPath), `${activityId}.md`)
-                    await writeFile(mdPath, text, 'utf-8')
+                    let mdText = text
+                    if (startTimeIso && tpStore) {
+                        const tpMatch = tpStore.findByDateTimeNear(startTimeIso, 60)
+                        if (tpMatch) {
+                            tpStore.linkGarminActivity(tpMatch.workoutId, activityId)
+                            mdText = buildTpSection(tpMatch.fileContent) + '\n\n' + text
+                            console.log(`[downloads] TP egyezés: ${activityId} <-> ${tpMatch.workoutId} (${startTimeIso})`)
+                        }
+                    }
 
+                    const mdPath = join(dirname(archivedPath), `${activityId}.md`)
+                    await writeFile(mdPath, mdText, 'utf-8')
+
+                    if (startTimeIso) {
+                        activityStore.updateDate(activityId, startTimeIso)
+                    }
                     activityStore.markProcessed(activityId)
                     console.log(`[downloads] PROCESSED: ${activityId} (${mdPath})`)
                 } catch (err) {
@@ -368,9 +448,25 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
         handleOptions(req, res)
         setCorsHeaders(res)
 
+        const reqUrl = new URL(req.url || '', 'http://localhost')
+        const daysParam = reqUrl.searchParams.get('days')
+        const daysLimit = daysParam !== null ? Math.max(1, Number(daysParam)) : null
+
+        // Ha days meg van adva, csak a DB-ben legalább annyira frissen létrehozott aktivitásokat processeljük.
+        let allowedIds: Set<string> | null = null
+        if (daysLimit !== null && Number.isFinite(daysLimit)) {
+            const cutoff = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000)
+            const y = cutoff.getFullYear()
+            const m = pad2(cutoff.getMonth() + 1)
+            const d = pad2(cutoff.getDate())
+            const cutoffIso = `${y}-${m}-${d}`
+            allowedIds = activityStore.getActivityIdsSince(cutoffIso)
+        }
+
         try {
             let reprocessedCount = 0;
             let errorCount = 0;
+            let skippedCount = 0;
             const errors: string[] = [];
 
             async function walkAndProcess(dir: string): Promise<void> {
@@ -393,18 +489,37 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
                     const idMatch = entry.name.match(/^(\d+)\.zip$/);
                     if (!idMatch) continue;
 
+                    if (allowedIds !== null && !allowedIds.has(idMatch[1])) {
+                        skippedCount++
+                        continue
+                    }
+
                     const activityId = idMatch[1];
 
                     try {
                         const buffer = await readFile(fullPath);
-                        const { text, errors: decodeErrors } = processBuffer(buffer, activityId);
+                        const { text, startTimeIso, errors: decodeErrors } = processBuffer(buffer, activityId);
 
                         if (decodeErrors.length > 0) {
                             console.warn(`[reprocess] Dekódolási hibák (${activityId}):`, decodeErrors);
                         }
 
+                        let mdText = text;
+                        if (startTimeIso && tpStore) {
+                            const tpMatch = tpStore.findByDateTimeNear(startTimeIso, 60);
+                            if (tpMatch) {
+                                tpStore.linkGarminActivity(tpMatch.workoutId, activityId);
+                                mdText = buildTpSection(tpMatch.fileContent) + '\n\n' + text;
+                                console.log(`[reprocess] TP egyezés: ${activityId} <-> ${tpMatch.workoutId}`);
+                            }
+                        }
+
                         const mdPath = join(dirname(fullPath), `${activityId}.md`);
-                        await writeFile(mdPath, text, 'utf-8');
+                        await writeFile(mdPath, mdText, 'utf-8');
+
+                        if (startTimeIso) {
+                            activityStore.updateDate(activityId, startTimeIso);
+                        }
 
                         console.log(`[reprocess] FELDOLGOZVA: ${activityId} (${mdPath})`);
                         reprocessedCount += 1;
@@ -424,7 +539,9 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
             res.end(JSON.stringify({
                 ok: true,
                 reprocessedCount,
+                skippedCount,
                 errorCount,
+                daysLimit,
                 errors: errors.length > 0 ? errors : undefined,
             }));
         } catch (err) {

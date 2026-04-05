@@ -205,5 +205,36 @@ export function createActivityStore(dbFilePath: string) {
                 throw err
             }
         },
+
+        /**
+         * Az adott ISO datetime óta (date >= cutoffIso) létrehozott aktivitás ID-k.
+         * A date mező immár ISO datetime formátumban van feltöltve a FIT feldolgozás alatt.
+         */
+        getActivityIdsSince(cutoffIso: string): Set<string> {
+            const rows = db.prepare(`
+                SELECT activity_id FROM activities WHERE date >= ?
+            `).all(cutoffIso) as Array<{ activity_id: string }>
+            return new Set(rows.map((r) => r.activity_id))
+        },
+
+        /**
+         * Frissíti az aktivitás date mezőjét ISO datetime értékre (a FIT startTime alapján).
+         */
+        updateDate(activityId: string, isoDateTime: string): void {
+            db.prepare(`UPDATE activities SET date = ?, updated_at = ? WHERE activity_id = ?`)
+                .run(isoDateTime, nowIso(), activityId)
+        },
+
+        /**
+         * Azokat az aktivitásokat adja vissza, amelyek date mezője még nem ISO datetime formátumú.
+         * Ezeket a startup migráció konvertálja át.
+         */
+        getAllForDateMigration(): Array<{ activityId: string; date: string }> {
+            const rows = db.prepare(`
+                SELECT activity_id AS activityId, date FROM activities
+                WHERE date NOT LIKE '____-__-__%'
+            `).all() as Array<{ activityId: string; date: string }>
+            return rows
+        },
     }
 }
