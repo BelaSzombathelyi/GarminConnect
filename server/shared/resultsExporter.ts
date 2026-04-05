@@ -244,7 +244,7 @@ export async function buildResultsMarkdown(entries: ResultTextEntry[]): Promise<
         lines.push(`<a id="${entry.markdownId}"></a>`)
         lines.push(`### Activity: ${entry.activityId}`)
         lines.push('')
-        lines.push(`**Típus:** ${entry.activityTypeLabel} | **Kezdés:** ${entry.startTimeLabel}`)
+        lines.push(`**Típus:** ${entry.activityTypeLabel}`)
         lines.push('')
         lines.push(normalizeEmbeddedMarkdown(entry.text || '(üres)'))
         lines.push('')

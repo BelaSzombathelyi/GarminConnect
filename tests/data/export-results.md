@@ -1,6 +1,6 @@
 # Garmin Download Results
 
-Generated: 2026-04-05T19:29:21.602Z
+Generated: 2026-04-05T19:33:20.898Z
 
 ## Tartalomjegyzék
 
@@ -22,7 +22,7 @@ Generated: 2026-04-05T19:29:21.602Z
 <a id="activity-2026-04-04-99000000004"></a>
 ### Activity: 99000000004
 
-**Típus:** Terepfutás | **Kezdés:** 10:11:25
+**Típus:** Terepfutás
 
 | Adat | Érték |
 | :--- | ---: |
@@ -187,7 +187,7 @@ ClimbPro részletek (18 üzenet):
 <a id="activity-2026-04-01-99000000003"></a>
 ### Activity: 99000000003
 
-**Típus:** Futás | **Kezdés:** 06:17:28
+**Típus:** Futás
 
 | Adat | Érték |
 | :--- | ---: |
@@ -302,7 +302,7 @@ nem feltétlenül egységes km-ek
 <a id="activity-2026-03-22-99000000001"></a>
 ### Activity: 99000000001
 
-**Típus:** Futás | **Kezdés:** 09:00:26
+**Típus:** Futás
 
 | Adat | Érték |
 | :--- | ---: |
@@ -394,7 +394,7 @@ nem feltétlenül egységes km-ek
 <a id="activity-2026-03-01-99000000002"></a>
 ### Activity: 99000000002
 
-**Típus:** Futás | **Kezdés:** 08:30:28
+**Típus:** Futás
 
 | Adat | Érték |
 | :--- | ---: |
