@@ -300,6 +300,9 @@ function extractPauseEvents(data: FitUploadResponse): string {
     const laps = data.messages['lapMesgs'] as Record<string, unknown>[] | undefined;
     if (!events || events.length === 0) return '';
 
+    const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0];
+    const sessionDate = toDate(session?.['startTime'])?.toLocaleDateString('hu-HU');
+
     const timerEvents = events
         .map((e) => ({
             event: String(e['event'] ?? '').toLowerCase(),
@@ -361,9 +364,10 @@ function extractPauseEvents(data: FitUploadResponse): string {
     ];
 
     pauses.forEach((p, i) => {
-        const startStr = p.start.toLocaleString('hu-HU');
-        const sameDay = p.start.toLocaleDateString('hu-HU') === p.end.toLocaleDateString('hu-HU');
-        const endStr = sameDay ? p.end.toLocaleTimeString('hu-HU') : p.end.toLocaleString('hu-HU');
+        const startSameDay = p.start.toLocaleDateString('hu-HU') === sessionDate;
+        const endSameDay = p.end.toLocaleDateString('hu-HU') === sessionDate;
+        const startStr = startSameDay ? p.start.toLocaleTimeString('hu-HU') : p.start.toLocaleString('hu-HU');
+        const endStr = endSameDay ? p.end.toLocaleTimeString('hu-HU') : p.end.toLocaleString('hu-HU');
         lines.push(`| ${i + 1} | ${startStr} | ${endStr} | ${formatSeconds(p.durationSec)} | ${p.lapLabel} |`);
     });
 
