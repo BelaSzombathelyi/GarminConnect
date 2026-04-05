@@ -52,10 +52,21 @@ function parseStartDateTimeToIso(raw: string): string | null {
 }
 
 function parseResultTextMeta(text: string): ParsedTextMeta {
-    const sportProfile = firstMatch(text, /^Sport profil:\s*(.+)$/m)
-    const sport = firstMatch(text, /^Sport:\s*(.+)$/m)
-    const subSport = firstMatch(text, /^Alsport:\s*(.+)$/m)
-    const startRaw = firstMatch(text, /^Kezdés:\s*(.+)$/m)
+    const extractField = (names: string[]): string => {
+        for (const name of names) {
+            const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            const lineValue = firstMatch(text, new RegExp(`^${escaped}:\\s*(.+)$`, 'mi'))
+            if (lineValue) return lineValue
+            const tableValue = firstMatch(text, new RegExp(`^\\|\\s*${escaped}\\s*\\|\\s*([^|]+)\\|\\s*$`, 'mi'))
+            if (tableValue) return tableValue
+        }
+        return ''
+    }
+
+    const sportProfile = extractField(['Sport profil', 'Sport profile'])
+    const sport = extractField(['Sport'])
+    const subSport = extractField(['Alsport', 'Subsport', 'Sub sport'])
+    const startRaw = extractField(['Kezdés', 'Start'])
     const startIso = parseStartDateTimeToIso(startRaw)
 
     return {
@@ -73,6 +84,19 @@ function buildActivityTypeLabel(meta: ParsedTextMeta): string {
     if (meta.sport) return meta.sport
     if (meta.subSport) return meta.subSport
     return 'ismeretlen típus'
+}
+
+function normalizeEmbeddedMarkdown(text: string): string {
+    // Keep embedded content renderable while avoiding heading-level collisions.
+    return text
+        .split('\n')
+        .map((line) => {
+            const match = line.match(/^(#{1,6})\s+(.*)$/)
+            if (!match) return line
+            const level = Math.min(6, match[1].length + 2)
+            return `${'#'.repeat(level)} ${match[2]}`
+        })
+        .join('\n')
 }
 
 function compareResultEntries(a: ResultTextEntry, b: ResultTextEntry): number {
@@ -179,7 +203,7 @@ export async function buildResultsMarkdown(entries: ResultTextEntry[]): Promise<
     lines.push('')
 
     if (entries.length === 0) {
-        lines.push('Nincs elérhető TXT eredmény fájl a data mappában.')
+        lines.push('Nincs elérhető markdown eredmény fájl a data mappában.')
         return Buffer.from(lines.join('\n'), 'utf-8')
     }
 
@@ -217,13 +241,12 @@ export async function buildResultsMarkdown(entries: ResultTextEntry[]): Promise<
             lines.push('')
         }
 
-        lines.push(`### Activity: ${entry.activityId} {#${entry.markdownId}}`)
+        lines.push(`<a id="${entry.markdownId}"></a>`)
+        lines.push(`### Activity: ${entry.activityId}`)
         lines.push('')
         lines.push(`**Típus:** ${entry.activityTypeLabel} | **Kezdés:** ${entry.startTimeLabel}`)
         lines.push('')
-        lines.push('```')
-        lines.push(entry.text || '(üres)')
-        lines.push('```')
+        lines.push(normalizeEmbeddedMarkdown(entry.text || '(üres)'))
         lines.push('')
     }
 

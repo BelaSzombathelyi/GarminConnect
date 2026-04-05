@@ -26,11 +26,13 @@ for (const { name, file } of TEST_FILES) {
         })
 
         it('tartalmaz edzés összefoglalót', () => {
-            expect(text).toContain('--- Edzés összefoglaló ---')
+            expect(text).toContain('## Edzés összefoglaló')
+            expect(text).toContain('| Adat | Érték |')
         })
 
         it('tartalmaz körök adatokat', () => {
-            expect(text).toContain('körök')
+            expect(text).toContain('## Körök')
+            expect(text).toContain('| # | Táv (km) | Pace (min/km) |')
         })
 
         it('nincs kritikus dekódolási hiba', () => {
