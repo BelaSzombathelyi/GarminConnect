@@ -27,19 +27,13 @@ Time: 1:33
 Distance: 14.19 km
 Total time: 1:08:53
 
+TSS: 99 rTSS
+Edzői instrukciók: Egyenletes, könnyed futás érzésre RPE 1-3
 Heart rate: avg 146 bpm
 RPE: 5/10
 
 Aerobic: 4.0 (magas)
 Anaerobic: alacsony
-
-#### TrainingPeaks
-
-TSS: 99 rTSS
-
-##### Edzői instrukciók
-
-Egyenletes, könnyed futás érzésre RPE 1-3
 
 ##### Kommentek
 
@@ -120,19 +114,13 @@ Distance: 30.163 km
 Total time: 3:18:21
 Elevation: +1265 m
 
+TSS: 220 rTSS
+Edzői instrukciók: Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.
 Heart rate: avg 143 bpm
 RPE: 6/10
 
 Aerobic: 4.9 (magas)
 Anaerobic: alacsony
-
-#### TrainingPeaks
-
-TSS: 220 rTSS
-
-##### Edzői instrukciók
-
-Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.
 
 ##### Kommentek
 
@@ -266,15 +254,12 @@ Time: 1:06
 Distance: 13.097 km
 Total time: 1:06:15
 
+TSS: 86 rTSS
 Heart rate: avg 141 bpm
 RPE: 9/10
 
 Aerobic: 3.9 (kozepes)
 Anaerobic: alacsony
-
-#### TrainingPeaks
-
-TSS: 86 rTSS
 
 ##### Kommentek
 

@@ -15,43 +15,42 @@ export interface ProcessBufferOptions {
     tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>
 }
 
-function buildTpSection(tp: Record<string, unknown>): string {
-    const lines: string[] = []
-    lines.push('## TrainingPeaks')
-    lines.push('')
+function injectTpDataIntoSummary(summaryText: string, tp: Record<string, unknown>): string {
+    const lines = summaryText.split('\n')
+    const heroineIndex = lines.findIndex((line) => line.startsWith('Heart rate:'))
+    let insertIndex = heroineIndex !== -1 ? heroineIndex : lines.length - 1
 
-    const rows: [string, string][] = []
+    const fieldsToAdd: Array<[string, string]> = []
     const tssValue = String(tp.tssValue ?? '').trim()
     const tssUnit = String(tp.tssUnit ?? '').trim()
-    if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
-
-    if (rows.length > 0) {
-        for (const [k, v] of rows) lines.push(`${k}: ${v}`)
-    }
+    if (tssValue) fieldsToAdd.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
 
     const description = String(tp.description ?? '').trim()
-    if (description) {
-        lines.push('')
-        lines.push('### Edzői instrukciók')
-        lines.push('')
-        lines.push(description)
+    if (description) fieldsToAdd.push(['Edzői instrukciók', description])
+
+    for (let i = fieldsToAdd.length - 1; i >= 0; i--) {
+        const [k, v] = fieldsToAdd[i]
+        lines.splice(insertIndex, 0, `${k}: ${v}`)
     }
 
+    return lines.join('\n')
+}
+
+function buildCommentsSection(tp: Record<string, unknown>): string {
     const comments = Array.isArray(tp.comments)
         ? (tp.comments as Array<{ text: string; date?: string; user?: string }>)
         : []
-    if (comments.length > 0) {
-        lines.push('')
-        lines.push('### Kommentek')
-        for (const c of comments) {
-            lines.push('')
-            const meta = [c.date, c.user].filter(Boolean).join(' — ')
-            if (meta) lines.push(`**${meta}**`)
-            lines.push('')
-            lines.push(c.text)
-        }
-    }
+    if (comments.length === 0) return ''
 
+    const lines: string[] = []
+    lines.push('### Kommentek')
+    for (const c of comments) {
+        lines.push('')
+        const meta = [c.date, c.user].filter(Boolean).join(' — ')
+        if (meta) lines.push(`**${meta}**`)
+        lines.push('')
+        lines.push(c.text)
+    }
     return lines.join('\n')
 }
 
@@ -139,7 +138,6 @@ export function processBuffer(buffer: Buffer, optionsOrActivityId: ProcessBuffer
             if (activityId) {
                 options.tpStore.linkGarminActivity(tpMatch.workoutId, activityId)
             }
-            const tpText = buildTpSection(tpMatch.fileContent)
             const summaryMatch = text.match(/^## Summary[\s\S]*?(?=\n##\s|$)/)
             if (summaryMatch) {
                 const tpName = String(tpMatch.fileContent?.name ?? '').trim()
@@ -147,12 +145,16 @@ export function processBuffer(buffer: Buffer, optionsOrActivityId: ProcessBuffer
                 let summaryText = summaryMatch[0].trim()
                 if (tpName) summaryText = injectSummaryTitle(summaryText, tpName)
                 if (tpTotalTime) summaryText = injectSummaryTotalTime(summaryText, tpTotalTime)
+                summaryText = injectTpDataIntoSummary(summaryText, tpMatch.fileContent)
+                const commentsSection = buildCommentsSection(tpMatch.fileContent)
                 const restText = text.slice(summaryMatch[0].length).trimStart()
-                finalText = restText
-                    ? `${summaryText}\n\n${tpText}\n\n${restText}`
-                    : `${summaryText}\n\n${tpText}`
-            } else {
-                finalText = tpText + '\n\n' + text
+                if (commentsSection) {
+                    finalText = restText
+                        ? `${summaryText}\n\n${commentsSection}\n\n${restText}`
+                        : `${summaryText}\n\n${commentsSection}`
+                } else {
+                    finalText = restText ? `${summaryText}\n\n${restText}` : summaryText
+                }
             }
         }
     }

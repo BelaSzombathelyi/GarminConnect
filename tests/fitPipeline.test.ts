@@ -120,8 +120,8 @@ describe('fitPipeline TP enrich', () => {
         const { text } = processBuffer(runZip, { activityId: '99000000004', tpStore })
 
         expect(text.startsWith('## Summary')).toBe(true)
-        expect(text).toContain('## TrainingPeaks')
         expect(text).toContain('TSS: 99 rTSS')
+        expect(text).toContain('Edzői instrukciók:')
         expect(text).toContain('## Edzés összefoglaló')
 
         rmSync(tmpTpDir, { recursive: true, force: true })
