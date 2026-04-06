@@ -6,15 +6,22 @@ export interface FitUploadResponse {
     errors: string[];
 }
 
+const SHOW_USER_PROFILE = false;
+
 /** Builds the full plain-text summary that goes into the textarea / /api/process response. */
 export function buildTextOutput(data: FitUploadResponse, mergeShortWalks = false): string {
-    return [
-        extractUserProfile(data),
+    const sections: string[] = [];
+    if (SHOW_USER_PROFILE) {
+        const profile = extractUserProfile(data);
+        if (profile) sections.push(profile);
+    }
+    sections.push(
         extractSession(data),
         extractLaps(data),
         extractSplits(data, mergeShortWalks),
         extractTrailClimbInfo(data),
-    ].filter(Boolean).join('\n\n');
+    );
+    return sections.filter(Boolean).join('\n\n');
 }
 
 // ---------------------------------------------------------------------------

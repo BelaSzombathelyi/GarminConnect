@@ -1,7 +1,5 @@
 # Garmin Download Results
 
-Generated: 2026-04-06T17:25:53.440Z
-
 ## Tartalomjegyzék
 
 ### 2026-04
@@ -40,13 +38,6 @@ Egyenletes, könnyed futás érzésre RPE 1-3
 **2026-04-05 — Szombathelyi Bela**
 
 Ettem egy közepes ebédet, majd nem sokkal utána mentünk anyukámmal bringával egy részen, aztán utána én futva, majd fél időnél fagyiztunk egyet Almádiban. Odafelé picit nyomtam a gázt, ahogy jól esett. Vissza felé, már nem akartam túlságosan erősen futni, így esett most jól. Egy zselé volt, a só most kiamaradt, 1l víz.
-
-#### Felhasználói profil
-
-Súly: 77.2 kg
-Magasság: 1.78 m
-Elalvás időpontja: 20:05
-Ébredési idő: 5:40 (9 ó 35 p)
 
 #### Edzés összefoglaló
 
@@ -131,13 +122,6 @@ Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg d
 **2026-04-04 — Szombathelyi Bela**
 
 Terepfutó cipő csere -> ugyan olyanra. A régi 11 hónapot és 1000km-ert élt meg. Ugyan az az útvonal volt mint múlt héten csak a start nem Óbuda hanem Solymár lett. Vittem botot, felfeléken használtam is. 4 zselé, 3 dekás marcipán szelet, 2 l víz. Lefeléket jobban meg futottam mint múlt héten. Persze van ezen az útvonalon 3-4 kisebb szakasz ahol nem lehet fékezni szinte lefelé mert túl meredek, ott a múltkor is gyors voltam. Talán picit alul frissítettem, és utána meg túl ettem magam, de aztán estére minden jó volt.
-
-#### Felhasználói profil
-
-Súly: 77.2 kg
-Magasság: 1.78 m
-Elalvás időpontja: 20:05
-Ébredési idő: 5:40 (9 ó 35 p)
 
 #### Edzés összefoglaló
 
@@ -273,13 +257,6 @@ Mikro megállások: 10 db (2 percnél rövidebb), összidő: 4:52.
 
 Ezt a tempót nem érzem biztonságosnak. 1-2 percig oké, de 20 percre olyan érzés mit amikor elkezd pörögni a villany óra csak itt a CH raktáron. Biztosan bele tudnék menni jobban is, de az már nem biztonságos érzés. Azért így sem lett olyan rossz 😉
 
-#### Felhasználói profil
-
-Súly: 77.2 kg
-Magasság: 1.78 m
-Elalvás időpontja: 20:05
-Ébredési idő: 5:40 (9 ó 35 p)
-
 #### Edzés összefoglaló
 
 Sport profil: Futás
@@ -374,13 +351,6 @@ Mikro megállások: 2 db (2 percnél rövidebb), összidő: 0:38.
 ## 2026-03-22
 
 <a id="activity-2026-03-22-99000000001"></a>
-#### Felhasználói profil
-
-Súly: 75.8 kg
-Magasság: 1.78 m
-Elalvás időpontja: 20:05
-Ébredési idő: 5:40 (9 ó 35 p)
-
 #### Edzés összefoglaló
 
 Sport profil: Futás
@@ -444,13 +414,6 @@ nem feltétlenül egységes km-ek
 ## 2026-03-01
 
 <a id="activity-2026-03-01-99000000002"></a>
-#### Felhasználói profil
-
-Súly: 75.3 kg
-Magasság: 1.78 m
-Elalvás időpontja: 20:05
-Ébredési idő: 5:40 (9 ó 35 p)
-
 #### Edzés összefoglaló
 
 Sport profil: Futás

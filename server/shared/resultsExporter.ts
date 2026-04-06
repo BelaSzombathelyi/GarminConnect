@@ -220,8 +220,6 @@ export async function buildResultsMarkdown(entries: ResultTextEntry[]): Promise<
     // Header
     lines.push('# Garmin Download Results')
     lines.push('')
-    lines.push(`Generated: ${new Date().toISOString()}`)
-    lines.push('')
 
     if (entries.length === 0) {
         lines.push('Nincs elérhető markdown eredmény fájl a data mappában.')
