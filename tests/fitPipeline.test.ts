@@ -77,7 +77,7 @@ for (const { name, activityId, dayKey } of TEST_FILES) {
 
         it('tartalmaz edzés összefoglalót', () => {
             expect(text).toContain('## Edzés összefoglaló')
-            expect(text).toContain('| Adat | Érték |')
+            expect(text).toContain('Sport profil:')
         })
 
         it('tartalmaz körök adatokat', () => {

@@ -38,6 +38,11 @@ function buildMarkdownTable(rows: Array<[string, string]>): string {
     return lines.join('\n');
 }
 
+function buildKeyValueLines(rows: Array<[string, string]>): string {
+    if (rows.length === 0) return '';
+    return rows.map(([key, val]) => `${key}: ${val}`).join('\n');
+}
+
 function mpsToMinPerKm(speed: unknown): string {
     if (typeof speed !== 'number' || speed <= 0) return '–';
     // Az FIT SDK az avgSpeed-et 0.01 m/s-es egységekben adja meg
@@ -465,17 +470,19 @@ export function extractSession(data: FitUploadResponse): string {
     } else if (typeof session['maxCadence'] === 'number') {
         rows.push(['Max. cadence', `${cadence(session['maxCadence'])} steps/min`]);
     }
-    if (typeof session['totalStrides'] === 'number') rows.push(['Total steps', String(session['totalStrides'])]);
-
-    // Temperature
-    if (typeof session['avgTemperature'] === 'number') rows.push(['Avg. arm temperature', `${session['avgTemperature']} C`]);
-    if (typeof session['maxTemperature'] === 'number') rows.push(['Max. arm temperature', `${session['maxTemperature']} C`]);
-    if (typeof session['minTemperature'] === 'number') rows.push(['Min. arm temperature', `${session['minTemperature']} C`]);
-
-    // Respiration
-    if (typeof session['enhancedAvgRespirationRate'] === 'number') rows.push(['Avg. respiration', `${session['enhancedAvgRespirationRate'].toFixed(1)} breaths/min`]);
-    if (typeof session['enhancedMaxRespirationRate'] === 'number') rows.push(['Max. respiration', `${session['enhancedMaxRespirationRate'].toFixed(1)} breaths/min`]);
-    if (typeof session['enhancedMinRespirationRate'] === 'number') rows.push(['Min. respiration', `${session['enhancedMinRespirationRate'].toFixed(1)} breaths/min`]);
+    // Respiration (single compact line)
+    const avgResp = typeof session['enhancedAvgRespirationRate'] === 'number'
+        ? (session['enhancedAvgRespirationRate'] as number).toFixed(1)
+        : '–';
+    const maxResp = typeof session['enhancedMaxRespirationRate'] === 'number'
+        ? (session['enhancedMaxRespirationRate'] as number).toFixed(1)
+        : '–';
+    const minResp = typeof session['enhancedMinRespirationRate'] === 'number'
+        ? (session['enhancedMinRespirationRate'] as number).toFixed(1)
+        : '–';
+    if (avgResp !== '–' || maxResp !== '–' || minResp !== '–') {
+        rows.push(['Respiration', `avg ${avgResp}, max ${maxResp}, min ${minResp} breaths/min`]);
+    }
 
     // Running dynamics
     if (typeof session['avgStepLength'] === 'number') rows.push(['Avg. step length', `${stepLengthMm(session['avgStepLength'])} mm`]);
@@ -514,7 +521,7 @@ export function extractSession(data: FitUploadResponse): string {
     // Séta / futás / állás idők a splitSummaryMesgs-ből
     const summaries = data.messages['splitSummaryMesgs'] as Record<string, unknown>[] | undefined;
     if (summaries && summaries.length > 0) {
-        const rwdTypes: Record<string, string> = { rwdRun: 'Futás idő:', rwdWalk: 'Séta idő:', rwdStand: 'Állás idő:' };
+        const rwdTypes: Record<string, string> = { rwdRun: 'Futás idő', rwdWalk: 'Séta idő', rwdStand: 'Állás idő' };
         for (const [key, label] of Object.entries(rwdTypes)) {
             const entry = summaries.find(s => String(s['splitType']) === key);
             if (entry && typeof entry['totalTimerTime'] === 'number') {
@@ -533,7 +540,7 @@ export function extractSession(data: FitUploadResponse): string {
         if (typeof workout['numValidSteps'] === 'number') rows.push(['workout steps', String(workout['numValidSteps'])]);
     }
 
-    const lines: string[] = ['## Edzés összefoglaló', '', buildMarkdownTable(rows)];
+    const lines: string[] = ['## Edzés összefoglaló', '', buildKeyValueLines(rows)];
 
     // Edzéslépések (workoutStepMesgs)
     const visibleSteps = getVisibleWorkoutSteps(data);
@@ -829,7 +836,7 @@ export function extractUserProfile(data: FitUploadResponse): string {
     }
     rows.push(['Ébredési idő', wakeTimeStr]);
 
-    return ['## Felhasználói profil', '', buildMarkdownTable(rows)].join('\n');
+    return ['## Felhasználói profil', '', buildKeyValueLines(rows)].join('\n');
 }
 
 function extractTrailClimbInfo(data: FitUploadResponse): string {
