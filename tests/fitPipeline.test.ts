@@ -36,6 +36,8 @@ function toTpInputFromFixture(filePath: string): TrainingPeaksWorkoutInput {
         distance: String(raw.distance ?? ''),
         tssValue: String(raw.tssValue ?? ''),
         tssUnit: String(raw.tssUnit ?? ''),
+        plannedTssValue: String(raw.plannedTssValue ?? ''),
+        plannedTssUnit: String(raw.plannedTssUnit ?? ''),
         description: String(raw.description ?? ''),
         comments: Array.isArray(raw.comments) ? (raw.comments as TrainingPeaksComment[]) : [],
         raw: { workoutId: String(raw.workoutId ?? '') },
@@ -121,6 +123,7 @@ describe('fitPipeline TP enrich', () => {
 
         expect(text.startsWith('## Summary')).toBe(true)
         expect(text).toContain('TSS: 99 rTSS')
+        expect(text).toContain('Tervezett TSS: 99 rTSS')
         expect(text).toContain('Edzői instrukciók:')
         expect(text).toContain('## Edzés összefoglaló')
 

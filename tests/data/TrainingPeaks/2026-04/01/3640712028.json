@@ -8,6 +8,8 @@
   "distance": "13.1",
   "tssValue": "86",
   "tssUnit": "rTSS",
+  "plannedTssValue": "",
+  "plannedTssUnit": "",
   "description": "",
   "comments": [
     {
@@ -17,5 +19,5 @@
     }
   ],
   "source": "trainingpeaks",
-  "savedAt": "2026-04-06T17:59:24.160Z"
+  "savedAt": "2026-04-06T19:10:27.906Z"
 }

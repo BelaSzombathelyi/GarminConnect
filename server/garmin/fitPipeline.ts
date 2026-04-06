@@ -2,6 +2,7 @@ import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
 import { FitUploadResponse, buildTextOutput } from '../../src/fitExtractor'
 import type { createTrainingPeaksWorkoutStore } from '../trainingpeaks/workoutStore'
+import { shouldMaskTpDescription } from '../trainingpeaks/descriptionMasking'
 
 export interface ProcessResult {
     text: string
@@ -25,8 +26,19 @@ function injectTpDataIntoSummary(summaryText: string, tp: Record<string, unknown
     const tssUnit = String(tp.tssUnit ?? '').trim()
     if (tssValue) fieldsToAdd.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
 
+    const plannedTssValue = String(tp.plannedTssValue ?? '').trim()
+    const plannedTssUnit = String(tp.plannedTssUnit ?? '').trim()
+    if (plannedTssValue) {
+        fieldsToAdd.push([
+            'Tervezett TSS',
+            plannedTssUnit ? `${plannedTssValue} ${plannedTssUnit}` : plannedTssValue,
+        ])
+    }
+
     const description = String(tp.description ?? '').trim()
-    if (description) fieldsToAdd.push(['Edzői instrukciók', description])
+    if (description && !shouldMaskTpDescription(tp)) {
+        fieldsToAdd.push(['Edzői instrukciók', description])
+    }
 
     for (let i = fieldsToAdd.length - 1; i >= 0; i--) {
         const [k, v] = fieldsToAdd[i]

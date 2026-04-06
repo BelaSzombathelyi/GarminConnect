@@ -8,8 +8,10 @@
   "distance": "4.85",
   "tssValue": "10",
   "tssUnit": "hrTSS",
+  "plannedTssValue": "",
+  "plannedTssUnit": "",
   "description": "",
   "comments": [],
   "source": "trainingpeaks",
-  "savedAt": "2026-04-06T17:59:24.165Z"
+  "savedAt": "2026-04-06T19:10:27.914Z"
 }

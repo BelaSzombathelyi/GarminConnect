@@ -21,6 +21,8 @@ export interface TrainingPeaksWorkoutInput {
     tss?: string
     tssValue?: string
     tssUnit?: string
+    plannedTssValue?: string
+    plannedTssUnit?: string
     description?: string
     comments?: (string | TrainingPeaksComment)[]
     raw?: Record<string, unknown>
@@ -56,6 +58,13 @@ function parseTss(item: TrainingPeaksWorkoutInput): { tssValue: string; tssUnit:
         return { tssValue: match[1], tssUnit: match[2] }
     }
     return { tssValue: combined, tssUnit: '' }
+}
+
+function parsePlannedTss(item: TrainingPeaksWorkoutInput): { plannedTssValue: string; plannedTssUnit: string } {
+    return {
+        plannedTssValue: String(item.plannedTssValue ?? '').trim(),
+        plannedTssUnit: String(item.plannedTssUnit ?? '').trim(),
+    }
 }
 
 // workoutStart formátumok: "5/4/26" (D/M/YY), "5/4/2026", "2026-04-05", "2026-04-05T16:54:49",
@@ -205,6 +214,8 @@ function buildRelativeWorkoutPath(workoutStart: string, workoutId: string): stri
 }
 
 function buildFullJson(item: TrainingPeaksWorkoutInput, normalized: NormalizedWorkout): Record<string, unknown> {
+    const { plannedTssValue, plannedTssUnit } = parsePlannedTss(item)
+
     return {
         rowKey: normalized.rowKey,
         workoutId: normalized.workoutId,
@@ -215,6 +226,8 @@ function buildFullJson(item: TrainingPeaksWorkoutInput, normalized: NormalizedWo
         distance: normalized.distance,
         tssValue: normalized.tssValue,
         tssUnit: normalized.tssUnit,
+        plannedTssValue,
+        plannedTssUnit,
         description: String(item.description ?? '').trim(),
         comments: normalizeComments(item.comments),
         source: 'trainingpeaks',
