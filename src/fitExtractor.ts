@@ -600,8 +600,12 @@ export function extractSession(data: FitUploadResponse): string {
     const workoutMesgs = data.messages['workoutMesgs'] as Record<string, unknown>[] | undefined;
     const workout = workoutMesgs?.[0];
     if (workout) {
-        const wktNameArr = Array.isArray(workout['wktName']) ? (workout['wktName'] as unknown[]).filter(s => typeof s === 'string' && (s as string).trim()) : null;
-        const wktName = wktNameArr && wktNameArr.length > 0 ? (wktNameArr as string[]).join(' ') : (typeof workout['wktName'] === 'string' ? workout['wktName'] : '');
+        const wktNameArr = Array.isArray(workout['wktName'])
+            ? (workout['wktName'] as unknown[]).filter(s => typeof s === 'string' && (s as string).trim())
+            : null;
+        const wktName = wktNameArr && wktNameArr.length > 0
+            ? String(wktNameArr[0])
+            : (typeof workout['wktName'] === 'string' ? workout['wktName'] : '');
         if (wktName) rows.push(['Edzés neve', wktName]);
         if (typeof workout['numValidSteps'] === 'number') rows.push(['workout steps', String(workout['numValidSteps'])]);
     }

@@ -74,7 +74,7 @@ Edzésterhelés (peak): 192.2
 Futás idő: 68:03
 Séta idő: 0:49
 Állás idő: 0:01
-Edzés neve: 70 perc kötetlen *5 min, 04:05
+Edzés neve: 70 perc kötetlen
 workout steps: 2
 
 ##### Edzéslépések
@@ -169,7 +169,7 @@ Edzésterhelés (peak): 273.1
 Futás idő: 145:23
 Séta idő: 52:46
 Állás idő: 0:13
-Edzés neve: 3,5 óra terepen 4*5 min, 04:05
+Edzés neve: 3,5 óra terepen
 workout steps: 2
 
 ##### Edzéslépések
