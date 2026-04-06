@@ -21,12 +21,9 @@ function buildTpSection(tp: Record<string, unknown>): string {
     lines.push('')
 
     const rows: [string, string][] = []
-    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
     const tssValue = String(tp.tssValue ?? '').trim()
     const tssUnit = String(tp.tssUnit ?? '').trim()
     if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
-    if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
-    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
 
     if (rows.length > 0) {
         for (const [k, v] of rows) lines.push(`${k}: ${v}`)
@@ -55,6 +52,32 @@ function buildTpSection(tp: Record<string, unknown>): string {
         }
     }
 
+    return lines.join('\n')
+}
+
+function injectSummaryTotalTime(summaryText: string, totalTime: string): string {
+    const lines = summaryText.split('\n')
+    const distanceLineIndex = lines.findIndex((line) => line.startsWith('Distance:'))
+    const alreadyHasTotalTime = lines.some((line) => line.startsWith('Total time:'))
+    if (distanceLineIndex === -1 || alreadyHasTotalTime) return summaryText
+    lines.splice(distanceLineIndex + 1, 0, `Total time: ${totalTime}`)
+    return lines.join('\n')
+}
+
+function injectSummaryTitle(summaryText: string, activityName: string): string {
+    const lines = summaryText.split('\n')
+    const titleIndex = lines.findIndex((line) => line.startsWith('Title:'))
+    if (titleIndex === -1) return summaryText
+
+    const currentTitle = lines[titleIndex].slice('Title:'.length).trim()
+    if (!currentTitle) {
+        lines[titleIndex] = `Title: ${activityName}`
+        return lines.join('\n')
+    }
+
+    const hasTypeAlready = activityName.toLowerCase().includes(currentTitle.toLowerCase())
+    const nextTitle = hasTypeAlready ? activityName : `${activityName} - ${currentTitle}`
+    lines[titleIndex] = `Title: ${nextTitle}`
     return lines.join('\n')
 }
 
@@ -119,7 +142,11 @@ export function processBuffer(buffer: Buffer, optionsOrActivityId: ProcessBuffer
             const tpText = buildTpSection(tpMatch.fileContent)
             const summaryMatch = text.match(/^## Summary[\s\S]*?(?=\n##\s|$)/)
             if (summaryMatch) {
-                const summaryText = summaryMatch[0].trim()
+                const tpName = String(tpMatch.fileContent?.name ?? '').trim()
+                const tpTotalTime = String(tpMatch.fileContent?.totalTime ?? '').trim()
+                let summaryText = summaryMatch[0].trim()
+                if (tpName) summaryText = injectSummaryTitle(summaryText, tpName)
+                if (tpTotalTime) summaryText = injectSummaryTotalTime(summaryText, tpTotalTime)
                 const restText = text.slice(summaryMatch[0].length).trimStart()
                 finalText = restText
                     ? `${summaryText}\n\n${tpText}\n\n${restText}`

@@ -68,7 +68,7 @@ function extractSummary(data: FitUploadResponse): string {
     return [
         '## Summary',
         '',
-        `Type: ${typeLabel}`,
+        `Title: ${typeLabel}`,
         `Time: ${durationLabel}`,
         `Distance: ${distanceLabel}`,
         ...(shouldHideAscent ? [] : [`Elevation: ${ascent}`]),

@@ -121,7 +121,7 @@ describe('fitPipeline TP enrich', () => {
 
         expect(text.startsWith('## Summary')).toBe(true)
         expect(text).toContain('## TrainingPeaks')
-        expect(text).toContain('Aktivitás neve: 70 perc kötetlen')
+        expect(text).toContain('TSS: 99 rTSS')
         expect(text).toContain('## Edzés összefoglaló')
 
         rmSync(tmpTpDir, { recursive: true, force: true })
