@@ -866,7 +866,7 @@ function extractTrailClimbInfo(data: FitUploadResponse): string {
 
     const climbPro = data.messages['climbProMesgs'] as Record<string, unknown>[] | undefined
     if (climbPro && climbPro.length > 0) {
-        const detailRows = climbPro
+        const sorted = climbPro
             .slice()
             .sort((a, b) => {
                 const ta = toDate(a['timestamp'])?.getTime() ?? 0
@@ -874,27 +874,43 @@ function extractTrailClimbInfo(data: FitUploadResponse): string {
                 return ta - tb
             })
 
+        // Group by climbNumber, keeping start and complete events separately
+        const climbMap = new Map<number | string, { start?: Record<string, unknown>; complete?: Record<string, unknown> }>()
+        for (const item of sorted) {
+            const climbNo = typeof item['climbNumber'] === 'number' ? item['climbNumber'] : String(item['climbNumber'] ?? '–')
+            const event = typeof item['climbProEvent'] === 'string' ? item['climbProEvent'] : ''
+            if (!climbMap.has(climbNo)) climbMap.set(climbNo, {})
+            const entry = climbMap.get(climbNo)!
+            if (event === 'start') entry.start = item
+            else if (event === 'complete') entry.complete = item
+        }
+
+        const climbEntries = [...climbMap.entries()]
+
         const rows: string[] = [
-            `## ClimbPro (${climbPro.length} esemény)`,
+            `## ClimbPro (${climbEntries.length} emelkedő)`,
             '',
-            '| # | Időpont | Climb# | Esemény | Kategória | Táv (km) |',
-            '| :--- | :--- | ---: | :--- | ---: | ---: |',
+            '| Category | Start | Length (km) |',
+            '| ---: | :--- | ---: |',
         ]
 
-        for (let i = 0; i < detailRows.length; i++) {
-            const item = detailRows[i]
+        const formatTime = (item: Record<string, unknown> | undefined): string => {
+            if (!item) return '–'
             const ts = toDate(item['timestamp'])
-            const tsDate = ts?.toLocaleDateString('hu-HU')
-            const timeLabel = ts
-                ? tsDate === sessionDate
-                    ? ts.toLocaleTimeString('hu-HU')
-                    : ts.toLocaleString('hu-HU')
-                : '–'
-            const climbNo = typeof item['climbNumber'] === 'number' ? String(item['climbNumber']) : '–'
-            const event = typeof item['climbProEvent'] === 'string' ? item['climbProEvent'] : '–'
-            const category = typeof item['climbCategory'] === 'number' ? String(item['climbCategory']) : '–'
-            const distanceKm = typeof item['currentDist'] === 'number' ? km(item['currentDist']) : '–'
-            rows.push(`| ${i + 1} | ${timeLabel} | ${climbNo} | ${event} | ${category} | ${distanceKm} |`)
+            if (!ts) return '–'
+            const tsDate = ts.toLocaleDateString('hu-HU')
+            return tsDate === sessionDate ? ts.toLocaleTimeString('hu-HU') : ts.toLocaleString('hu-HU')
+        }
+
+        for (const [, { start, complete }] of climbEntries) {
+            const category = start
+                ? (typeof start['climbCategory'] === 'number' ? String(start['climbCategory']) : '–')
+                : (complete ? (typeof complete['climbCategory'] === 'number' ? String(complete['climbCategory']) : '–') : '–')
+            const startTime = formatTime(start)
+            const startDist = start && typeof start['currentDist'] === 'number' ? (start['currentDist'] as number) : null
+            const completeDist = complete && typeof complete['currentDist'] === 'number' ? (complete['currentDist'] as number) : null
+            const length = startDist !== null && completeDist !== null ? km(completeDist - startDist) : '–'
+            rows.push(`| ${category} | ${startTime} | ${length} |`)
         }
         blocks.push(rows.join('\n'))
     }
