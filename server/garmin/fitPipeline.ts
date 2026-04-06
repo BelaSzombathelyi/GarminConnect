@@ -146,15 +146,22 @@ export function processBuffer(buffer: Buffer, optionsOrActivityId: ProcessBuffer
                 if (tpName) summaryText = injectSummaryTitle(summaryText, tpName)
                 if (tpTotalTime) summaryText = injectSummaryTotalTime(summaryText, tpTotalTime)
                 summaryText = injectTpDataIntoSummary(summaryText, tpMatch.fileContent)
+                let restText = text.slice(summaryMatch[0].length).trimStart()
+                
                 const commentsSection = buildCommentsSection(tpMatch.fileContent)
-                const restText = text.slice(summaryMatch[0].length).trimStart()
                 if (commentsSection) {
-                    finalText = restText
-                        ? `${summaryText}\n\n${commentsSection}\n\n${restText}`
-                        : `${summaryText}\n\n${commentsSection}`
-                } else {
-                    finalText = restText ? `${summaryText}\n\n${restText}` : summaryText
+                    // Insert comments before ### Pause Events section (or before ## Körók if no pause events)
+                    const pauseEventsIndex = restText.indexOf('### Pause Events')
+                    const insertIndex = pauseEventsIndex !== -1 ? pauseEventsIndex : restText.indexOf('## Körök')
+                    
+                    if (insertIndex !== -1) {
+                        restText = restText.slice(0, insertIndex).trimEnd() + '\n\n' + commentsSection + '\n\n' + restText.slice(insertIndex)
+                    } else {
+                        restText = restText ? `${restText}\n\n${commentsSection}` : commentsSection
+                    }
                 }
+                
+                finalText = restText ? `${summaryText}\n\n${restText}` : summaryText
             }
         }
     }

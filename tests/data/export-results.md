@@ -35,12 +35,6 @@ RPE: 5/10
 Aerobic: 4.0 (magas)
 Anaerobic: alacsony
 
-##### Kommentek
-
-**2026-04-05 — Szombathelyi Bela**
-
-Ettem egy közepes ebédet, majd nem sokkal utána mentünk anyukámmal bringával egy részen, aztán utána én futva, majd fél időnél fagyiztunk egyet Almádiban. Odafelé picit nyomtam a gázt, ahogy jól esett. Vissza felé, már nem akartam túlságosan erősen futni, így esett most jól. Egy zselé volt, a só most kiamaradt, 1l víz.
-
 #### Edzés összefoglaló
 
 Sport profil: Futás
@@ -72,6 +66,18 @@ workout steps: 2
 ##### Edzéslépések
   1.  RPE 1-3  [active]  70:00
 
+##### Kommentek
+
+**2026-04-05 — Szombathelyi Bela**
+
+Ettem egy közepes ebédet, majd nem sokkal utána mentünk anyukámmal bringával egy részen, aztán utána én futva, majd fél időnél fagyiztunk egyet Almádiban. Odafelé picit nyomtam a gázt, ahogy jól esett. Vissza felé, már nem akartam túlságosan erősen futni, így esett most jól. Egy zselé volt, a só most kiamaradt, 1l víz.
+
+##### Pause Events (Timer Button)
+
+| Start | End | Duration | Lap |
+| :--- | :--- | ---: | ---: |
+| 15:54:03 | 16:18:21 | 24:18 | 12 |
+
 #### Körök
 nem feltétlenül egységes km-ek
 
@@ -97,12 +103,6 @@ nem feltétlenül egységes km-ek
 | 18 | 1 | 5:10 | 2 | 2 | 166 | 170 | 1160.60 | 104.7 | 258 | 8.8 | 37.9 | 43.1 |
 | 19 | 0.609 | 5:05 | 0 | 1 | 164 | 166 | 1202.10 | 110.1 | 258 | 8.9 | 39.4 | 41.7 |
 
-##### Pause Events (Timer Button)
-
-| Start | End | Duration | Lap |
-| :--- | :--- | ---: | ---: |
-| 15:54:03 | 16:18:21 | 24:18 | 12 |
-
 ## 2026-04-04
 
 <a id="activity-2026-04-04-99000000005"></a>
@@ -121,12 +121,6 @@ RPE: 6/10
 
 Aerobic: 4.9 (magas)
 Anaerobic: alacsony
-
-##### Kommentek
-
-**2026-04-04 — Szombathelyi Bela**
-
-Terepfutó cipő csere -> ugyan olyanra. A régi 11 hónapot és 1000km-ert élt meg. Ugyan az az útvonal volt mint múlt héten csak a start nem Óbuda hanem Solymár lett. Vittem botot, felfeléken használtam is. 4 zselé, 3 dekás marcipán szelet, 2 l víz. Lefeléket jobban meg futottam mint múlt héten. Persze van ezen az útvonalon 3-4 kisebb szakasz ahol nem lehet fékezni szinte lefelé mert túl meredek, ott a múltkor is gyors voltam. Talán picit alul frissítettem, és utána meg túl ettem magam, de aztán estére minden jó volt.
 
 #### Edzés összefoglaló
 
@@ -158,6 +152,16 @@ workout steps: 2
 
 ##### Edzéslépések
   1.  Active  [active]  210:00  114–150 bpm
+
+##### Kommentek
+
+**2026-04-04 — Szombathelyi Bela**
+
+Terepfutó cipő csere -> ugyan olyanra. A régi 11 hónapot és 1000km-ert élt meg. Ugyan az az útvonal volt mint múlt héten csak a start nem Óbuda hanem Solymár lett. Vittem botot, felfeléken használtam is. 4 zselé, 3 dekás marcipán szelet, 2 l víz. Lefeléket jobban meg futottam mint múlt héten. Persze van ezen az útvonalon 3-4 kisebb szakasz ahol nem lehet fékezni szinte lefelé mert túl meredek, ott a múltkor is gyors voltam. Talán picit alul frissítettem, és utána meg túl ettem magam, de aztán estére minden jó volt.
+
+##### Pause Events (Timer Button)
+
+Mikro megállások: 10 db (2 percnél rövidebb), összidő: 4:52.
 
 #### Körök
 nem feltétlenül egységes km-ek
@@ -226,10 +230,6 @@ nem feltétlenül egységes km-ek
 | 60 | 1 | 5:26 | 6 | 21 | 166 | 170 | 1110.20 | 101.5 | 264 | 8.9 | 31.0 | 35.2 |
 | 61 | 0.156 | 5:25 | 2 | 0 | 166 | 168 | 1097.50 | 99.2 | 264 | 8.8 | 32.3 | 34.4 |
 
-##### Pause Events (Timer Button)
-
-Mikro megállások: 10 db (2 percnél rövidebb), összidő: 4:52.
-
 #### ClimbPro
 
 | Start | Duration | Ascent (m) | Length (km) |
@@ -260,12 +260,6 @@ RPE: 9/10
 
 Aerobic: 3.9 (kozepes)
 Anaerobic: alacsony
-
-##### Kommentek
-
-**2026-04-01 — Szombathelyi Bela**
-
-Ezt a tempót nem érzem biztonságosnak. 1-2 percig oké, de 20 percre olyan érzés mit amikor elkezd pörögni a villany óra csak itt a CH raktáron. Biztosan bele tudnék menni jobban is, de az már nem biztonságos érzés. Azért így sem lett olyan rossz 😉
 
 #### Edzés összefoglaló
 
@@ -305,6 +299,39 @@ workout steps: 9
   7.  repeatUntilStepsCmplt
   8.  Recovery  [rest]  5:00  speed
 
+##### Intervallumok - **6 blokk**
+
+| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
+| ---: | :--- | ---: | ---: | ---: | ---: |
+| 4:49 | Bemelegítés | 0.836 | 5:46 | 12 | 0 |
+| 0:35 + 2:00 | Intervallum | 0.137 / 0.37 | 4:16 | 1 | 0 |
+| 0:35 + 2:00 | Intervallum | 0.141 / 0.345 | 4:08 | 0 | 0 |
+| 5:00 + 5:00 | Intervallum | 1.202 / 0.907 | 4:10 | 0 | 0 |
+| 5:00 + 5:00 | Intervallum | 1.222 / 0.914 | 4:05 | 1 | 2 |
+| 5:00 + 5:00 | Intervallum | 1.213 / 0.898 | 4:07 | 1 | 0 |
+| 5:00 + 5:00 | Intervallum | 1.197 / 0.87 | 4:11 | 1 | 1 |
+| 5:00 | Pihenő interval | 0.899 | 5:34 | 1 | 0 |
+| 11:16 | Levezető | 1.948 | 5:47 | 13 | 10 |
+
+##### Intervallum összefoglalók
+
+| Típus | Darab | Össz táv (km) | Össz idő |
+| :--- | ---: | ---: | ---: |
+| Pihenő interval | 7 | 5.202 | 29:00 |
+| Aktív interval | 6 | 5.111 | 21:10 |
+| Levezető | 1 | 1.948 | 11:16 |
+| Bemelegítés | 1 | 0.836 | 4:49 |
+
+##### Kommentek
+
+**2026-04-01 — Szombathelyi Bela**
+
+Ezt a tempót nem érzem biztonságosnak. 1-2 percig oké, de 20 percre olyan érzés mit amikor elkezd pörögni a villany óra csak itt a CH raktáron. Biztosan bele tudnék menni jobban is, de az már nem biztonságos érzés. Azért így sem lett olyan rossz 😉
+
+##### Pause Events (Timer Button)
+
+Mikro megállások: 2 db (2 percnél rövidebb), összidő: 0:38.
+
 #### Körök
 nem feltétlenül egységes km-ek
 
@@ -330,33 +357,6 @@ nem feltétlenül egységes km-ek
 | 18 | 0.899 | 5:34 | 1 | 0 | 170 | 176 | 1057.40 | 105.2 | 222 | 9.8 | 38.6 | 44.1 |
 | 19 | 1 | 5:59 | 13 | 0 | 168 | 172 | 1020.50 | 100.2 | 247 | 9.6 | 36.3 | 44.3 |
 | 20 | 0.948 | 5:35 | 0 | 10 | 168 | 172 | 1054.60 | 103.6 | 246 | 9.7 | 33.5 | 38.3 |
-
-##### Intervallumok - **6 blokk**
-
-| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
-| ---: | :--- | ---: | ---: | ---: | ---: |
-| 4:49 | Bemelegítés | 0.836 | 5:46 | 12 | 0 |
-| 0:35 + 2:00 | Intervallum | 0.137 / 0.37 | 4:16 | 1 | 0 |
-| 0:35 + 2:00 | Intervallum | 0.141 / 0.345 | 4:08 | 0 | 0 |
-| 5:00 + 5:00 | Intervallum | 1.202 / 0.907 | 4:10 | 0 | 0 |
-| 5:00 + 5:00 | Intervallum | 1.222 / 0.914 | 4:05 | 1 | 2 |
-| 5:00 + 5:00 | Intervallum | 1.213 / 0.898 | 4:07 | 1 | 0 |
-| 5:00 + 5:00 | Intervallum | 1.197 / 0.87 | 4:11 | 1 | 1 |
-| 5:00 | Pihenő interval | 0.899 | 5:34 | 1 | 0 |
-| 11:16 | Levezető | 1.948 | 5:47 | 13 | 10 |
-
-##### Intervallum összefoglalók
-
-| Típus | Darab | Össz táv (km) | Össz idő |
-| :--- | ---: | ---: | ---: |
-| Pihenő interval | 7 | 5.202 | 29:00 |
-| Aktív interval | 6 | 5.111 | 21:10 |
-| Levezető | 1 | 1.948 | 11:16 |
-| Bemelegítés | 1 | 0.836 | 4:49 |
-
-##### Pause Events (Timer Button)
-
-Mikro megállások: 2 db (2 percnél rövidebb), összidő: 0:38.
 
 ## 2026-03-22
 
@@ -399,6 +399,12 @@ Futás idő: 90:00
 Séta idő: 0:00
 Állás idő: 0:00
 
+##### Intervallumok
+
+| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
+| ---: | :--- | ---: | ---: | ---: | ---: |
+| 90:00 | Aktív interval | 21.351 | 4:13 | 62 | 60 |
+
 #### Körök
 nem feltétlenül egységes km-ek
 
@@ -426,12 +432,6 @@ nem feltétlenül egységes km-ek
 | 20 | 1 | 4:06 | 1 | 5 | 168 | 176 | 1447.50 | 109.3 | 213 | 7.3 | – | – |
 | 21 | 1 | 4:22 | 1 | 0 | 166 | 168 | 1381.20 | 108.7 | 223 | 7.7 | – | – |
 | 22 | 0.351 | 3:43 | 0 | 2 | 168 | 176 | 1503.00 | 111.0 | 195 | 7.3 | – | – |
-
-##### Intervallumok
-
-| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
-| ---: | :--- | ---: | ---: | ---: | ---: |
-| 90:00 | Aktív interval | 21.351 | 4:13 | 62 | 60 |
 
 ## 2026-03-01
 
@@ -473,6 +473,29 @@ Edzésterhelés (peak): 171.8
 Futás idő: 384:56
 Séta idő: 21:47
 Állás idő: 4:58
+
+##### Intervallumok - **16 blokk**
+
+| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
+| ---: | :--- | ---: | ---: | ---: | ---: |
+| 17:07 | Aktív interval | 2.347 | 7:18 | 18 | 0 |
+| 23:31 + 0:13 | Intervallum | 3.305 / 0.006 | 7:07 | 4 | 26 |
+| 14:53 + 0:44 | Intervallum | 2.068 / 0.007 | 7:12 | 6 | 2 |
+| 25:55 + 0:16 | Intervallum | 3.42 / 0.003 | 7:35 | 4 | 9 |
+| 26:57 + 0:55 | Intervallum | 3.59 / 0.017 | 7:30 | 4 | 4 |
+| 11:10 + 0:57 | Intervallum | 1.508 / 0.025 | 7:24 | 1 | 0 |
+| 13:43 | Aktív interval | 1.89 | 7:16 | 3 | 0 |
+| 29:42 + 0:29 | Intervallum | 3.94 / 0.006 | 7:32 | 35 | 34 |
+| 24:07 + 0:43 | Intervallum | 3.176 / 0.019 | 7:36 | 3 | 3 |
+| 5:24 + 0:04 | Intervallum | 0.707 / 0.002 | 7:38 | 0 | 4 |
+| 5:56 + 0:26 | Intervallum | 0.764 / 0.01 | 7:46 | 0 | 1 |
+| 1:18 | Pihenő interval | 0.065 | 20:03 | 0 | 0 |
+| 28:05 + 0:48 | Intervallum | 3.669 / 0.006 | 7:39 | 8 | 16 |
+| 1:44 | Aktív interval | 0.234 | 7:24 | 0 | 3 |
+| 3:57 | Aktív interval | 0.512 | 7:43 | 2 | 1 |
+| 11:14 | Aktív interval | 1.449 | 7:45 | 0 | 2 |
+| 32:27 | Aktív interval | 4.476 | 7:15 | 0 | 5 |
+| 0:00 | Levezető | 0.003 | 1:30 | 0 | 0 |
 
 #### Körök
 nem feltétlenül egységes km-ek
@@ -579,26 +602,3 @@ nem feltétlenül egységes km-ek
 | 98 | 1 | 7:03 | 0 | 0 | 170 | 176 | 826.50 | 67.6 | 300 | 8.0 | 28.9 | 33.0 |
 | 99 | 0.476 | 6:33 | 0 | 1 | 172 | 178 | 872.60 | 72.9 | 278 | 8.2 | 30.7 | 35.4 |
 | 100 | 0.003 | 1:33 | 0 | 0 | 166 | 168 | 1055.00 | 74.0 | 277 | 7.6 | 35.4 | 35.4 |
-
-##### Intervallumok - **16 blokk**
-
-| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
-| ---: | :--- | ---: | ---: | ---: | ---: |
-| 17:07 | Aktív interval | 2.347 | 7:18 | 18 | 0 |
-| 23:31 + 0:13 | Intervallum | 3.305 / 0.006 | 7:07 | 4 | 26 |
-| 14:53 + 0:44 | Intervallum | 2.068 / 0.007 | 7:12 | 6 | 2 |
-| 25:55 + 0:16 | Intervallum | 3.42 / 0.003 | 7:35 | 4 | 9 |
-| 26:57 + 0:55 | Intervallum | 3.59 / 0.017 | 7:30 | 4 | 4 |
-| 11:10 + 0:57 | Intervallum | 1.508 / 0.025 | 7:24 | 1 | 0 |
-| 13:43 | Aktív interval | 1.89 | 7:16 | 3 | 0 |
-| 29:42 + 0:29 | Intervallum | 3.94 / 0.006 | 7:32 | 35 | 34 |
-| 24:07 + 0:43 | Intervallum | 3.176 / 0.019 | 7:36 | 3 | 3 |
-| 5:24 + 0:04 | Intervallum | 0.707 / 0.002 | 7:38 | 0 | 4 |
-| 5:56 + 0:26 | Intervallum | 0.764 / 0.01 | 7:46 | 0 | 1 |
-| 1:18 | Pihenő interval | 0.065 | 20:03 | 0 | 0 |
-| 28:05 + 0:48 | Intervallum | 3.669 / 0.006 | 7:39 | 8 | 16 |
-| 1:44 | Aktív interval | 0.234 | 7:24 | 0 | 3 |
-| 3:57 | Aktív interval | 0.512 | 7:43 | 2 | 1 |
-| 11:14 | Aktív interval | 1.449 | 7:45 | 0 | 2 |
-| 32:27 | Aktív interval | 4.476 | 7:15 | 0 | 5 |
-| 0:00 | Levezető | 0.003 | 1:30 | 0 | 0 |

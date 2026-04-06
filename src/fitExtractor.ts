@@ -19,8 +19,8 @@ export function buildTextOutput(data: FitUploadResponse, mergeShortWalks = false
     }
     sections.push(
         extractSession(data),
-        extractLaps(data),
         extractSplits(data, mergeShortWalks),
+        extractLaps(data),
         extractTrailClimbInfo(data),
     );
     return sections.filter(Boolean).join('\n\n');
