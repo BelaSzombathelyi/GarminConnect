@@ -888,7 +888,7 @@ function extractTrailClimbInfo(data: FitUploadResponse): string {
         const climbEntries = [...climbMap.entries()]
 
         const rows: string[] = [
-            `## ClimbPro (${climbEntries.length} emelkedő)`,
+            `## ClimbPro`,
             '',
             '| Category | Start | Length (km) |',
             '| ---: | :--- | ---: |',

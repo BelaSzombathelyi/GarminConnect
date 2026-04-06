@@ -1,6 +1,6 @@
 # Garmin Download Results
 
-Generated: 2026-04-06T14:11:21.737Z
+Generated: 2026-04-06T14:13:01.721Z
 
 ## Tartalomjegyzék
 
@@ -276,7 +276,7 @@ nem feltétlenül egységes km-ek
 | 9 | 12:41:08 | 12:41:21 | 0:13 | 41 |
 | 10 | 13:01:36 | 13:01:50 | 0:14 | 50 |
 
-#### ClimbPro (9 emelkedő)
+#### ClimbPro
 
 | Category | Start | Length (km) |
 | ---: | :--- | ---: |
