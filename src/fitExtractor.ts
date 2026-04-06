@@ -391,20 +391,31 @@ function extractPauseEvents(data: FitUploadResponse): string {
 
     if (pauses.length === 0) return '';
 
-    const lines: string[] = [
-        '### Pause események (timer gomb)',
-        '',
-        '| # | Kezdés | Vége | Időtartam | Kör |',
-        '| :--- | :--- | :--- | ---: | ---: |',
-    ];
+    const MICRO_PAUSE_LIMIT_SEC = 120;
+    const microPauses = pauses.filter((p) => p.durationSec < MICRO_PAUSE_LIMIT_SEC);
+    const longPauses = pauses.filter((p) => p.durationSec >= MICRO_PAUSE_LIMIT_SEC);
 
-    pauses.forEach((p, i) => {
-        const startSameDay = p.start.toLocaleDateString('hu-HU') === sessionDate;
-        const endSameDay = p.end.toLocaleDateString('hu-HU') === sessionDate;
-        const startStr = startSameDay ? p.start.toLocaleTimeString('hu-HU') : p.start.toLocaleString('hu-HU');
-        const endStr = endSameDay ? p.end.toLocaleTimeString('hu-HU') : p.end.toLocaleString('hu-HU');
-        lines.push(`| ${i + 1} | ${startStr} | ${endStr} | ${formatSeconds(p.durationSec)} | ${p.lapLabel} |`);
-    });
+    const lines: string[] = ['### Pause Events (Timer Button)'];
+
+    if (microPauses.length > 0) {
+        const microTotalSec = microPauses.reduce((sum, p) => sum + p.durationSec, 0);
+        lines.push('');
+        lines.push(`Mikro megállások: ${microPauses.length} db (2 percnél rövidebb), összidő: ${formatSeconds(microTotalSec)}.`);
+    }
+
+    if (longPauses.length > 0) {
+        lines.push('');
+        lines.push('| Start | End | Duration | Lap |');
+        lines.push('| :--- | :--- | ---: | ---: |');
+
+        longPauses.forEach((p) => {
+            const startSameDay = p.start.toLocaleDateString('hu-HU') === sessionDate;
+            const endSameDay = p.end.toLocaleDateString('hu-HU') === sessionDate;
+            const startStr = startSameDay ? p.start.toLocaleTimeString('hu-HU') : p.start.toLocaleString('hu-HU');
+            const endStr = endSameDay ? p.end.toLocaleTimeString('hu-HU') : p.end.toLocaleString('hu-HU');
+            lines.push(`| ${startStr} | ${endStr} | ${formatSeconds(p.durationSec)} | ${p.lapLabel} |`);
+        });
+    }
 
     return lines.join('\n');
 }
@@ -887,11 +898,20 @@ function extractTrailClimbInfo(data: FitUploadResponse): string {
 
         const climbEntries = [...climbMap.entries()]
 
+        const records = (data.messages['recordMesgs'] as Record<string, unknown>[] | undefined)
+            ?.map((r) => {
+                const ts = toDate(r['timestamp'])?.getTime()
+                const alt = typeof r['enhancedAltitude'] === 'number' ? (r['enhancedAltitude'] as number) : null
+                return typeof ts === 'number' && alt !== null ? { ts, alt } : null
+            })
+            .filter((r): r is { ts: number; alt: number } => r !== null)
+            .sort((a, b) => a.ts - b.ts) ?? []
+
         const rows: string[] = [
             `## ClimbPro`,
             '',
-            '| Category | Start | Length (km) |',
-            '| ---: | :--- | ---: |',
+            '| Start | Duration | Ascent (m) | Length (km) |',
+            '| :--- | ---: | ---: | ---: |',
         ]
 
         const formatTime = (item: Record<string, unknown> | undefined): string => {
@@ -902,15 +922,33 @@ function extractTrailClimbInfo(data: FitUploadResponse): string {
             return tsDate === sessionDate ? ts.toLocaleTimeString('hu-HU') : ts.toLocaleString('hu-HU')
         }
 
+        const ascentBetween = (startTs: number | null, endTs: number | null): string => {
+            if (startTs === null || endTs === null || endTs < startTs || records.length === 0) return '–'
+            let prevAlt: number | null = null
+            let ascent = 0
+            for (const rec of records) {
+                if (rec.ts < startTs) continue
+                if (rec.ts > endTs) break
+                if (prevAlt !== null && rec.alt > prevAlt) {
+                    ascent += rec.alt - prevAlt
+                }
+                prevAlt = rec.alt
+            }
+            return prevAlt === null ? '–' : num(ascent, 0)
+        }
+
         for (const [, { start, complete }] of climbEntries) {
-            const category = start
-                ? (typeof start['climbCategory'] === 'number' ? String(start['climbCategory']) : '–')
-                : (complete ? (typeof complete['climbCategory'] === 'number' ? String(complete['climbCategory']) : '–') : '–')
             const startTime = formatTime(start)
+            const startTs = toDate(start?.['timestamp'])?.getTime() ?? null
+            const completeTs = toDate(complete?.['timestamp'])?.getTime() ?? null
+            const duration = startTs !== null && completeTs !== null && completeTs >= startTs
+                ? formatSeconds((completeTs - startTs) / 1000)
+                : '–'
+            const ascent = ascentBetween(startTs, completeTs)
             const startDist = start && typeof start['currentDist'] === 'number' ? (start['currentDist'] as number) : null
             const completeDist = complete && typeof complete['currentDist'] === 'number' ? (complete['currentDist'] as number) : null
             const length = startDist !== null && completeDist !== null ? km(completeDist - startDist) : '–'
-            rows.push(`| ${category} | ${startTime} | ${length} |`)
+            rows.push(`| ${startTime} | ${duration} | ${ascent} | ${length} |`)
         }
         blocks.push(rows.join('\n'))
     }
