@@ -1,3 +1,18 @@
+## TrainingPeaks
+
+| Adat | Érték |
+| :--- | ---: |
+| Aktivitás neve | VO2 max - SUM 20p 4*5 min, 04:05 iram |
+| TSS | 86 rTSS |
+| Edzés típus | Run |
+| Tervezett idő | 1:06:15 |
+
+### Kommentek
+
+**2026-04-01 — Szombathelyi Bela**
+
+Ezt a tempót nem érzem biztonságosnak. 1-2 percig oké, de 20 percre olyan érzés mit amikor elkezd pörögni a villany óra csak itt a CH raktáron. Biztosan bele tudnék menni jobban is, de az már nem biztonságos érzés. Azért így sem lett olyan rossz 😉
+
 ## Felhasználói profil
 
 | Adat | Érték |

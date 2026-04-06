@@ -27,51 +27,6 @@ function localTodayIso(): string {
     return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
 }
 
-function buildTpSection(tp: Record<string, unknown>): string {
-    const lines: string[] = []
-    lines.push('## TrainingPeaks')
-    lines.push('')
-
-    const rows: [string, string][] = []
-    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
-    const tssValue = String(tp.tssValue ?? '').trim()
-    const tssUnit = String(tp.tssUnit ?? '').trim()
-    if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
-    if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
-    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
-
-    if (rows.length > 0) {
-        lines.push('| Adat | Érték |')
-        lines.push('| :--- | ---: |')
-        for (const [k, v] of rows) lines.push(`| ${k} | ${v} |`)
-    }
-
-    const description = String(tp.description ?? '').trim()
-    if (description) {
-        lines.push('')
-        lines.push('### Leírás')
-        lines.push('')
-        lines.push(description)
-    }
-
-    const comments = Array.isArray(tp.comments)
-        ? (tp.comments as Array<{ text: string; date?: string; user?: string }>)
-        : []
-    if (comments.length > 0) {
-        lines.push('')
-        lines.push('### Kommentek')
-        for (const c of comments) {
-            lines.push('')
-            const meta = [c.date, c.user].filter(Boolean).join(' — ')
-            if (meta) lines.push(`**${meta}**`)
-            lines.push('')
-            lines.push(c.text)
-        }
-    }
-
-    return lines.join('\n')
-}
-
 function normalizeMonthToken(raw: string): string {
     return raw
         .toLowerCase()
@@ -238,7 +193,7 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
 
                 try {
                     const buffer = await readFile(archivedPath)
-                    const { text, startTimeIso, errors } = processBuffer(buffer, activityId)
+                    const { text, startTimeIso, errors } = processBuffer(buffer, { activityId, tpStore })
                     if (errors.length > 0) {
                         console.warn(`[downloads] Dekódolási hibák (${activityId}):`, errors)
                     }
@@ -375,7 +330,7 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
         const activityId = req.headers['x-activity-id'] ?? null
 
         try {
-            const { text, errors } = processBuffer(buffer, activityId)
+            const { text, errors } = processBuffer(buffer, { activityId, tpStore })
             if (errors.length > 0) {
                 console.warn('[process] Dekódolási hibák:', errors)
             }
@@ -498,24 +453,14 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
 
                     try {
                         const buffer = await readFile(fullPath);
-                        const { text, startTimeIso, errors: decodeErrors } = processBuffer(buffer, activityId);
+                        const { text, startTimeIso, errors: decodeErrors } = processBuffer(buffer, { activityId, tpStore });
 
                         if (decodeErrors.length > 0) {
                             console.warn(`[reprocess] Dekódolási hibák (${activityId}):`, decodeErrors);
                         }
 
-                        let mdText = text;
-                        if (startTimeIso && tpStore) {
-                            const tpMatch = tpStore.findByDateTimeNear(startTimeIso, 60);
-                            if (tpMatch) {
-                                tpStore.linkGarminActivity(tpMatch.workoutId, activityId);
-                                mdText = buildTpSection(tpMatch.fileContent) + '\n\n' + text;
-                                console.log(`[reprocess] TP egyezés: ${activityId} <-> ${tpMatch.workoutId}`);
-                            }
-                        }
-
                         const mdPath = join(dirname(fullPath), `${activityId}.md`);
-                        await writeFile(mdPath, mdText, 'utf-8');
+                        await writeFile(mdPath, text, 'utf-8');
 
                         if (startTimeIso) {
                             activityStore.updateDate(activityId, startTimeIso);

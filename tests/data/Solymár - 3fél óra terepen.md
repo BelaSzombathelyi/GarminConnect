@@ -1,3 +1,22 @@
+## TrainingPeaks
+
+| Adat | Érték |
+| :--- | ---: |
+| Aktivitás neve | 3,5 óra terepen |
+| TSS | 220 rTSS |
+| Edzés típus | Run |
+| Tervezett idő | 3:18:21 |
+
+### Leírás
+
+Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.
+
+### Kommentek
+
+**2026-04-04 — Szombathelyi Bela**
+
+Terepfutó cipő csere -> ugyan olyanra. A régi 11 hónapot és 1000km-ert élt meg. Ugyan az az útvonal volt mint múlt héten csak a start nem Óbuda hanem Solymár lett. Vittem botot, felfeléken használtam is. 4 zselé, 3 dekás marcipán szelet, 2 l víz. Lefeléket jobban meg futottam mint múlt héten. Persze van ezen az útvonalon 3-4 kisebb szakasz ahol nem lehet fékezni szinte lefelé mert túl meredek, ott a múltkor is gyors voltam. Talán picit alul frissítettem, és utána meg túl ettem magam, de aztán estére minden jó volt.
+
 ## Felhasználói profil
 
 | Adat | Érték |

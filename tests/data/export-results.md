@@ -1,6 +1,6 @@
 # Garmin Download Results
 
-Generated: 2026-04-06T12:39:30.310Z
+Generated: 2026-04-06T12:54:00.404Z
 
 ## Tartalomjegyzék
 
@@ -22,6 +22,25 @@ Generated: 2026-04-06T12:39:30.310Z
 ## 2026-04-05
 
 <a id="activity-2026-04-05-99000000004"></a>
+#### TrainingPeaks
+
+| Adat | Érték |
+| :--- | ---: |
+| Aktivitás neve | 70 perc kötetlen |
+| TSS | 99 rTSS |
+| Edzés típus | Run |
+| Tervezett idő | 1:08:53 |
+
+##### Leírás
+
+Egyenletes, könnyed futás érzésre RPE 1-3
+
+##### Kommentek
+
+**2026-04-05 — Szombathelyi Bela**
+
+Ettem egy közepes ebédet, majd nem sokkal utána mentünk anyukámmal bringával egy részen, aztán utána én futva, majd fél időnél fagyiztunk egyet Almádiban. Odafelé picit nyomtam a gázt, ahogy jól esett. Vissza felé, már nem akartam túlságosan erősen futni, így esett most jól. Egy zselé volt, a só most kiamaradt, 1l víz.
+
 #### Felhasználói profil
 
 | Adat | Érték |
@@ -106,6 +125,25 @@ nem feltétlenül egységes km-ek
 ## 2026-04-04
 
 <a id="activity-2026-04-04-99000000005"></a>
+#### TrainingPeaks
+
+| Adat | Érték |
+| :--- | ---: |
+| Aktivitás neve | 3,5 óra terepen |
+| TSS | 220 rTSS |
+| Edzés típus | Run |
+| Tervezett idő | 3:18:21 |
+
+##### Leírás
+
+Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.
+
+##### Kommentek
+
+**2026-04-04 — Szombathelyi Bela**
+
+Terepfutó cipő csere -> ugyan olyanra. A régi 11 hónapot és 1000km-ert élt meg. Ugyan az az útvonal volt mint múlt héten csak a start nem Óbuda hanem Solymár lett. Vittem botot, felfeléken használtam is. 4 zselé, 3 dekás marcipán szelet, 2 l víz. Lefeléket jobban meg futottam mint múlt héten. Persze van ezen az útvonalon 3-4 kisebb szakasz ahol nem lehet fékezni szinte lefelé mert túl meredek, ott a múltkor is gyors voltam. Talán picit alul frissítettem, és utána meg túl ettem magam, de aztán estére minden jó volt.
+
 #### Felhasználói profil
 
 | Adat | Érték |
@@ -264,6 +302,21 @@ nem feltétlenül egységes km-ek
 ## 2026-04-01
 
 <a id="activity-2026-04-01-99000000003"></a>
+#### TrainingPeaks
+
+| Adat | Érték |
+| :--- | ---: |
+| Aktivitás neve | VO2 max - SUM 20p 4*5 min, 04:05 iram |
+| TSS | 86 rTSS |
+| Edzés típus | Run |
+| Tervezett idő | 1:06:15 |
+
+##### Kommentek
+
+**2026-04-01 — Szombathelyi Bela**
+
+Ezt a tempót nem érzem biztonságosnak. 1-2 percig oké, de 20 percre olyan érzés mit amikor elkezd pörögni a villany óra csak itt a CH raktáron. Biztosan bele tudnék menni jobban is, de az már nem biztonságos érzés. Azért így sem lett olyan rossz 😉
+
 #### Felhasználói profil
 
 | Adat | Érték |

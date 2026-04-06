@@ -1,0 +1,21 @@
+{
+  "rowKey": "1/4/26_Run_1:06:15_86rTSS",
+  "workoutId": "3640712028",
+  "name": "VO2 max - SUM 20p 4*5 min, 04:05 iram",
+  "workoutStart": "2026-04-01T06:17:28",
+  "workoutType": "Run",
+  "totalTime": "1:06:15",
+  "distance": "13.1",
+  "tssValue": "86",
+  "tssUnit": "rTSS",
+  "description": "",
+  "comments": [
+    {
+      "text": "Ezt a tempót nem érzem biztonságosnak. 1-2 percig oké, de 20 percre olyan érzés mit amikor elkezd pörögni a villany óra csak itt a CH raktáron. Biztosan bele tudnék menni jobban is, de az már nem biztonságos érzés. Azért így sem lett olyan rossz 😉",
+      "date": "2026-04-01",
+      "user": "Szombathelyi Bela"
+    }
+  ],
+  "source": "trainingpeaks",
+  "savedAt": "2026-04-06T12:53:59.424Z"
+}

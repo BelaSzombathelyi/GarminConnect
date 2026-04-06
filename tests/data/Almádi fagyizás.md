@@ -1,3 +1,22 @@
+## TrainingPeaks
+
+| Adat | Érték |
+| :--- | ---: |
+| Aktivitás neve | 70 perc kötetlen |
+| TSS | 99 rTSS |
+| Edzés típus | Run |
+| Tervezett idő | 1:08:53 |
+
+### Leírás
+
+Egyenletes, könnyed futás érzésre RPE 1-3
+
+### Kommentek
+
+**2026-04-05 — Szombathelyi Bela**
+
+Ettem egy közepes ebédet, majd nem sokkal utána mentünk anyukámmal bringával egy részen, aztán utána én futva, majd fél időnél fagyiztunk egyet Almádiban. Odafelé picit nyomtam a gázt, ahogy jól esett. Vissza felé, már nem akartam túlságosan erősen futni, így esett most jól. Egy zselé volt, a só most kiamaradt, 1l víz.
+
 ## Felhasználói profil
 
 | Adat | Érték |
