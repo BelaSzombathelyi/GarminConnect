@@ -12,8 +12,6 @@
 | Adat | Érték |
 | :--- | ---: |
 | Sport profil | Futás |
-| Sport | running |
-| Alsport | generic |
 | Kezdés | 2026. 03. 01. 8:30:28 |
 | Befejezés | 2026. 03. 01. 15:22:09 |
 | Össz. emelkedés | 215 m |

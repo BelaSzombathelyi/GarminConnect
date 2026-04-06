@@ -96,8 +96,6 @@ describe('results export összefűzés', () => {
         expect(outputText).toContain('## Tartalomjegyzék')
         expect(outputText).toContain('### 2026-03')
         expect(outputText).toContain('### 2026-04')
-        expect(outputText).toContain('### Activity: 99000000001')
-        expect(outputText).toContain(`### Activity: ${String(99000000000 + TEST_FILES.length)}`)
         expect(outputText).toContain('#### Edzés összefoglaló')
         expect(outputText).not.toContain('ismeretlen idő • ismeretlen típus')
     })

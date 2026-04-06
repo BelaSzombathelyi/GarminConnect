@@ -1,31 +1,27 @@
 # Garmin Download Results
 
-Generated: 2026-04-06T12:31:30.826Z
+Generated: 2026-04-06T12:39:30.310Z
 
 ## Tartalomjegyzék
 
 ### 2026-04
 - **2026-04-05**
-  - [15:18:24 • Futás • #99000000004](#activity-2026-04-05-99000000004)
+  - [15:18:24 • Futás](#activity-2026-04-05-99000000004)
 - **2026-04-04**
-  - [10:11:25 • Terepfutás • #99000000005](#activity-2026-04-04-99000000005)
+  - [10:11:25 • Terepfutás](#activity-2026-04-04-99000000005)
 - **2026-04-01**
-  - [06:17:28 • Futás • #99000000003](#activity-2026-04-01-99000000003)
+  - [06:17:28 • Futás](#activity-2026-04-01-99000000003)
 ### 2026-03
 - **2026-03-22**
-  - [09:00:26 • Futás • #99000000001](#activity-2026-03-22-99000000001)
+  - [09:00:26 • Futás](#activity-2026-03-22-99000000001)
 - **2026-03-01**
-  - [08:30:28 • Futás • #99000000002](#activity-2026-03-01-99000000002)
+  - [08:30:28 • Futás](#activity-2026-03-01-99000000002)
 
 ---
 
 ## 2026-04-05
 
 <a id="activity-2026-04-05-99000000004"></a>
-### Activity: 99000000004
-
-**Típus:** Futás
-
 #### Felhasználói profil
 
 | Adat | Érték |
@@ -40,8 +36,6 @@ Generated: 2026-04-06T12:31:30.826Z
 | Adat | Érték |
 | :--- | ---: |
 | Sport profil | Futás |
-| Sport | running |
-| Alsport | generic |
 | Kezdés | 2026. 04. 05. 15:18:24 |
 | Befejezés | 2026. 04. 05. 16:51:34 |
 | Össz. emelkedés | 20 m |
@@ -112,10 +106,6 @@ nem feltétlenül egységes km-ek
 ## 2026-04-04
 
 <a id="activity-2026-04-04-99000000005"></a>
-### Activity: 99000000005
-
-**Típus:** Terepfutás
-
 #### Felhasználói profil
 
 | Adat | Érték |
@@ -130,8 +120,6 @@ nem feltétlenül egységes km-ek
 | Adat | Érték |
 | :--- | ---: |
 | Sport profil | Terepfutás |
-| Sport | running |
-| Alsport | trail |
 | Kezdés | 2026. 04. 04. 10:11:25 |
 | Befejezés | 2026. 04. 04. 13:34:38 |
 | Össz. emelkedés | 1265 m |
@@ -276,10 +264,6 @@ nem feltétlenül egységes km-ek
 ## 2026-04-01
 
 <a id="activity-2026-04-01-99000000003"></a>
-### Activity: 99000000003
-
-**Típus:** Futás
-
 #### Felhasználói profil
 
 | Adat | Érték |
@@ -294,8 +278,6 @@ nem feltétlenül egységes km-ek
 | Adat | Érték |
 | :--- | ---: |
 | Sport profil | Futás |
-| Sport | running |
-| Alsport | generic |
 | Kezdés | 2026. 04. 01. 6:17:28 |
 | Befejezés | 2026. 04. 01. 7:24:20 |
 | Össz. emelkedés | 34 m |
@@ -398,10 +380,6 @@ nem feltétlenül egységes km-ek
 ## 2026-03-22
 
 <a id="activity-2026-03-22-99000000001"></a>
-### Activity: 99000000001
-
-**Típus:** Futás
-
 #### Felhasználói profil
 
 | Adat | Érték |
@@ -416,8 +394,6 @@ nem feltétlenül egységes km-ek
 | Adat | Érték |
 | :--- | ---: |
 | Sport profil | Futás |
-| Sport | running |
-| Alsport | generic |
 | Kezdés | 2026. 03. 22. 9:00:26 |
 | Befejezés | 2026. 03. 22. 10:30:26 |
 | Össz. emelkedés | 62 m |
@@ -486,10 +462,6 @@ nem feltétlenül egységes km-ek
 ## 2026-03-01
 
 <a id="activity-2026-03-01-99000000002"></a>
-### Activity: 99000000002
-
-**Típus:** Futás
-
 #### Felhasználói profil
 
 | Adat | Érték |
@@ -504,8 +476,6 @@ nem feltétlenül egységes km-ek
 | Adat | Érték |
 | :--- | ---: |
 | Sport profil | Futás |
-| Sport | running |
-| Alsport | generic |
 | Kezdés | 2026. 03. 01. 8:30:28 |
 | Befejezés | 2026. 03. 01. 15:22:09 |
 | Össz. emelkedés | 215 m |

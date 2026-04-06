@@ -225,7 +225,7 @@ export async function buildResultsMarkdown(entries: ResultTextEntry[]): Promise<
             lines.push(`- **${currentDayKey}**`)
         }
 
-        lines.push(`  - [${entry.startTimeLabel} • ${entry.activityTypeLabel} • #${entry.activityId}](#${entry.markdownId})`)
+        lines.push(`  - [${entry.startTimeLabel} • ${entry.activityTypeLabel}](#${entry.markdownId})`)
     }
 
     lines.push('')
@@ -242,10 +242,6 @@ export async function buildResultsMarkdown(entries: ResultTextEntry[]): Promise<
         }
 
         lines.push(`<a id="${entry.markdownId}"></a>`)
-        lines.push(`### Activity: ${entry.activityId}`)
-        lines.push('')
-        lines.push(`**Típus:** ${entry.activityTypeLabel}`)
-        lines.push('')
         lines.push(normalizeEmbeddedMarkdown(entry.text || '(üres)'))
         lines.push('')
     }

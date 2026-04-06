@@ -12,8 +12,6 @@
 | Adat | Érték |
 | :--- | ---: |
 | Sport profil | Terepfutás |
-| Sport | running |
-| Alsport | trail |
 | Kezdés | 2026. 04. 04. 10:11:25 |
 | Befejezés | 2026. 04. 04. 13:34:38 |
 | Össz. emelkedés | 1265 m |

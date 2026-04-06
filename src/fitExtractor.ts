@@ -421,8 +421,6 @@ export function extractSession(data: FitUploadResponse): string {
 
     // Sport
     if (session['sportProfileName']) rows.push(['Sport profil', String(session['sportProfileName'])]);
-    if (session['sport']) rows.push(['Sport', String(session['sport'])]);
-    if (session['subSport']) rows.push(['Alsport', String(session['subSport'])]);
 
     // Időpontok
     const startDate = toDate(session['startTime']);
