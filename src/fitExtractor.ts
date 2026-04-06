@@ -455,20 +455,22 @@ export function extractSession(data: FitUploadResponse): string {
     if (typeof session['totalCalories'] === 'number') rows.push(['Kalória', `${session['totalCalories']} kcal`]);
     if (typeof session['metabolicCalories'] === 'number') rows.push(['Metabolikus kalória', `${session['metabolicCalories']} kcal`]);
 
-    // Heart rate
-    if (typeof session['avgHeartRate'] === 'number') rows.push(['Avg. heart rate', `${session['avgHeartRate']} bpm`]);
-    if (typeof session['maxHeartRate'] === 'number') rows.push(['Max. heart rate', `${session['maxHeartRate']} bpm`]);
-
-    // Cadence / steps
-    if (typeof session['avgRunningCadence'] === 'number') {
-        rows.push(['Avg. running cadence', `${cadence(session['avgRunningCadence'])} steps/min`]);
-    } else if (typeof session['avgCadence'] === 'number') {
-        rows.push(['Avg. cadence', `${cadence(session['avgCadence'])} steps/min`]);
+    // Heart rate (single compact line)
+    const avgHeart = typeof session['avgHeartRate'] === 'number' ? String(session['avgHeartRate']) : '–';
+    const maxHeart = typeof session['maxHeartRate'] === 'number' ? String(session['maxHeartRate']) : '–';
+    if (avgHeart !== '–' || maxHeart !== '–') {
+        rows.push(['Heart rate', `avg ${avgHeart}, max ${maxHeart} bpm`]);
     }
-    if (typeof session['maxRunningCadence'] === 'number') {
-        rows.push(['Max. running cadence', `${cadence(session['maxRunningCadence'])} steps/min`]);
-    } else if (typeof session['maxCadence'] === 'number') {
-        rows.push(['Max. cadence', `${cadence(session['maxCadence'])} steps/min`]);
+
+    // Cadence (single compact line)
+    const avgCadenceVal = typeof session['avgRunningCadence'] === 'number'
+        ? cadence(session['avgRunningCadence'])
+        : (typeof session['avgCadence'] === 'number' ? cadence(session['avgCadence']) : '–');
+    const maxCadenceVal = typeof session['maxRunningCadence'] === 'number'
+        ? cadence(session['maxRunningCadence'])
+        : (typeof session['maxCadence'] === 'number' ? cadence(session['maxCadence']) : '–');
+    if (avgCadenceVal !== '–' || maxCadenceVal !== '–') {
+        rows.push(['Cadence', `avg ${avgCadenceVal}, max ${maxCadenceVal} spm`]);
     }
     // Respiration (single compact line)
     const avgResp = typeof session['enhancedAvgRespirationRate'] === 'number'

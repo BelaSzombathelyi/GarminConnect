@@ -1,6 +1,6 @@
 # Garmin Download Results
 
-Generated: 2026-04-06T17:24:28.215Z
+Generated: 2026-04-06T17:25:53.440Z
 
 ## Tartalomjegyzék
 
@@ -57,10 +57,8 @@ Befejezés: 2026. 04. 05. 16:51:34
 Össz. süllyedés: 14 m
 Kalória: 1019 kcal
 Metabolikus kalória: 100 kcal
-Avg. heart rate: 146 bpm
-Max. heart rate: 164 bpm
-Avg. running cadence: 170 steps/min
-Max. running cadence: 182 steps/min
+Heart rate: avg 146, max 164 bpm
+Cadence: avg 170, max 182 spm
 Respiration: avg 37.2, max 50.0, min 19.0 breaths/min
 Avg. step length: 1210.70 mm
 Avg. ground contact time: 256 ms
@@ -150,10 +148,8 @@ Befejezés: 2026. 04. 04. 13:34:38
 Össz. süllyedés: 1275 m
 Kalória: 2448 kcal
 Metabolikus kalória: 288 kcal
-Avg. heart rate: 143 bpm
-Max. heart rate: 160 bpm
-Avg. running cadence: 152 steps/min
-Max. running cadence: 248 steps/min
+Heart rate: avg 143, max 160 bpm
+Cadence: avg 152, max 248 spm
 Respiration: avg 35.6, max 46.0, min 13.2 breaths/min
 Avg. step length: 979.70 mm
 Avg. ground contact time: 298 ms
@@ -293,10 +289,8 @@ Befejezés: 2026. 04. 01. 7:24:20
 Össz. süllyedés: 29 m
 Kalória: 938 kcal
 Metabolikus kalória: 96 kcal
-Avg. heart rate: 141 bpm
-Max. heart rate: 166 bpm
-Avg. running cadence: 170 steps/min
-Max. running cadence: 182 steps/min
+Heart rate: avg 141, max 166 bpm
+Cadence: avg 170, max 182 spm
 Respiration: avg 36.7, max 48.2, min 22.2 breaths/min
 Avg. step length: 1159.40 mm
 Avg. ground contact time: 226 ms
@@ -396,10 +390,8 @@ Befejezés: 2026. 03. 22. 10:30:26
 Össz. süllyedés: 60 m
 Kalória: 1445 kcal
 Metabolikus kalória: 129 kcal
-Avg. heart rate: 161 bpm
-Max. heart rate: 181 bpm
-Avg. running cadence: 170 steps/min
-Max. running cadence: 182 steps/min
+Heart rate: avg 161, max 181 bpm
+Cadence: avg 170, max 182 spm
 Respiration: avg 40.0, max 45.4, min 34.8 breaths/min
 Avg. step length: 1393.80 mm
 Avg. ground contact time: 213 ms
@@ -468,10 +460,8 @@ Befejezés: 2026. 03. 01. 15:22:09
 Össz. süllyedés: 214 m
 Kalória: 3594 kcal
 Metabolikus kalória: 591 kcal
-Avg. heart rate: 116 bpm
-Max. heart rate: 134 bpm
-Avg. running cadence: 162 steps/min
-Max. running cadence: 218 steps/min
+Heart rate: avg 116, max 134 bpm
+Cadence: avg 162, max 218 spm
 Respiration: avg 28.5, max 41.6, min 14.3 breaths/min
 Avg. step length: 770.30 mm
 Avg. ground contact time: 306 ms
