@@ -119,6 +119,41 @@ function formatSeconds(secs: number): string {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function splitTimeSeconds(split: Record<string, unknown>): number | null {
+    if (typeof split['totalTimerTime'] === 'number') return split['totalTimerTime'] as number;
+    if (typeof split['totalElapsedTime'] === 'number') return split['totalElapsedTime'] as number;
+    return null;
+}
+
+function firstPlannedStepDurationBeforeCooldown(data: FitUploadResponse): number | null {
+    const steps = data.messages['workoutStepMesgs'] as Record<string, unknown>[] | undefined;
+    if (!steps || steps.length === 0) return null;
+
+    const beforeCooldown = steps.filter((s) => String(s['intensity'] ?? '').toLowerCase() !== 'cooldown');
+    if (beforeCooldown.length !== 1) return null;
+
+    const first = beforeCooldown[0];
+    if (String(first['durationType'] ?? '').toLowerCase() !== 'time') return null;
+    return typeof first['durationTime'] === 'number' ? first['durationTime'] as number : null;
+}
+
+function isOpenCooldownStep(step: Record<string, unknown>): boolean {
+    const intensity = String(step['intensity'] ?? '').toLowerCase();
+    const durationType = String(step['durationType'] ?? '').toLowerCase();
+    const targetType = String(step['targetType'] ?? '').toLowerCase();
+    return intensity === 'cooldown' && durationType === 'open' && targetType === 'open';
+}
+
+function getVisibleWorkoutSteps(data: FitUploadResponse): Record<string, unknown>[] {
+    const workoutSteps = data.messages['workoutStepMesgs'] as Record<string, unknown>[] | undefined;
+    if (!workoutSteps || workoutSteps.length === 0) return [];
+    const visibleSteps = [...workoutSteps];
+    if (visibleSteps.length > 0 && isOpenCooldownStep(visibleSteps[visibleSteps.length - 1])) {
+        visibleSteps.pop();
+    }
+    return visibleSteps;
+}
+
 export function formatValue(val: unknown): string {
     if (val === null || val === undefined) return '–';
     if (val instanceof Date) return val.toLocaleString('hu-HU');
@@ -492,12 +527,12 @@ export function extractSession(data: FitUploadResponse): string {
     const lines: string[] = ['## Edzés összefoglaló', '', buildMarkdownTable(rows)];
 
     // Edzéslépések (workoutStepMesgs)
-    const workoutSteps = data.messages['workoutStepMesgs'] as Record<string, unknown>[] | undefined;
-    if (workoutSteps && workoutSteps.length > 0) {
+    const visibleSteps = getVisibleWorkoutSteps(data);
+    if (visibleSteps.length > 0) {
         lines.push('');
-        lines.push('Edzéslépések:');
-        for (let i = 0; i < workoutSteps.length; i++) {
-            const step = workoutSteps[i];
+        lines.push('### Edzéslépések');
+        for (let i = 0; i < visibleSteps.length; i++) {
+            const step = visibleSteps[i];
             const notesArr = Array.isArray(step['notes']) ? step['notes'] as unknown[] : null;
             const noteText = notesArr && typeof notesArr[0] === 'string' && notesArr[0].trim() ? notesArr[0].trim() : '';
 
@@ -517,7 +552,7 @@ export function extractSession(data: FitUploadResponse): string {
             if (targetType === 'heartRate') {
                 if (hrZone > 0) targetStr = `HR Z${hrZone}`;
                 else if (hrLow !== null && hrHigh !== null) targetStr = `${hrLow}–${hrHigh} bpm`;
-            } else if (targetType) {
+            } else if (targetType && targetType.toLowerCase() !== 'open') {
                 targetStr = targetType;
             }
 
@@ -557,31 +592,43 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
         const type = String(split['splitType']);
 
         if (type === 'intervalActive') {
+            if (currentActive) {
+                paired.push({ single: currentActive['active'] as Record<string, unknown> });
+            }
             currentActive = { active: split };
         } else if (type === 'intervalRest' && currentActive) {
             paired.push({ active: currentActive['active'], rest: split });
             currentActive = null;
         } else {
+            if (currentActive) {
+                paired.push({ single: currentActive['active'] as Record<string, unknown> });
+                currentActive = null;
+            }
             paired.push({ single: split });
         }
     }
 
-    const header = ['#', 'Típus', 'Táv (km)', 'Idő', 'Pace (min/km)', 'Emelkedés (m)', 'Süllyedés (m)'];
+    if (currentActive) {
+        paired.push({ single: currentActive['active'] as Record<string, unknown> });
+    }
 
-    let activeIdx = 0;
-    let passiveIdx = 0;
+    const header = ['Idő', 'Típus', 'Táv (km)', 'Pace (min/km)', 'Emelkedés (m)', 'Süllyedés (m)'];
 
+    const blockCount = filtered.filter(s => String(s['splitType']) === 'intervalActive').length;
     const rows = paired.map((block) => {
         if ('active' in block && 'rest' in block) {
             const a = block['active'] as Record<string, unknown>;
             const r = block['rest'] as Record<string, unknown>;
+            const activeSecs = splitTimeSeconds(a);
+            const restSecs = splitTimeSeconds(r);
+            const activeTime = typeof activeSecs === 'number' ? formatSeconds(activeSecs) : '–';
+            const restTime = typeof restSecs === 'number' ? formatSeconds(restSecs) : '–';
 
             return [
-                `${++activeIdx}`,
+                `${activeTime} + ${restTime}`,
                 'Intervallum',
                 `${km(a['totalDistance'])} / ${km(r['totalDistance'])}`,
-                `${formatSeconds(a['totalElapsedTime'] as number)} + ${formatSeconds(r['totalElapsedTime'] as number)}`,
-                paceFromTimeDistance(a['totalElapsedTime'], a['totalDistance']),
+                paceFromTimeDistance(activeSecs, a['totalDistance']),
                 num(a['totalAscent'], 0),
                 num(a['totalDescent'], 0),
             ];
@@ -589,43 +636,84 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
 
         const split = block['single'] as Record<string, unknown>;
         const type = String(split['splitType'] ?? '');
-        const isActive = ACTIVE_SPLIT_TYPES.has(type);
         const label = SPLIT_TYPE_HU[type] ?? type;
-        const idx = isActive ? `${++activeIdx}` : `${++passiveIdx}`;
+        const secs = splitTimeSeconds(split);
 
         return [
-            idx,
+            typeof secs === 'number' ? formatSeconds(secs) : '–',
             label,
             km(split['totalDistance']),
-            typeof split['totalElapsedTime'] === 'number' ? formatSeconds(split['totalElapsedTime'] as number) : '–',
-            paceFromTimeDistance(split['totalElapsedTime'], split['totalDistance']),
+            paceFromTimeDistance(secs, split['totalDistance']),
             num(split['totalAscent'], 0),
             num(split['totalDescent'], 0),
         ];
     });
 
-    const lines = [
-        `### Intervallumok - **${filtered.length} bejegyzés, ${activeIdx} blokk**`,
-        '',
-        `| ${header.join(' | ')} |`,
-        `| :--- | :--- | ---: | ---: | ---: | ---: | ---: |`,
-        ...rows.map(r => `| ${r.join(' | ')} |`),
-    ];
+    const headerTitle = blockCount > 1
+        ? `### Intervallumok - **${blockCount} blokk**`
+        : '### Intervallumok';
 
-    if (summaries && summaries.length > 0) {
-        lines.push('');
+    const firstPlannedDuration = firstPlannedStepDurationBeforeCooldown(data);
+    const activeSplits = filtered.filter((s) => String(s['splitType']) === 'intervalActive');
+    const cooldownSplits = filtered.filter((s) => String(s['splitType']) === 'intervalCooldown');
+    const firstActiveSeconds = activeSplits.length > 0
+        ? splitTimeSeconds(activeSplits[0] as Record<string, unknown>)
+        : null;
+    const firstBlock = paired[0] as Record<string, unknown> | undefined;
+    const firstDisplayedSeconds = firstBlock
+        ? ('active' in firstBlock && firstBlock['active']
+            ? splitTimeSeconds(firstBlock['active'] as Record<string, unknown>)
+            : 'single' in firstBlock
+                ? splitTimeSeconds(firstBlock['single'] as Record<string, unknown>)
+                : null)
+        : null;
+    const isSimpleSingleIntervalCase =
+        activeSplits.length === 1 &&
+        cooldownSplits.length <= 1 &&
+        typeof firstPlannedDuration === 'number' &&
+        typeof firstActiveSeconds === 'number' &&
+        firstActiveSeconds <= firstPlannedDuration;
+    const shouldShowSplitHint =
+        typeof firstPlannedDuration === 'number' &&
+        typeof firstDisplayedSeconds === 'number' &&
+        firstDisplayedSeconds < firstPlannedDuration &&
+        !isSimpleSingleIntervalCase;
+
+    const visibleWorkoutSteps = getVisibleWorkoutSteps(data);
+    const shouldHideIntervals = filtered.length === 2 && visibleWorkoutSteps.length === 1;
+
+    const lines: string[] = [];
+    if (!shouldHideIntervals) {
+        lines.push(
+            headerTitle,
+            '',
+            ...(shouldShowSplitHint
+                ? [
+                    '_Megjegyzés: ha az első szakasz rövidebb a tervezettnél, ez jellemzően abból adódik, hogy futás közben a kör gombbal jelölés/szakaszbontás történt, ezért az első rész több szakaszra tagolódott._',
+                    '',
+                ]
+                : []),
+            `| ${header.join(' | ')} |`,
+            `| ---: | :--- | ---: | ---: | ---: | ---: |`,
+            ...rows.map(r => `| ${r.join(' | ')} |`),
+        );
+    }
+
+    const shouldShowIntervalSummary = visibleWorkoutSteps.length > 1;
+    if (shouldShowIntervalSummary && summaries && summaries.length > 0) {
+        if (lines.length > 0) lines.push('');
         lines.push('### Intervallum összefoglalók');
         lines.push('');
         const summaryHeader = ['Típus', 'Darab', 'Össz táv (km)', 'Össz idő'];
         const summaryRows: string[][] = [];
-        const NOISE_TYPES = new Set(['rwdWalk', 'rwdStand']);
         for (const s of summaries) {
             const type = String(s['splitType'] ?? '');
-            if (NOISE_TYPES.has(type) && typeof s['totalTimerTime'] === 'number' && (s['totalTimerTime'] as number) < 30) continue;
+            if (!INTERVAL_TYPES.has(type)) continue;
             const label = SPLIT_TYPE_HU[type] ?? type;
             const count = typeof s['numSplits'] === 'number' ? String(s['numSplits']) : '–';
             const dist = km(s['totalDistance']);
-            const time = typeof s['totalTimerTime'] === 'number' ? formatSeconds(s['totalTimerTime'] as number) : '–';
+            const timeSecs = splitTimeSeconds(s);
+            const time = typeof timeSecs === 'number' ? formatSeconds(timeSecs) : '–';
             summaryRows.push([label, count, dist, time]);
         }
         lines.push(`| ${summaryHeader.join(' | ')} |`);
@@ -635,19 +723,19 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
 
     const pauseText = extractPauseEvents(data);
     if (pauseText) {
-        lines.push('');
+        if (lines.length > 0) lines.push('');
         lines.push(pauseText);
     }
 
     const stopsText = extractStops(data, splits);
     if (stopsText) {
-        lines.push('');
+        if (lines.length > 0) lines.push('');
         lines.push(stopsText);
     }
 
     const slowText = extractSlowSegments(data, splits);
     if (slowText) {
-        lines.push('');
+        if (lines.length > 0) lines.push('');
         lines.push(slowText);
     }
 
@@ -694,7 +782,7 @@ export function extractLaps(data: FitUploadResponse): string {
     ]);
 
     const lines = [
-        `## Körök - **${laps.length} darab**`,
+        '## Körök',
         'nem feltétlenül egységes km-ek',
         '',
         `| ${header.join(' | ')} |`,
@@ -732,7 +820,7 @@ export function extractUserProfile(data: FitUploadResponse): string {
     }
     rows.push(['Ébredési idő', wakeTimeStr]);
 
-    return buildMarkdownTable(rows);
+    return ['## Felhasználói profil', '', buildMarkdownTable(rows)].join('\n');
 }
 
 function extractTrailClimbInfo(data: FitUploadResponse): string {

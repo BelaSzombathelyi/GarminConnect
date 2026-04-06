@@ -1,3 +1,5 @@
+## Felhasználói profil
+
 | Adat | Érték |
 | :--- | ---: |
 | Súly | 75.3 kg |
@@ -43,7 +45,7 @@
 | Séta idő: | 21:47 |
 | Állás idő: | 4:58 |
 
-## Körök - **100 darab**
+## Körök
 nem feltétlenül egységes km-ek
 
 | # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | Talajérintés (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
@@ -149,31 +151,25 @@ nem feltétlenül egységes km-ek
 | 99 | 0.476 | 6:33 | 0 | 1 | 172 | 178 | 872.60 | 72.9 | 278 | 8.2 | 30.7 | 35.4 |
 | 100 | 0.003 | 1:33 | 0 | 0 | 166 | 168 | 1055.00 | 74.0 | 277 | 7.6 | 35.4 | 35.4 |
 
-### Intervallumok - **28 bejegyzés, 11 blokk**
+### Intervallumok - **16 blokk**
 
-| # | Típus | Táv (km) | Idő | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: |
-| 1 | Intervallum | 3.305 / 0.006 | 23:31 + 0:13 | 7:07 | 4 | 26 |
-| 2 | Intervallum | 2.068 / 0.007 | 14:53 + 0:44 | 7:12 | 6 | 2 |
-| 3 | Intervallum | 3.42 / 0.003 | 25:55 + 0:16 | 7:35 | 4 | 9 |
-| 4 | Intervallum | 3.59 / 0.017 | 26:57 + 0:55 | 7:30 | 4 | 4 |
-| 5 | Intervallum | 1.508 / 0.025 | 11:10 + 0:57 | 7:24 | 1 | 0 |
-| 6 | Intervallum | 3.94 / 0.006 | 29:42 + 0:29 | 7:32 | 35 | 34 |
-| 7 | Intervallum | 3.176 / 0.019 | 24:07 + 0:43 | 7:36 | 3 | 3 |
-| 8 | Intervallum | 0.707 / 0.002 | 5:24 + 0:04 | 7:38 | 0 | 4 |
-| 9 | Intervallum | 0.764 / 0.01 | 5:56 + 0:26 | 7:46 | 0 | 1 |
-| 1 | Pihenő interval | 0.065 | 1:18 | 20:03 | 0 | 0 |
-| 10 | Intervallum | 3.669 / 0.006 | 28:05 + 0:48 | 7:39 | 8 | 16 |
-| 11 | Levezető | 0.003 | 2:03 | 629:10 | 0 | 0 |
-
-### Intervallum összefoglalók
-
-| Típus | Darab | Össz táv (km) | Össz idő |
-| :--- | ---: | ---: | ---: |
-| Aktív interval | 16 | 37.054 | 275:51 |
-| Futás | 31 | 50.062 | 384:56 |
-| Pihenő interval | 11 | 0.167 | 6:53 |
-| Gyaloglás | 36 | 1.413 | 21:47 |
-| Levezető | 1 | 0.003 | 0:00 |
-| Felépülés | 10 | 14.294 | 128:57 |
-| Állás | 18 | 0.044 | 4:58 |
+| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
+| ---: | :--- | ---: | ---: | ---: | ---: |
+| 17:07 | Aktív interval | 2.347 | 7:18 | 18 | 0 |
+| 23:31 + 0:13 | Intervallum | 3.305 / 0.006 | 7:07 | 4 | 26 |
+| 14:53 + 0:44 | Intervallum | 2.068 / 0.007 | 7:12 | 6 | 2 |
+| 25:55 + 0:16 | Intervallum | 3.42 / 0.003 | 7:35 | 4 | 9 |
+| 26:57 + 0:55 | Intervallum | 3.59 / 0.017 | 7:30 | 4 | 4 |
+| 11:10 + 0:57 | Intervallum | 1.508 / 0.025 | 7:24 | 1 | 0 |
+| 13:43 | Aktív interval | 1.89 | 7:16 | 3 | 0 |
+| 29:42 + 0:29 | Intervallum | 3.94 / 0.006 | 7:32 | 35 | 34 |
+| 24:07 + 0:43 | Intervallum | 3.176 / 0.019 | 7:36 | 3 | 3 |
+| 5:24 + 0:04 | Intervallum | 0.707 / 0.002 | 7:38 | 0 | 4 |
+| 5:56 + 0:26 | Intervallum | 0.764 / 0.01 | 7:46 | 0 | 1 |
+| 1:18 | Pihenő interval | 0.065 | 20:03 | 0 | 0 |
+| 28:05 + 0:48 | Intervallum | 3.669 / 0.006 | 7:39 | 8 | 16 |
+| 1:44 | Aktív interval | 0.234 | 7:24 | 0 | 3 |
+| 3:57 | Aktív interval | 0.512 | 7:43 | 2 | 1 |
+| 11:14 | Aktív interval | 1.449 | 7:45 | 0 | 2 |
+| 32:27 | Aktív interval | 4.476 | 7:15 | 0 | 5 |
+| 0:00 | Levezető | 0.003 | 1:30 | 0 | 0 |

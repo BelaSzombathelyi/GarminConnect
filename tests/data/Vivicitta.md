@@ -1,3 +1,5 @@
+## Felhasználói profil
+
 | Adat | Érték |
 | :--- | ---: |
 | Súly | 75.8 kg |
@@ -43,7 +45,7 @@
 | Séta idő: | 0:00 |
 | Állás idő: | 0:00 |
 
-## Körök - **22 darab**
+## Körök
 nem feltétlenül egységes km-ek
 
 | # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | Talajérintés (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
@@ -71,14 +73,8 @@ nem feltétlenül egységes km-ek
 | 21 | 1 | 4:22 | 1 | 0 | 166 | 168 | 1381.20 | 108.7 | 223 | 7.7 | – | – |
 | 22 | 0.351 | 3:43 | 0 | 2 | 168 | 176 | 1503.00 | 111.0 | 195 | 7.3 | – | – |
 
-### Intervallumok - **1 bejegyzés, 0 blokk**
+### Intervallumok
 
-| # | Típus | Táv (km) | Idő | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: |
-
-### Intervallum összefoglalók
-
-| Típus | Darab | Össz táv (km) | Össz idő |
-| :--- | ---: | ---: | ---: |
-| Aktív interval | 1 | 21.351 | 90:00 |
-| Futás | 1 | 21.351 | 90:00 |
+| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
+| ---: | :--- | ---: | ---: | ---: | ---: |
+| 90:00 | Aktív interval | 21.351 | 4:13 | 62 | 60 |

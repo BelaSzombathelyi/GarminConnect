@@ -1,3 +1,5 @@
+## Felhasználói profil
+
 | Adat | Érték |
 | :--- | ---: |
 | Súly | 77.2 kg |
@@ -45,11 +47,10 @@
 | Edzés neve | 3,5 óra terepen 4*5 min, 04:05 |
 | workout steps | 2 |
 
-Edzéslépések:
+### Edzéslépések
   1.  Active  [active]  210:00  114–150 bpm
-  2.  [cooldown]  open  open
 
-## Körök - **61 darab**
+## Körök
 nem feltétlenül egységes km-ek
 
 | # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | Talajérintés (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
@@ -115,21 +116,6 @@ nem feltétlenül egységes km-ek
 | 59 | 1 | 4:42 | 0 | 60 | 170 | 174 | 1251.10 | 104.2 | 244 | 8.1 | 34.3 | 39.6 |
 | 60 | 1 | 5:26 | 6 | 21 | 166 | 170 | 1110.20 | 101.5 | 264 | 8.9 | 31.0 | 35.2 |
 | 61 | 0.156 | 5:25 | 2 | 0 | 166 | 168 | 1097.50 | 99.2 | 264 | 8.8 | 32.3 | 34.4 |
-
-### Intervallumok - **2 bejegyzés, 1 blokk**
-
-| # | Típus | Táv (km) | Idő | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: |
-| 1 | Levezető | 27.793 | 188:18 | 6:47 | 1181 | 1248 |
-
-### Intervallum összefoglalók
-
-| Típus | Darab | Össz táv (km) | Össz idő |
-| :--- | ---: | ---: | ---: |
-| Levezető | 1 | 27.793 | 183:21 |
-| Gyaloglás | 32 | 4.375 | 52:46 |
-| Futás | 28 | 25.786 | 145:23 |
-| Aktív interval | 1 | 2.37 | 15:00 |
 
 ### Pause események (timer gomb)
 
