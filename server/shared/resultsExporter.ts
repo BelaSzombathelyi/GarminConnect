@@ -99,7 +99,7 @@ function normalizeEmbeddedMarkdown(text: string): string {
         .join('\n')
 }
 
-function compareResultEntries(a: ResultTextEntry, b: ResultTextEntry): number {
+export function compareResultEntries(a: ResultTextEntry, b: ResultTextEntry): number {
     const aKnown = a.dayKey !== 'ismeretlen-datum'
     const bKnown = b.dayKey !== 'ismeretlen-datum'
     if (aKnown !== bKnown) return aKnown ? -1 : 1
@@ -158,6 +158,27 @@ function extractDateAndIdFromPath(filePath: string): { dateKey: string; activity
     return {
         dateKey: 'ismeretlen-datum',
         activityId: fileNameMatch ? fileNameMatch[1] : 'ismeretlen-activity',
+    }
+}
+
+export function buildResultTextEntryFromText(text: string, activityId: string): ResultTextEntry {
+    const meta = parseResultTextMeta(text)
+    const dayKey = meta.dayKey ?? 'ismeretlen-datum'
+    const monthKey = dayKey !== 'ismeretlen-datum' ? dayKey.slice(0, 7) : dayKey
+    return {
+        dateKey: dayKey,
+        activityId,
+        filePath: '',
+        text,
+        dayKey,
+        monthKey,
+        sportProfile: meta.sportProfile,
+        sport: meta.sport,
+        subSport: meta.subSport,
+        activityTypeLabel: buildActivityTypeLabel(meta),
+        startIso: meta.startIso,
+        startTimeLabel: meta.startTimeLabel,
+        markdownId: `activity-${dayKey}-${activityId}`,
     }
 }
 

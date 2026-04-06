@@ -2,34 +2,26 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { processBuffer } from '../server/garmin/fitPipeline'
-import { buildResultsMarkdown, collectResultTextEntries } from '../server/shared/resultsExporter'
+import { buildResultsMarkdown, buildResultTextEntryFromText, compareResultEntries } from '../server/shared/resultsExporter'
 import { createTrainingPeaksWorkoutStore, type TrainingPeaksWorkoutInput, type TrainingPeaksComment } from '../server/trainingpeaks/workoutStore'
 
 const DATA_DIR = join(import.meta.dirname, 'data')
+const GARMIN_DATA_DIR = join(DATA_DIR, 'Garmin')
 
 const TEST_FILES = [
-    { name: 'Vivicitta',       file: 'Vivicitta.zip' },
-    { name: 'BSzM 4',          file: 'BSzM 4.zip' },
-    { name: 'VO2max interval', file: 'VO2 max - SUM 20p 4x5 min, 04_05.zip' },
-    { name: 'Almádi fagyizás',         file: 'Alsoors-Almadai-fagyi-Alsoors.zip' },
-    { name: 'Solymár - 3fél óra terepen', file: 'Solymár - 3fél óra terepen.zip' },
+    { name: 'Vivicitta', activityId: '22257203916', dayKey: '2026-03-22' },
+    { name: 'BSzM 4', activityId: '22025969195', dayKey: '2026-03-01' },
+    { name: 'VO2max interval', activityId: '22367706617', dayKey: '2026-04-01' },
+    { name: 'Almádi fagyizás', activityId: '22417526163', dayKey: '2026-04-05' },
+    { name: 'Solymár - 3fél óra terepen', activityId: '22403957560', dayKey: '2026-04-04' },
 ]
 
-function buildExportSlot(idx: number, text: string): { id: string; dayKey: string } {
-    const id = String(99000000001 + idx)
-
-    const startFromTable = text.match(/^\|\s*Kezdés\s*\|\s*(\d{4})\.\s*(\d{2})\.\s*(\d{2})\./m)
-    if (!startFromTable) {
-        throw new Error('A forrás markdown nem tartalmaz kinyerhető "Kezdés" mezőt az export-fixture dátumhoz.')
-    }
-
-    return {
-        id,
-        dayKey: `${startFromTable[1]}-${startFromTable[2]}-${startFromTable[3]}`,
-    }
+function activityFilePath(dayKey: string, activityId: string, ext: 'zip' | 'md'): string {
+    const monthKey = dayKey.slice(0, 7)
+    const day = dayKey.slice(8, 10)
+    return join(GARMIN_DATA_DIR, monthKey, day, `${activityId}.${ext}`)
 }
 
-const EXPORT_FIXTURE_DIR = join(DATA_DIR, '_export-fixture')
 const EXPORT_OUTPUT_PATH = join(DATA_DIR, 'export-results.md')
 const TP_FIXTURE_DIR = join(DATA_DIR, 'TrainingPeaks')
 
@@ -62,7 +54,7 @@ function findJsonFiles(dir: string): string[] {
 }
 
 // Megosztott TP store a golden fájlok TP-vel való gazdagításához
-const sharedTpDbPath = join(DATA_DIR, '_tmp-golden-tp.sqlite')
+const sharedTpDbPath = join(TP_FIXTURE_DIR, 'trainingpeaks-workouts.sqlite')
 rmSync(sharedTpDbPath, { force: true })
 const sharedTpStore = createTrainingPeaksWorkoutStore(sharedTpDbPath, DATA_DIR)
 const allTpFixtures = findJsonFiles(TP_FIXTURE_DIR)
@@ -70,13 +62,13 @@ if (allTpFixtures.length > 0) {
     sharedTpStore.upsertWorkouts(allTpFixtures.map(toTpInputFromFixture))
 }
 
-for (const { name, file } of TEST_FILES) {
+for (const { name, activityId, dayKey } of TEST_FILES) {
     describe(name, () => {
-        const buffer = readFileSync(join(DATA_DIR, file))
+        const buffer = readFileSync(activityFilePath(dayKey, activityId, 'zip'))
         const { text, errors } = processBuffer(buffer, { tpStore: sharedTpStore })
 
         // Golden-file: mindig felülíródik – git diff mutatja a változásokat
-        const outputPath = join(DATA_DIR, `${name}.md`)
+        const outputPath = activityFilePath(dayKey, activityId, 'md')
         writeFileSync(outputPath, text, 'utf8')
 
         it('nem üres kimenetet ad', () => {
@@ -124,7 +116,7 @@ describe('fitPipeline TP enrich', () => {
         const tpStore = createTrainingPeaksWorkoutStore(tmpTpDb, tmpTpDataDir)
         tpStore.upsertWorkouts([toTpInputFromFixture(fixtureSrc)])
 
-        const runZip = readFileSync(join(DATA_DIR, 'Alsoors-Almadai-fagyi-Alsoors.zip'))
+        const runZip = readFileSync(activityFilePath('2026-04-05', '22417526163', 'zip'))
         const { text } = processBuffer(runZip, { activityId: '99000000004', tpStore })
 
         expect(text.startsWith('## TrainingPeaks')).toBe(true)
@@ -136,26 +128,16 @@ describe('fitPipeline TP enrich', () => {
 })
 
 describe('results export összefűzés', () => {
-    it('a korábbi tesztek md kimeneteit másolva exportálhatóan összefűzi', async () => {
-        rmSync(EXPORT_FIXTURE_DIR, { recursive: true, force: true })
-        mkdirSync(EXPORT_FIXTURE_DIR, { recursive: true })
-
-        TEST_FILES.forEach(({ name }, idx) => {
-            const sourcePath = join(DATA_DIR, `${name}.md`)
+    it('a korábbi tesztek md kimeneteit összefűzi', async () => {
+        const entries = TEST_FILES.map(({ activityId, dayKey }, idx) => {
+            const sourcePath = activityFilePath(dayKey, activityId, 'md')
             expect(existsSync(sourcePath)).toBe(true)
-
             const text = readFileSync(sourcePath, 'utf8')
             expect(text.length).toBeGreaterThan(0)
-
-            const slot = buildExportSlot(idx, text)
-            const monthKey = slot.dayKey.slice(0, 7)
-            const day = slot.dayKey.slice(8, 10)
-            const targetDir = join(EXPORT_FIXTURE_DIR, monthKey, day)
-            mkdirSync(targetDir, { recursive: true })
-            writeFileSync(join(targetDir, `${slot.id}.md`), text, 'utf8')
+            return buildResultTextEntryFromText(text, String(99000000001 + idx))
         })
+        entries.sort(compareResultEntries)
 
-        const entries = await collectResultTextEntries(EXPORT_FIXTURE_DIR)
         const outputBuffer = await buildResultsMarkdown(entries)
         const outputText = outputBuffer.toString('utf8')
 
