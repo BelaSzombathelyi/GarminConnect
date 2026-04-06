@@ -4,10 +4,11 @@ import { registerGarminRoutes } from './server/garmin/routes'
 import { registerTrainingPeaksRoutes } from './server/trainingpeaks/routes'
 import { registerSharedRoutes } from './server/shared/routes'
 
-const GARMIN_DB_FILE_PATH = resolve(process.cwd(), 'data', 'garmin-activities.sqlite')
-const TRAININGPEAKS_DB_FILE_PATH = resolve(process.cwd(), 'data', 'TrainingPeaks', 'trainingpeaks-workouts.sqlite')
+const DATA_DIR = resolve(process.cwd(), 'data')
+const GARMIN_DIR = resolve(DATA_DIR, 'Garmin')
+const GARMIN_DB_FILE_PATH = resolve(GARMIN_DIR, 'garmin-activities.sqlite')
+const TRAININGPEAKS_DB_FILE_PATH = resolve(DATA_DIR, 'TrainingPeaks', 'trainingpeaks-workouts.sqlite')
 const DOWNLOADS_DIR = process.env.GARMIN_DOWNLOADS_DIR || resolve(process.env.HOME || '.', 'Downloads')
-const ARCHIVE_DIR = resolve(process.cwd(), 'data')
 
 function fitUploadPlugin(): Plugin {
     return {
@@ -15,18 +16,18 @@ function fitUploadPlugin(): Plugin {
         configureServer(server: ViteDevServer) {
             const tpStore = registerTrainingPeaksRoutes(server, {
                 dbFilePath: TRAININGPEAKS_DB_FILE_PATH,
-                dataDir: ARCHIVE_DIR,
+                dataDir: DATA_DIR,
             })
 
             registerGarminRoutes(server, {
                 dbFilePath: GARMIN_DB_FILE_PATH,
                 downloadsDir: DOWNLOADS_DIR,
-                archiveDir: ARCHIVE_DIR,
+                archiveDir: GARMIN_DIR,
                 tpStore,
             })
 
             registerSharedRoutes(server, {
-                archiveDir: ARCHIVE_DIR,
+                archiveDir: GARMIN_DIR,
             })
         },
     }
