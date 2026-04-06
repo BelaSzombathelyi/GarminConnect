@@ -11,6 +11,8 @@ const SHOW_USER_PROFILE = false;
 /** Builds the full plain-text summary that goes into the textarea / /api/process response. */
 export function buildTextOutput(data: FitUploadResponse, mergeShortWalks = false): string {
     const sections: string[] = [];
+    const summary = extractSummary(data);
+    if (summary) sections.push(summary);
     if (SHOW_USER_PROFILE) {
         const profile = extractUserProfile(data);
         if (profile) sections.push(profile);
@@ -22,6 +24,61 @@ export function buildTextOutput(data: FitUploadResponse, mergeShortWalks = false
         extractTrailClimbInfo(data),
     );
     return sections.filter(Boolean).join('\n\n');
+}
+
+function teShortLabel(val: number): string {
+    if (val >= 4.0) return 'magas';
+    if (val >= 2.0) return 'kozepes';
+    if (val > 0.0) return 'alacsony';
+    return 'nincs';
+}
+
+function extractSummary(data: FitUploadResponse): string {
+    const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0];
+    if (!session) return '';
+
+    const sportProfile = typeof session['sportProfileName'] === 'string'
+        ? (session['sportProfileName'] as string).toLowerCase()
+        : '';
+    const totalElapsed = typeof session['totalElapsedTime'] === 'number' ? (session['totalElapsedTime'] as number) : null;
+    const durationLabel = totalElapsed !== null ? secondsToHHMM(totalElapsed) : '–';
+    const distanceLabel = typeof session['totalDistance'] === 'number' ? `${km(session['totalDistance'])} km` : '–';
+    const typeLabel = sportProfile
+        ? (totalElapsed !== null && totalElapsed >= 3 * 3600 ? `${sportProfile} (hosszu)` : sportProfile)
+        : '–';
+    const ascentValue = typeof session['totalAscent'] === 'number' ? (session['totalAscent'] as number) : null;
+    const distanceValue = typeof session['totalDistance'] === 'number' ? (session['totalDistance'] as number) : null;
+    const ascentRatioPercent =
+        ascentValue !== null && distanceValue !== null && distanceValue > 0
+            ? (ascentValue / distanceValue) * 100
+            : null;
+    const shouldHideAscent = sportProfile.includes('futás') && ascentRatioPercent !== null && ascentRatioPercent < 1;
+    const ascent = ascentValue !== null ? `+${ascentValue} m` : '–';
+
+    const avgHeart = typeof session['avgHeartRate'] === 'number' ? String(session['avgHeartRate']) : '–';
+
+    const rawRpe = typeof session['workoutRpe'] === 'number' ? (session['workoutRpe'] as number) : null;
+    const rpeLabel = rawRpe !== null ? `${Math.min(10, Math.max(1, Math.round(rawRpe / 10)))}/10` : '–';
+
+    const aerobic = typeof session['totalTrainingEffect'] === 'number' ? (session['totalTrainingEffect'] as number) : null;
+    const anaerobic = typeof session['totalAnaerobicTrainingEffect'] === 'number' ? (session['totalAnaerobicTrainingEffect'] as number) : null;
+    const aerobicLabel = aerobic !== null ? `${aerobic.toFixed(1)} (${teShortLabel(aerobic)})` : '–';
+    const anaerobicLabel = anaerobic !== null ? teShortLabel(anaerobic) : '–';
+
+    return [
+        '## Summary',
+        '',
+        `Type: ${typeLabel}`,
+        `Time: ${durationLabel}`,
+        `Distance: ${distanceLabel}`,
+        ...(shouldHideAscent ? [] : [`Elevation: ${ascent}`]),
+        '',
+        `Heart rate: avg ${avgHeart} bpm`,
+        `RPE: ${rpeLabel}`,
+        '',
+        `Aerobic: ${aerobicLabel}`,
+        `Anaerobic: ${anaerobicLabel}`,
+    ].join('\n');
 }
 
 // ---------------------------------------------------------------------------

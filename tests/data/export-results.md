@@ -20,16 +20,26 @@
 ## 2026-04-05
 
 <a id="activity-2026-04-05-99000000004"></a>
+#### Summary
+
+Type: futás
+Time: 1:33
+Distance: 14.19 km
+
+Heart rate: avg 146 bpm
+RPE: 5/10
+
+Aerobic: 4.0 (magas)
+Anaerobic: alacsony
+
 #### TrainingPeaks
 
-| Adat | Érték |
-| :--- | ---: |
-| Aktivitás neve | 70 perc kötetlen |
-| TSS | 99 rTSS |
-| Edzés típus | Run |
-| Tervezett idő | 1:08:53 |
+Aktivitás neve: 70 perc kötetlen
+TSS: 99 rTSS
+Edzés típus: Run
+Tervezett idő: 1:08:53
 
-##### Leírás
+##### Edzői instrukciók
 
 Egyenletes, könnyed futás érzésre RPE 1-3
 
@@ -104,16 +114,27 @@ nem feltétlenül egységes km-ek
 ## 2026-04-04
 
 <a id="activity-2026-04-04-99000000005"></a>
+#### Summary
+
+Type: terepfutás (hosszu)
+Time: 3:23
+Distance: 30.163 km
+Elevation: +1265 m
+
+Heart rate: avg 143 bpm
+RPE: 6/10
+
+Aerobic: 4.9 (magas)
+Anaerobic: alacsony
+
 #### TrainingPeaks
 
-| Adat | Érték |
-| :--- | ---: |
-| Aktivitás neve | 3,5 óra terepen |
-| TSS | 220 rTSS |
-| Edzés típus | Run |
-| Tervezett idő | 3:18:21 |
+Aktivitás neve: 3,5 óra terepen
+TSS: 220 rTSS
+Edzés típus: Run
+Tervezett idő: 3:18:21
 
-##### Leírás
+##### Edzői instrukciók
 
 Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.
 
@@ -242,14 +263,24 @@ Mikro megállások: 10 db (2 percnél rövidebb), összidő: 4:52.
 ## 2026-04-01
 
 <a id="activity-2026-04-01-99000000003"></a>
+#### Summary
+
+Type: futás
+Time: 1:06
+Distance: 13.097 km
+
+Heart rate: avg 141 bpm
+RPE: 9/10
+
+Aerobic: 3.9 (kozepes)
+Anaerobic: alacsony
+
 #### TrainingPeaks
 
-| Adat | Érték |
-| :--- | ---: |
-| Aktivitás neve | VO2 max - SUM 20p 4*5 min, 04:05 iram |
-| TSS | 86 rTSS |
-| Edzés típus | Run |
-| Tervezett idő | 1:06:15 |
+Aktivitás neve: VO2 max - SUM 20p 4*5 min, 04:05 iram
+TSS: 86 rTSS
+Edzés típus: Run
+Tervezett idő: 1:06:15
 
 ##### Kommentek
 
@@ -351,6 +382,18 @@ Mikro megállások: 2 db (2 percnél rövidebb), összidő: 0:38.
 ## 2026-03-22
 
 <a id="activity-2026-03-22-99000000001"></a>
+#### Summary
+
+Type: futás
+Time: 1:30
+Distance: 21.351 km
+
+Heart rate: avg 161 bpm
+RPE: 10/10
+
+Aerobic: 5.0 (magas)
+Anaerobic: kozepes
+
 #### Edzés összefoglaló
 
 Sport profil: Futás
@@ -414,6 +457,18 @@ nem feltétlenül egységes km-ek
 ## 2026-03-01
 
 <a id="activity-2026-03-01-99000000002"></a>
+#### Summary
+
+Type: futás (hosszu)
+Time: 6:51
+Distance: 51.519 km
+
+Heart rate: avg 116 bpm
+RPE: 9/10
+
+Aerobic: 3.8 (kozepes)
+Anaerobic: nincs
+
 #### Edzés összefoglaló
 
 Sport profil: Futás
