@@ -65,8 +65,24 @@ function extractSummary(data: FitUploadResponse): string {
     const aerobicLabel = aerobic !== null ? `${aerobic.toFixed(1)} (${teShortLabel(aerobic)})` : '–';
     const anaerobicLabel = anaerobic !== null ? teShortLabel(anaerobic) : '–';
 
+    const startDate = toDate(session['startTime']);
+    const startDateStr = startDate
+        ? `${startDate.toLocaleDateString('hu-HU')} ${startDate.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' })}`
+        : '';
+    const workoutMesgs = data.messages['workoutMesgs'] as Record<string, unknown>[] | undefined;
+    const workout = workoutMesgs?.[0];
+    const wktNameArr = workout && Array.isArray(workout['wktName'])
+        ? (workout['wktName'] as unknown[]).filter(s => typeof s === 'string' && (s as string).trim())
+        : null;
+    const wktName = wktNameArr && wktNameArr.length > 0
+        ? (wktNameArr as string[]).join(' ')
+        : (workout && typeof workout['wktName'] === 'string' ? workout['wktName'] as string : '');
+
+    const headerParts = [startDateStr, durationLabel, wktName].filter(Boolean);
+    const headerLine = "# Workout Summary: " + (headerParts.length > 0 ? headerParts.join(' | ') : 'Summary');
+
     return [
-        '## Summary',
+        headerLine,
         '',
         `Type: ${typeLabel}`,
         `Time: ${durationLabel}`,

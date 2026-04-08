@@ -5,7 +5,9 @@
 // @description  Garmin Connect activity FIT ZIP automatikus letöltése
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activity/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      localhost
+// @connect      127.0.0.1
 // ==/UserScript==
 
 (function () {
@@ -16,6 +18,9 @@
     const closeAfterDownload = params.get('close_after_download') === '1';
     const closeDelayMs = Number(params.get('close_delay_ms') || '2000');
     const shouldAutoDownload = autoDownloadParam === null ? true : autoDownloadParam === '1';
+    const hasAutoDownloadParam = params.has('auto_download');
+    const hasCloseAfterDownloadParam = params.has('close_after_download');
+    const API_BASE = 'http://localhost:5173/api';
 
     const EXPORT_LABELS = [
         'Fájl exportálása',
@@ -62,6 +67,194 @@
     function getActivityIdFromUrl() {
         const m = window.location.pathname.match(/\/app\/activity\/(\d+)/);
         return m ? m[1] : null;
+    }
+
+    function httpRequestText(method, url) {
+        return new Promise((resolve, reject) => {
+            if (typeof GM_xmlhttpRequest !== 'function') {
+                reject(new Error('GM_xmlhttpRequest nem elerheto'));
+                return;
+            }
+
+            GM_xmlhttpRequest({
+                method,
+                url,
+                onload: (response) => {
+                    if (response.status < 200 || response.status >= 300) {
+                        reject(new Error(`HTTP ${response.status} ${url}: ${response.responseText}`));
+                        return;
+                    }
+
+                    resolve(response.responseText || '');
+                },
+                onerror: () => reject(new Error(`Halozati hiba: ${url}`)),
+            });
+        });
+    }
+
+    function httpRequestJson(method, url, data) {
+        return new Promise((resolve, reject) => {
+            if (typeof GM_xmlhttpRequest !== 'function') {
+                reject(new Error('GM_xmlhttpRequest nem elerheto'));
+                return;
+            }
+
+            GM_xmlhttpRequest({
+                method,
+                url,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                data: data ? JSON.stringify(data) : undefined,
+                onload: (response) => {
+                    if (response.status < 200 || response.status >= 300) {
+                        reject(new Error(`HTTP ${response.status} ${url}: ${response.responseText}`));
+                        return;
+                    }
+
+                    try {
+                        resolve(response.responseText ? JSON.parse(response.responseText) : {});
+                    } catch (err) {
+                        reject(err);
+                    }
+                },
+                onerror: () => reject(new Error(`Halozati hiba: ${url}`)),
+            });
+        });
+    }
+
+    async function fetchZipBlobViaApi(activityId) {
+        const response = await fetch(`/download-service/files/activity/${activityId}`, {
+            method: 'GET',
+            credentials: 'include',
+        });
+
+        if (!response.ok) {
+            throw new Error(`ZIP letoltes sikertelen (${response.status})`);
+        }
+
+        return await response.blob();
+    }
+
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = String(reader.result || '');
+                const commaIdx = result.indexOf(',');
+                resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+            };
+            reader.onerror = () => reject(new Error('Nem sikerult base64-re alakitani a ZIP-et'));
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    function downloadText(fileName, text) {
+        const blob = new Blob([String(text || '')], { type: 'text/markdown;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+    }
+
+    function downloadBlob(fileName, blob) {
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+    }
+
+    async function downloadCurrentWorkoutFromEndpoint() {
+        const activityId = getActivityIdFromUrl();
+        if (!activityId) {
+            throw new Error('Nincs activity ID az URL-ben');
+        }
+
+        const zipBlob = await fetchZipBlobViaApi(activityId);
+        downloadBlob(`activity-${activityId}.zip`, zipBlob);
+
+        const zipBase64 = await blobToBase64(zipBlob);
+        await httpRequestJson('POST', `${API_BASE}/garmin/upload_activity_zip`, {
+            activityId,
+            zipBase64,
+        });
+
+        const endpoint = `${API_BASE}/reprocess_workout_by_garmin_id?garminActivityId=${encodeURIComponent(activityId)}`;
+        const markdown = await httpRequestText('GET', endpoint);
+        downloadText(`garmin-${activityId}.md`, markdown);
+        return activityId;
+    }
+
+    function ensureQuickPanel() {
+        if (document.getElementById('gc-quick-panel')) return;
+
+        const panel = document.createElement('div');
+        panel.id = 'gc-quick-panel';
+        panel.style.position = 'fixed';
+        panel.style.right = '16px';
+        panel.style.bottom = '16px';
+        panel.style.zIndex = '99999';
+        panel.style.background = '#0f172a';
+        panel.style.color = '#fff';
+        panel.style.padding = '10px 12px';
+        panel.style.borderRadius = '10px';
+        panel.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)';
+        panel.style.fontFamily = 'system-ui, sans-serif';
+        panel.style.fontSize = '13px';
+        panel.style.maxWidth = '320px';
+
+        const title = document.createElement('div');
+        title.textContent = 'Garmin Quick Actions';
+        title.style.fontWeight = '700';
+        title.style.marginBottom = '8px';
+
+        const status = document.createElement('div');
+        status.style.marginBottom = '8px';
+        status.textContent = (!hasAutoDownloadParam || !hasCloseAfterDownloadParam)
+            ? 'URL param hiany: auto_download / close_after_download (defaultok futnak)'
+            : 'Kesz';
+
+        const downloadBtn = document.createElement('button');
+        downloadBtn.textContent = 'Download current workout';
+        downloadBtn.style.border = 'none';
+        downloadBtn.style.borderRadius = '8px';
+        downloadBtn.style.background = '#0ea5e9';
+        downloadBtn.style.color = 'white';
+        downloadBtn.style.padding = '8px 10px';
+        downloadBtn.style.cursor = 'pointer';
+        downloadBtn.style.fontWeight = '600';
+        downloadBtn.style.display = 'block';
+        downloadBtn.style.width = '100%';
+
+        downloadBtn.addEventListener('click', async () => {
+            const originalLabel = downloadBtn.textContent;
+            downloadBtn.disabled = true;
+            downloadBtn.style.opacity = '0.7';
+            downloadBtn.textContent = 'Download folyamatban...';
+            try {
+                const activityId = await downloadCurrentWorkoutFromEndpoint();
+                status.textContent = `Letoltes kesz: Garmin ${activityId}`;
+            } catch (err) {
+                status.textContent = `Download hiba: ${err instanceof Error ? err.message : String(err)}`;
+            } finally {
+                downloadBtn.disabled = false;
+                downloadBtn.style.opacity = '1';
+                downloadBtn.textContent = originalLabel;
+            }
+        });
+
+        panel.appendChild(title);
+        panel.appendChild(status);
+        panel.appendChild(downloadBtn);
+        document.body.appendChild(panel);
     }
 
     async function downloadViaApiFallback() {
@@ -164,6 +357,10 @@
     }
 
     console.log('[GarminConnect] Script elindult, URL:', window.location.href);
+
+    if (!hasAutoDownloadParam || !hasCloseAfterDownloadParam) {
+        ensureQuickPanel();
+    }
 
     if (!shouldAutoDownload) {
         console.log('[GarminConnect] auto_download=0, nincs automatikus export.');

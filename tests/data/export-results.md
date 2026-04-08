@@ -20,18 +20,6 @@
 ## 2026-04-05
 
 <a id="activity-2026-04-05-99000000004"></a>
-#### Summary
-
-Type: futás
-Time: 1:33
-Distance: 14.19 km
-
-Heart rate: avg 146 bpm
-RPE: 5/10
-
-Aerobic: 4.0 (magas)
-Anaerobic: alacsony
-
 #### TrainingPeaks
 
 Aktivitás neve: 70 perc kötetlen
@@ -48,6 +36,18 @@ Egyenletes, könnyed futás érzésre RPE 1-3
 **2026-04-05 — Szombathelyi Bela**
 
 Ettem egy közepes ebédet, majd nem sokkal utána mentünk anyukámmal bringával egy részen, aztán utána én futva, majd fél időnél fagyiztunk egyet Almádiban. Odafelé picit nyomtam a gázt, ahogy jól esett. Vissza felé, már nem akartam túlságosan erősen futni, így esett most jól. Egy zselé volt, a só most kiamaradt, 1l víz.
+
+### Workout Summary: 2026. 04. 05. 15:18 | 1:33 | 70 perc kötetlen *5 min, 04:05
+
+Type: futás
+Time: 1:33
+Distance: 14.19 km
+
+Heart rate: avg 146 bpm
+RPE: 5/10
+
+Aerobic: 4.0 (magas)
+Anaerobic: alacsony
 
 #### Edzés összefoglaló
 
@@ -114,19 +114,6 @@ nem feltétlenül egységes km-ek
 ## 2026-04-04
 
 <a id="activity-2026-04-04-99000000005"></a>
-#### Summary
-
-Type: terepfutás (hosszu)
-Time: 3:23
-Distance: 30.163 km
-Elevation: +1265 m
-
-Heart rate: avg 143 bpm
-RPE: 6/10
-
-Aerobic: 4.9 (magas)
-Anaerobic: alacsony
-
 #### TrainingPeaks
 
 Aktivitás neve: 3,5 óra terepen
@@ -143,6 +130,19 @@ Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg d
 **2026-04-04 — Szombathelyi Bela**
 
 Terepfutó cipő csere -> ugyan olyanra. A régi 11 hónapot és 1000km-ert élt meg. Ugyan az az útvonal volt mint múlt héten csak a start nem Óbuda hanem Solymár lett. Vittem botot, felfeléken használtam is. 4 zselé, 3 dekás marcipán szelet, 2 l víz. Lefeléket jobban meg futottam mint múlt héten. Persze van ezen az útvonalon 3-4 kisebb szakasz ahol nem lehet fékezni szinte lefelé mert túl meredek, ott a múltkor is gyors voltam. Talán picit alul frissítettem, és utána meg túl ettem magam, de aztán estére minden jó volt.
+
+### Workout Summary: 2026. 04. 04. 10:11 | 3:23 | 3,5 óra terepen 4*5 min, 04:05
+
+Type: terepfutás (hosszu)
+Time: 3:23
+Distance: 30.163 km
+Elevation: +1265 m
+
+Heart rate: avg 143 bpm
+RPE: 6/10
+
+Aerobic: 4.9 (magas)
+Anaerobic: alacsony
 
 #### Edzés összefoglaló
 
@@ -263,18 +263,6 @@ Mikro megállások: 10 db (2 percnél rövidebb), összidő: 4:52.
 ## 2026-04-01
 
 <a id="activity-2026-04-01-99000000003"></a>
-#### Summary
-
-Type: futás
-Time: 1:06
-Distance: 13.097 km
-
-Heart rate: avg 141 bpm
-RPE: 9/10
-
-Aerobic: 3.9 (kozepes)
-Anaerobic: alacsony
-
 #### TrainingPeaks
 
 Aktivitás neve: VO2 max - SUM 20p 4*5 min, 04:05 iram
@@ -287,6 +275,18 @@ Tervezett idő: 1:06:15
 **2026-04-01 — Szombathelyi Bela**
 
 Ezt a tempót nem érzem biztonságosnak. 1-2 percig oké, de 20 percre olyan érzés mit amikor elkezd pörögni a villany óra csak itt a CH raktáron. Biztosan bele tudnék menni jobban is, de az már nem biztonságos érzés. Azért így sem lett olyan rossz 😉
+
+### Workout Summary: 2026. 04. 01. 06:17 | 1:06 | VO2 max - SUM 20p 4*5 min, 04:05
+
+Type: futás
+Time: 1:06
+Distance: 13.097 km
+
+Heart rate: avg 141 bpm
+RPE: 9/10
+
+Aerobic: 3.9 (kozepes)
+Anaerobic: alacsony
 
 #### Edzés összefoglaló
 
@@ -382,7 +382,7 @@ Mikro megállások: 2 db (2 percnél rövidebb), összidő: 0:38.
 ## 2026-03-22
 
 <a id="activity-2026-03-22-99000000001"></a>
-#### Summary
+### Workout Summary: 2026. 03. 22. 09:00 | 1:30
 
 Type: futás
 Time: 1:30
@@ -457,7 +457,7 @@ nem feltétlenül egységes km-ek
 ## 2026-03-01
 
 <a id="activity-2026-03-01-99000000002"></a>
-#### Summary
+### Workout Summary: 2026. 03. 01. 08:30 | 6:51
 
 Type: futás (hosszu)
 Time: 6:51

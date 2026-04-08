@@ -1,7 +1,7 @@
 import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
 import { dirname, join } from 'node:path'
-import { readFile, readdir, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises'
 import type { ViteDevServer } from 'vite'
 import { ActivityStatus, createActivityStore, type ActivityInput } from './activityStore'
 import { startDownloadWatcher } from './downloadWatcher'
@@ -341,6 +341,66 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
             res.statusCode = 422
             res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+        }
+    })
+
+    server.middlewares.use('/api/garmin/upload_activity_zip', async (req, res) => {
+        if (handleOptions(req, res)) return
+        setCorsHeaders(res)
+
+        if (req.method !== 'POST') {
+            res.statusCode = 405
+            res.end('Method Not Allowed')
+            return
+        }
+
+        try {
+            const payload = await readJsonBody(req)
+            const activityId = String(payload.activityId ?? '').trim()
+            const zipBase64 = String(payload.zipBase64 ?? '').trim()
+
+            if (!activityId || !zipBase64) {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'activityId és zipBase64 kötelező' }))
+                return
+            }
+
+            const zipBuffer = Buffer.from(zipBase64, 'base64')
+            if (zipBuffer.length === 0) {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'Üres ZIP payload' }))
+                return
+            }
+
+            const activity = activityStore.getById(activityId)
+            const isoDate = parseActivityDateToIso(activity?.date ?? '') ?? localTodayIso()
+            const relativeDir = `${isoDate.slice(0, 7)}/${isoDate.slice(8, 10)}`
+            const targetDir = join(archiveDir, relativeDir)
+            const zipFileName = `${activityId}.zip`
+            const targetZipPath = join(targetDir, zipFileName)
+
+            await mkdir(targetDir, { recursive: true })
+            await writeFile(targetZipPath, zipBuffer)
+
+            activityStore.markReceived(activityId, zipFileName)
+
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.statusCode = 200
+            res.end(JSON.stringify({
+                ok: true,
+                activityId,
+                relativeDir,
+                zipPath: targetZipPath,
+            }))
+        } catch (err) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+            }))
         }
     })
 

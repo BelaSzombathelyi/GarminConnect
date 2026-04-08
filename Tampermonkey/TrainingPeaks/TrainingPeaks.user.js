@@ -13,17 +13,19 @@
   "use strict";
 
   const LOG_PREFIX = "[TP Search]";
-  const API_BASE = "http://localhost:5173/api";
+  const API_BASE = "http://127.0.0.1:5173/api";
   const HANDLE_FUTURE_EVENTS = false;
   const INCLUDE_FUTURE_ROWS = HANDLE_FUTURE_EVENTS;
   const UI_STATE = {
     runInProgress: false,
+    downloadInProgress: false,
     visibleSignature: "",
     lastServerCheckSignature: "",
     pendingWorkoutKeys: new Set(),
     refreshTimer: null,
     observer: null,
     syncBtn: null,
+    downloadBtn: null,
     statusEl: null,
   };
   const SELECTORS = {
@@ -87,6 +89,147 @@
         onerror: () => reject(new Error(`Halozati hiba: ${url}`)),
       });
     });
+  }
+
+  function httpRequestText(method, url, data) {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== "function") {
+        reject(new Error("GM_xmlhttpRequest nem elerheto"));
+        return;
+      }
+
+      GM_xmlhttpRequest({
+        method,
+        url,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        data: data ? JSON.stringify(data) : undefined,
+        onload: (response) => {
+          if (response.status < 200 || response.status >= 300) {
+            reject(new Error(`HTTP ${response.status} ${url}: ${response.responseText}`));
+            return;
+          }
+
+          resolve(response.responseText || "");
+        },
+        onerror: () => reject(new Error(`Halozati hiba: ${url}`)),
+      });
+    });
+  }
+
+  function triggerTextDownload(fileName, text) {
+    const blob = new Blob([String(text || "")], { type: "text/markdown;charset=utf-8" });
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  async function downloadCurrentWorkoutMarkdown() {
+    const tpWorkoutId =
+      getWorkoutIdFromRoute() ||
+      getWorkoutIdFromDomContext(getWorkoutQuickViewRoot()) ||
+      getWorkoutIdFromNetworkEntries(120000);
+
+    if (!tpWorkoutId) {
+      throw new Error("Nem sikerult TP workout ID-t talalni az aktualis nezetben");
+    }
+
+    const endpoint = `${API_BASE}/reprocess_workout_by_tp_id`;
+    const markdown = await httpRequestText("POST", endpoint, { tpWorkoutId });
+    triggerTextDownload(`tp-workout-${tpWorkoutId}.md`, markdown);
+    return tpWorkoutId;
+  }
+
+  function inferWorkoutNameFromDetail() {
+    const root = getWorkoutQuickViewRoot() || document;
+    const selectors = [
+      "h1",
+      "h2",
+      ".title",
+      ".workoutTitle",
+      "[data-test='workout-title']",
+      "[data-testid='workout-title']",
+    ];
+
+    for (const selector of selectors) {
+      const el = root.querySelector(selector);
+      const text = normalizedText(el?.textContent);
+      if (text && !/search|filter|advanced/i.test(text)) {
+        return text;
+      }
+    }
+
+    return normalizedText(document.title.replace(/\s*-\s*TrainingPeaks\s*$/i, ""));
+  }
+
+  function getWorkoutDayTokenFromStart(workoutStart) {
+    const value = normalizedText(workoutStart);
+    const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) {
+      return `${Number(iso[3])}/${Number(iso[2])}/${iso[1]}`;
+    }
+    return value;
+  }
+
+  async function collectCurrentWorkoutPayload() {
+    const root = getWorkoutQuickViewRoot() || document;
+    const tpWorkoutId =
+      getWorkoutIdFromRoute() ||
+      getWorkoutIdFromDomContext(root) ||
+      getWorkoutIdFromNetworkEntries(120000);
+
+    if (!tpWorkoutId) {
+      throw new Error("Nem sikerult TP workout ID-t talalni az aktualis nezetben");
+    }
+
+    const workoutStart = resolveWorkoutStartDate(getWorkoutStartDateText(), "");
+    const workoutType = normalizedText(
+      root.querySelector("[data-test='workout-type'], [data-testid='workout-type'], .workoutType, .type")?.textContent,
+    );
+    const totalTime = normalizedText(
+      root.querySelector("[data-test='workout-total-time'], [data-testid='workout-total-time'], .totalTime")?.textContent,
+    );
+    const distance = normalizedText(
+      root.querySelector("[data-test='workout-distance'], [data-testid='workout-distance'], .distance")?.textContent,
+    );
+    const tssValue = normalizedText(
+      root.querySelector("[data-test='workout-tss-value'], [data-testid='workout-tss-value'], .tss .value")?.textContent,
+    );
+    const tssUnit = normalizedText(
+      root.querySelector("[data-test='workout-tss-unit'], [data-testid='workout-tss-unit'], .tss .units")?.textContent,
+    );
+    const name = inferWorkoutNameFromDetail();
+
+    if (!name || !workoutStart) {
+      throw new Error("Nincs eleg adat a workout mentesehez (name/workoutStart)");
+    }
+
+    const workoutDay = getWorkoutDayTokenFromStart(workoutStart);
+    const rowKey = buildRowKey(workoutDay, workoutType, totalTime, tssValue, tssUnit) || `${workoutDay}_${tpWorkoutId}`;
+
+    return {
+      rowKey,
+      name,
+      workoutStart,
+      workoutType,
+      totalTime,
+      distance,
+      tssValue,
+      tssUnit,
+      description: extractWorkoutDescription(),
+      comments: extractComments(),
+      source: "trainingpeaks",
+      raw: {
+        route: currentRouteSignature(),
+        workoutId: tpWorkoutId,
+      },
+    };
   }
 
   async function reportWorkoutsToLocalApi(workouts) {
@@ -1307,6 +1450,7 @@
 
   function refreshSyncButtonState(loadedCountOverride) {
     const syncBtn = UI_STATE.syncBtn;
+    const downloadBtn = UI_STATE.downloadBtn;
     const statusEl = UI_STATE.statusEl;
     if (!syncBtn || !statusEl) {
       return;
@@ -1316,11 +1460,31 @@
       ? loadedCountOverride
       : collectResultListWorkouts(INCLUDE_FUTURE_ROWS).length;
     const pendingCount = UI_STATE.pendingWorkoutKeys.size;
+    const detailVisible = isWorkoutDetailVisible();
+
+    if (downloadBtn) {
+      downloadBtn.style.display = detailVisible ? "block" : "none";
+    }
 
     if (UI_STATE.runInProgress) {
       syncBtn.disabled = true;
       syncBtn.style.opacity = "0.7";
       syncBtn.textContent = "Sync folyamatban...";
+      if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.style.opacity = "0.7";
+      }
+      return;
+    }
+
+    if (UI_STATE.downloadInProgress) {
+      syncBtn.disabled = true;
+      syncBtn.style.opacity = "0.7";
+      if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.style.opacity = "0.7";
+        downloadBtn.textContent = "Download folyamatban...";
+      }
       return;
     }
 
@@ -1328,6 +1492,11 @@
       syncBtn.disabled = false;
       syncBtn.style.opacity = "1";
       syncBtn.textContent = `Sync (${pendingCount})`;
+      if (downloadBtn) {
+        downloadBtn.disabled = !detailVisible;
+        downloadBtn.style.opacity = detailVisible ? "1" : "0.7";
+        downloadBtn.textContent = "Download current workout";
+      }
       statusEl.textContent = `Lista: ${loadedCount}, nem riportalt: ${pendingCount}`;
       return;
     }
@@ -1335,6 +1504,11 @@
     syncBtn.disabled = true;
     syncBtn.style.opacity = "0.55";
     syncBtn.textContent = "Sync";
+    if (downloadBtn) {
+      downloadBtn.disabled = !detailVisible;
+      downloadBtn.style.opacity = detailVisible ? "1" : "0.7";
+      downloadBtn.textContent = "Download current workout";
+    }
     statusEl.textContent = `Lista: ${loadedCount}, minden riportalva`;
   }
 
@@ -1543,12 +1717,59 @@
       }
     });
 
+    const downloadBtn = document.createElement("button");
+    downloadBtn.textContent = "Download current workout";
+    downloadBtn.style.border = "none";
+    downloadBtn.style.borderRadius = "8px";
+    downloadBtn.style.background = "#0ea5e9";
+    downloadBtn.style.color = "white";
+    downloadBtn.style.padding = "8px 10px";
+    downloadBtn.style.cursor = "pointer";
+    downloadBtn.style.fontWeight = "600";
+    downloadBtn.style.display = "block";
+    downloadBtn.style.width = "100%";
+    downloadBtn.style.marginTop = "8px";
+
+    downloadBtn.addEventListener("click", async () => {
+      if (UI_STATE.runInProgress || UI_STATE.downloadInProgress) {
+        return;
+      }
+
+      UI_STATE.downloadInProgress = true;
+      refreshSyncButtonState();
+
+      try {
+        // Mindig leküldjük a workout adatokat a szervernek, mielőtt MD-t kérnénk.
+        // Ha az adatgyűjtés nem sikerül (pl. hiányos DOM), akkor is próbálunk letölteni –
+        // a szerveren lehet már meglévő rekord.
+        try {
+          const workout = await collectCurrentWorkoutPayload();
+          await reportWorkoutsToLocalApi([workout]);
+        } catch (reportErr) {
+          log("Workout riportalas nem sikerult (folytatjuk a letoltessel)", reportErr);
+        }
+
+        const tpWorkoutId = await downloadCurrentWorkoutMarkdown();
+        status.textContent = `MD letoltes kesz: TP ${tpWorkoutId}`;
+      } catch (err) {
+        const errorText = err instanceof Error ? err.message : String(err);
+        status.textContent = `Download hiba: ${errorText}`;
+        alert(`Download hiba: ${errorText}`);
+        log("Download hiba", err);
+      } finally {
+        UI_STATE.downloadInProgress = false;
+        refreshSyncButtonState();
+      }
+    });
+
     UI_STATE.syncBtn = syncBtn;
+    UI_STATE.downloadBtn = downloadBtn;
     UI_STATE.statusEl = status;
 
     panel.appendChild(title);
     panel.appendChild(status);
     panel.appendChild(syncBtn);
+    panel.appendChild(downloadBtn);
     document.body.appendChild(panel);
 
     refreshSyncButtonState();

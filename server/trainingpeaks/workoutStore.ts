@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite'
+import Database from 'better-sqlite3'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
@@ -225,7 +225,7 @@ function buildFullJson(item: TrainingPeaksWorkoutInput, normalized: NormalizedWo
 export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: string) {
     mkdirSync(dirname(dbFilePath), { recursive: true })
 
-    const db = new DatabaseSync(dbFilePath)
+    const db = new Database(dbFilePath)
 
     const schemaSql = `
         CREATE TABLE IF NOT EXISTS trainingpeaks_workouts (
@@ -499,6 +499,43 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
             }
 
             return true
+        },
+
+        getByWorkoutId(workoutId: string): {
+            rowKey: string
+            workoutId: string
+            workoutStart: string
+            garminActivityId: string
+            filePath: string
+            fileContent: Record<string, unknown> | null
+        } | null {
+            const row = db.prepare(
+                `SELECT row_key, workout_start, garmin_activity_id FROM trainingpeaks_workouts WHERE workout_id = ? LIMIT 1`,
+            ).get(workoutId) as
+                | { row_key: string; workout_start: string; garmin_activity_id: string }
+                | undefined
+
+            if (!row) return null
+
+            const filePath = buildRelativeWorkoutPath(row.workout_start, workoutId)
+            const absPath = join(dataDir, filePath)
+            let fileContent: Record<string, unknown> | null = null
+            if (existsSync(absPath)) {
+                try {
+                    fileContent = JSON.parse(readFileSync(absPath, 'utf-8')) as Record<string, unknown>
+                } catch {
+                    fileContent = null
+                }
+            }
+
+            return {
+                rowKey: row.row_key,
+                workoutId,
+                workoutStart: row.workout_start,
+                garminActivityId: String(row.garmin_activity_id ?? '').trim(),
+                filePath,
+                fileContent,
+            }
         },
     }
 }
