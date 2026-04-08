@@ -1,7 +1,7 @@
 import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
-import { dirname, join } from 'node:path'
-import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
+import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import type { ViteDevServer } from 'vite'
 import { ActivityStatus, createActivityStore, type ActivityInput } from './activityStore'
 import { startDownloadWatcher } from './downloadWatcher'
@@ -91,24 +91,75 @@ function parseActivityDateToIso(rawDate: string): string | null {
     return null
 }
 
+function buildTpSection(tp: Record<string, unknown>): string {
+    const lines: string[] = []
+    lines.push('## TrainingPeaks')
+    lines.push('')
+
+    const rows: [string, string][] = []
+    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
+    const tssValue = String(tp.tssValue ?? '').trim()
+    const tssUnit = String(tp.tssUnit ?? '').trim()
+    if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
+    if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
+    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
+
+    if (rows.length > 0) {
+        for (const [k, v] of rows) lines.push(`${k}: ${v}`)
+    }
+
+    const description = String(tp.description ?? '').trim()
+    if (description) {
+        lines.push('')
+        lines.push('### Edzői instrukciók')
+        lines.push('')
+        lines.push(description)
+    }
+
+    const comments = Array.isArray(tp.comments)
+        ? (tp.comments as Array<{ text: string; date?: string; user?: string }>)
+        : []
+    if (comments.length > 0) {
+        lines.push('')
+        lines.push('### Kommentek')
+        for (const c of comments) {
+            lines.push('')
+            const meta = [c.date, c.user].filter(Boolean).join(' — ')
+            if (meta) lines.push(`**${meta}**`)
+            lines.push('')
+            lines.push(c.text)
+        }
+    }
+
+    return lines.join('\n')
+}
+
 async function cleanupIncompleteActivities(
     activityStore: ReturnType<typeof createActivityStore>,
     archiveDir: string,
+    tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>,
 ): Promise<void> {
-    const incomplete = activityStore.getAllNonProcessed()
-    if (incomplete.length === 0) {
-        console.log('[cleanup] 0 félbehagyott rekord törölve')
-        return
+    function extractActivityIdFromZipName(fileName: string): string | null {
+        const match = fileName.match(/^(\d+)\.zip$/)
+        return match?.[1] ?? null
     }
 
-    const ids = incomplete.map((record) => record.activityId)
-    const expectedFiles = new Set<string>()
-    for (const id of ids) {
-        expectedFiles.add(`${id}.zip`)
-        expectedFiles.add(`${id}.md`)
+    async function exists(path: string): Promise<boolean> {
+        try {
+            await access(path)
+            return true
+        } catch {
+            return false
+        }
     }
 
-    async function walkAndDelete(dir: string): Promise<void> {
+    let scannedZipCount = 0
+    let generatedMdCount = 0
+    let alreadyPresentCount = 0
+    let skippedNoIdCount = 0
+    let errorCount = 0
+
+    async function walkAndRecover(dir: string): Promise<void> {
         let entries
         try {
             entries = await readdir(dir, { withFileTypes: true })
@@ -119,32 +170,70 @@ async function cleanupIncompleteActivities(
         for (const entry of entries) {
             const fullPath = join(dir, entry.name)
             if (entry.isDirectory()) {
-                await walkAndDelete(fullPath)
+                await walkAndRecover(fullPath)
                 continue
             }
 
-            if (!entry.isFile() || !expectedFiles.has(entry.name)) continue
+            if (!entry.isFile() || !entry.name.endsWith('.zip')) continue
+
+            scannedZipCount += 1
+            const activityId = extractActivityIdFromZipName(entry.name)
+            if (!activityId) {
+                skippedNoIdCount += 1
+                continue
+            }
+
+            const mdPath = join(dirname(fullPath), `${activityId}.md`)
+            if (await exists(mdPath)) {
+                alreadyPresentCount += 1
+                continue
+            }
 
             try {
-                await unlink(fullPath)
-            } catch {
-                // fájl nem létezik, nem baj
+                const buffer = await readFile(fullPath)
+                const { text, startTimeIso, errors: decodeErrors } = processBuffer(buffer, { activityId, tpStore })
+                if (decodeErrors.length > 0) {
+                    console.warn(`[startup-recovery] Dekódolási hibák (${activityId}):`, decodeErrors)
+                }
+
+                let mdText = text
+                if (startTimeIso && tpStore) {
+                    const tpMatch = tpStore.findByDateTimeNear(startTimeIso, 60)
+                    if (tpMatch) {
+                        tpStore.linkGarminActivity(tpMatch.workoutId, activityId)
+                        mdText = buildTpSection(tpMatch.fileContent) + '\n\n' + text
+                        console.log(`[startup-recovery] TP egyezés: ${activityId} <-> ${tpMatch.workoutId} (${startTimeIso})`)
+                    }
+                }
+
+                await writeFile(mdPath, mdText, 'utf-8')
+                activityStore.markReceived(activityId, basename(fullPath))
+                if (startTimeIso) {
+                    activityStore.updateDate(activityId, startTimeIso)
+                }
+                activityStore.markProcessed(activityId)
+                generatedMdCount += 1
+                console.log(`[startup-recovery] MD generálva: ${activityId} (${mdPath})`)
+            } catch (err) {
+                errorCount += 1
+                console.error(`[startup-recovery] Hiba (${activityId}):`, err)
             }
         }
     }
 
-    await walkAndDelete(archiveDir)
-
-    activityStore.deleteActivities(ids)
-    console.log(`[cleanup] ${ids.length} félbehagyott rekord törölve`)
+    await walkAndRecover(archiveDir)
+    console.log(
+        `[startup-recovery] ZIP: ${scannedZipCount}, generált MD: ${generatedMdCount}, ` +
+        `már megvolt: ${alreadyPresentCount}, ID nélkül kihagyva: ${skippedNoIdCount}, hibás: ${errorCount}`,
+    )
 }
 
 export function registerGarminRoutes(server: ViteDevServer, options: RegisterGarminRoutesOptions): void {
     const { dbFilePath, downloadsDir, archiveDir, tpStore } = options
     const activityStore = createActivityStore(dbFilePath)
 
-    cleanupIncompleteActivities(activityStore, archiveDir).catch((err) =>
-        console.error('[cleanup] Hiba az indításkori takarításban:', err)
+    cleanupIncompleteActivities(activityStore, archiveDir, tpStore).catch((err) =>
+        console.error('[startup-recovery] Hiba az indításkori recovery közben:', err)
     )
 
     // Startup migráció: régi lokál-formátumú dátumok átalakítása ISO-ra (YYYY-MM-DDT00:00:00).

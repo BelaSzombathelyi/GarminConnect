@@ -253,6 +253,45 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
         // Már létezik – rendben.
     }
 
+    // Migráció: legacy workout_start értékek normalizálása ISO datetime-re,
+    // mert a Garmin-TP párosítás ±másodperc tartományban datetime mezőre keres.
+    try {
+        const legacyRows = db.prepare(`
+            SELECT row_key, workout_start FROM trainingpeaks_workouts
+            WHERE workout_start NOT LIKE '____-__-__T__:%'
+        `).all() as Array<{ row_key: string; workout_start: string }>
+
+        let normalizedCount = 0
+        const updateWorkoutStartStmt = db.prepare(`
+            UPDATE trainingpeaks_workouts
+            SET workout_start = ?, updated_at = ?
+            WHERE row_key = ?
+        `)
+
+        db.exec('BEGIN')
+        try {
+            for (const row of legacyRows) {
+                const normalized =
+                    normalizeWorkoutStartDateTime(row.workout_start) ??
+                    normalizeWorkoutStartDateTime(rowKeyToWorkoutDay(row.row_key))
+                if (!normalized) continue
+
+                updateWorkoutStartStmt.run(normalized, nowIso(), row.row_key)
+                normalizedCount += 1
+            }
+            db.exec('COMMIT')
+        } catch (err) {
+            db.exec('ROLLBACK')
+            throw err
+        }
+
+        if (normalizedCount > 0) {
+            console.log(`[trainingpeaks-migration] ${normalizedCount}/${legacyRows.length} workout_start mező normalizálva`)
+        }
+    } catch (err) {
+        console.error('[trainingpeaks-migration] Hiba workout_start normalizálás közben:', err)
+    }
+
     const selectByRowKeyStmt = db.prepare(`
         SELECT row_key FROM trainingpeaks_workouts WHERE row_key = ? LIMIT 1
     `)
