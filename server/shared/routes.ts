@@ -11,68 +11,6 @@ export interface RegisterSharedRoutesOptions {
     tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>
 }
 
-function buildTpSection(tp: Record<string, unknown>): string {
-    const lines: string[] = []
-    lines.push('## TrainingPeaks')
-    lines.push('')
-
-    const rows: [string, string][] = []
-    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
-    const tssValue = String(tp.tssValue ?? '').trim()
-    const tssUnit = String(tp.tssUnit ?? '').trim()
-    if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
-    if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
-    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
-
-    if (rows.length > 0) {
-        for (const [k, v] of rows) lines.push(`${k}: ${v}`)
-    }
-
-    const description = String(tp.description ?? '').trim()
-    if (description) {
-        lines.push('')
-        lines.push('### Edzői instrukciók')
-        lines.push('')
-        lines.push(description)
-    }
-
-    const comments = Array.isArray(tp.comments)
-        ? (tp.comments as Array<{ text: string; date?: string; user?: string }>)
-        : []
-    if (comments.length > 0) {
-        lines.push('')
-        lines.push('### Kommentek')
-        for (const c of comments) {
-            lines.push('')
-            const meta = [c.date, c.user].filter(Boolean).join(' — ')
-            if (meta) lines.push(`**${meta}**`)
-            lines.push('')
-            lines.push(c.text)
-        }
-    }
-
-    return lines.join('\n')
-}
-
-function withExactTpSection(markdown: string, tp: Record<string, unknown>): string {
-    const tpSection = buildTpSection(tp)
-    const existingTpMatch = markdown.match(/^## TrainingPeaks[\s\S]*?(?=\n##\s|$)/m)
-    if (existingTpMatch) {
-        return markdown.replace(existingTpMatch[0], tpSection)
-    }
-
-    const summaryMatch = markdown.match(/^## Summary[\s\S]*?(?=\n##\s|$)/m)
-    if (summaryMatch) {
-        const summaryText = summaryMatch[0].trim()
-        const restText = markdown.slice(summaryMatch[0].length).trimStart()
-        return restText
-            ? `${summaryText}\n\n${tpSection}\n\n${restText}`
-            : `${summaryText}\n\n${tpSection}`
-    }
-
-    return `${tpSection}\n\n${markdown}`
-}
-
 async function findZipByGarminActivityId(archiveDir: string, garminActivityId: string): Promise<string | null> {
     async function walk(dir: string): Promise<string | null> {
         let entries
@@ -105,7 +43,7 @@ export async function reprocessWorkoutByGarminId(
     archiveDir: string,
     garminActivityId: string,
     tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>,
-): Promise<{ markdown: string; zipPath: string; mdPath: string; startTimeIso: string | null }> {
+): Promise<{ zipPath: string; mdPath: string; startTimeIso: string | null }> {
     const zipPath = await findZipByGarminActivityId(archiveDir, garminActivityId)
     if (!zipPath) {
         throw new Error(`Nem található ZIP ehhez a Garmin ID-hoz: ${garminActivityId}`)
@@ -121,7 +59,7 @@ export async function reprocessWorkoutByGarminId(
     const mdPath = join(dirname(zipPath), `${garminActivityId}.md`)
     await writeFile(mdPath, text, 'utf-8')
 
-    return { markdown: text, zipPath, mdPath, startTimeIso }
+    return { zipPath, mdPath, startTimeIso }
 }
 
 function getQueryParam(req: any, key: string): string {
@@ -156,12 +94,13 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
             }
 
             const result = await reprocessWorkoutByGarminId(archiveDir, garminActivityId, tpStore)
+            const markdown = await readFile(result.mdPath, 'utf-8')
 
             res.statusCode = 200
             res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
             res.setHeader('X-Garmin-Activity-Id', garminActivityId)
             res.setHeader('X-Reprocessed-File', result.mdPath)
-            res.end(result.markdown)
+            res.end(markdown)
         } catch (err) {
             res.statusCode = 500
             res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -222,13 +161,7 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
             }
 
             const result = await reprocessWorkoutByGarminId(archiveDir, garminActivityId, tpStore)
-            const markdown = workout.fileContent
-                ? withExactTpSection(result.markdown, workout.fileContent)
-                : result.markdown
-
-            if (markdown !== result.markdown) {
-                await writeFile(result.mdPath, markdown, 'utf-8')
-            }
+            const markdown = await readFile(result.mdPath, 'utf-8')
 
             res.statusCode = 200
             res.setHeader('Content-Type', 'text/markdown; charset=utf-8')

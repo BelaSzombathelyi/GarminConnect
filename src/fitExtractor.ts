@@ -6,13 +6,26 @@ export interface FitUploadResponse {
     errors: string[];
 }
 
+type TpComment = { text: string; date?: string; user?: string }
+
 const SHOW_USER_PROFILE = false;
 
 /** Builds the full plain-text summary that goes into the textarea / /api/process response. */
-export function buildTextOutput(data: FitUploadResponse, mergeShortWalks = false): string {
+export function buildTextOutput(
+    data: FitUploadResponse,
+    mergeShortWalks = false,
+    trainingPeaksData?: Record<string, unknown> | null,
+): string {
     const sections: string[] = [];
     const summary = extractSummary(data);
     if (summary) sections.push(summary);
+
+    if (trainingPeaksData) {
+        sections.push(...buildTpMetaLines(trainingPeaksData));
+        sections.push(...buildTpDescriptionLines(trainingPeaksData));
+        sections.push(...buildTpCommentsLines(trainingPeaksData));
+    }
+    
     if (SHOW_USER_PROFILE) {
         const profile = extractUserProfile(data);
         if (profile) sections.push(profile);
@@ -24,6 +37,59 @@ export function buildTextOutput(data: FitUploadResponse, mergeShortWalks = false
         extractTrailClimbInfo(data),
     );
     return sections.filter(Boolean).join('\n\n');
+}
+
+function buildTpMetaLines(tp: Record<string, unknown>): string[] {
+    const rows: [string, string][] = []
+    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
+
+    const tssValue = String(tp.tssValue ?? '').trim()
+    const tssUnit = String(tp.tssUnit ?? '').trim()
+    if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
+
+    if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
+    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
+
+    return rows.map(([key, value]) => `${key}: ${value}`)
+}
+
+function buildTpDescriptionLines(tp: Record<string, unknown>): string[] {
+    const description = String(tp.description ?? '').trim()
+    if (!description) {
+        return []
+    }
+
+    return [
+        '',
+        '### Edzői instrukciók',
+        '',
+        description,
+    ]
+}
+
+function buildTpCommentLines(comment: TpComment): string[] {
+    const lines = ['']
+    const meta = [comment.date, comment.user].filter(Boolean).join(' — ')
+    if (meta) lines.push(`**${meta}**`)
+    lines.push('')
+    lines.push(comment.text)
+    return lines
+}
+
+function buildTpCommentsLines(tp: Record<string, unknown>): string[] {
+    const comments = Array.isArray(tp.comments)
+        ? (tp.comments as TpComment[])
+        : []
+
+    if (comments.length === 0) {
+        return []
+    }
+
+    return [
+        '',
+        '### Kommentek',
+        ...comments.flatMap((comment) => buildTpCommentLines(comment)),
+    ]
 }
 
 function teShortLabel(val: number): string {

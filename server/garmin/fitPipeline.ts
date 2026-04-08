@@ -15,49 +15,6 @@ export interface ProcessBufferOptions {
     tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>
 }
 
-function buildTpSection(tp: Record<string, unknown>): string {
-    const lines: string[] = []
-    lines.push('## TrainingPeaks')
-    lines.push('')
-
-    const rows: [string, string][] = []
-    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
-    const tssValue = String(tp.tssValue ?? '').trim()
-    const tssUnit = String(tp.tssUnit ?? '').trim()
-    if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
-    if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
-    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
-
-    if (rows.length > 0) {
-        for (const [k, v] of rows) lines.push(`${k}: ${v}`)
-    }
-
-    const description = String(tp.description ?? '').trim()
-    if (description) {
-        lines.push('')
-        lines.push('### Edzői instrukciók')
-        lines.push('')
-        lines.push(description)
-    }
-
-    const comments = Array.isArray(tp.comments)
-        ? (tp.comments as Array<{ text: string; date?: string; user?: string }>)
-        : []
-    if (comments.length > 0) {
-        lines.push('')
-        lines.push('### Kommentek')
-        for (const c of comments) {
-            lines.push('')
-            const meta = [c.date, c.user].filter(Boolean).join(' — ')
-            if (meta) lines.push(`**${meta}**`)
-            lines.push('')
-            lines.push(c.text)
-        }
-    }
-
-    return lines.join('\n')
-}
-
 function toLocalIso(d: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0')
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
@@ -95,8 +52,6 @@ export function processBuffer(buffer: Buffer, optionsOrActivityId: ProcessBuffer
         errors: errors.map(String),
     }
 
-    const text = buildTextOutput(data)
-
     // Kezdési időpont kinyerése (lokális idő) a TP egyeztetéshez
     let startTimeIso: string | null = null
     const sessionMesgs = data.messages['sessionMesgs'] as Record<string, unknown>[] | undefined
@@ -109,26 +64,18 @@ export function processBuffer(buffer: Buffer, optionsOrActivityId: ProcessBuffer
         if (d) startTimeIso = toLocalIso(d)
     }
 
-    let finalText = text
+    let tpFileContent: Record<string, unknown> | null = null
     if (startTimeIso && options.tpStore) {
         const tpMatch = options.tpStore.findByDateTimeNear(startTimeIso, 60)
         if (tpMatch) {
             if (activityId) {
                 options.tpStore.linkGarminActivity(tpMatch.workoutId, activityId)
             }
-            const tpText = buildTpSection(tpMatch.fileContent)
-            const summaryMatch = text.match(/^## Summary[\s\S]*?(?=\n##\s|$)/)
-            if (summaryMatch) {
-                const summaryText = summaryMatch[0].trim()
-                const restText = text.slice(summaryMatch[0].length).trimStart()
-                finalText = restText
-                    ? `${summaryText}\n\n${tpText}\n\n${restText}`
-                    : `${summaryText}\n\n${tpText}`
-            } else {
-                finalText = tpText + '\n\n' + text
-            }
+            tpFileContent = tpMatch.fileContent
         }
     }
+
+    const finalText = buildTextOutput(data, false, tpFileContent)
 
     return { text: finalText, activityId, startTimeIso, errors: errors.map(String) }
 }

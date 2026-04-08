@@ -91,49 +91,6 @@ function parseActivityDateToIso(rawDate: string): string | null {
     return null
 }
 
-function buildTpSection(tp: Record<string, unknown>): string {
-    const lines: string[] = []
-    lines.push('## TrainingPeaks')
-    lines.push('')
-
-    const rows: [string, string][] = []
-    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
-    const tssValue = String(tp.tssValue ?? '').trim()
-    const tssUnit = String(tp.tssUnit ?? '').trim()
-    if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
-    if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
-    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
-
-    if (rows.length > 0) {
-        for (const [k, v] of rows) lines.push(`${k}: ${v}`)
-    }
-
-    const description = String(tp.description ?? '').trim()
-    if (description) {
-        lines.push('')
-        lines.push('### Edzői instrukciók')
-        lines.push('')
-        lines.push(description)
-    }
-
-    const comments = Array.isArray(tp.comments)
-        ? (tp.comments as Array<{ text: string; date?: string; user?: string }>)
-        : []
-    if (comments.length > 0) {
-        lines.push('')
-        lines.push('### Kommentek')
-        for (const c of comments) {
-            lines.push('')
-            const meta = [c.date, c.user].filter(Boolean).join(' — ')
-            if (meta) lines.push(`**${meta}**`)
-            lines.push('')
-            lines.push(c.text)
-        }
-    }
-
-    return lines.join('\n')
-}
-
 async function cleanupIncompleteActivities(
     activityStore: ReturnType<typeof createActivityStore>,
     archiveDir: string,
@@ -196,17 +153,7 @@ async function cleanupIncompleteActivities(
                     console.warn(`[startup-recovery] Dekódolási hibák (${activityId}):`, decodeErrors)
                 }
 
-                let mdText = text
-                if (startTimeIso && tpStore) {
-                    const tpMatch = tpStore.findByDateTimeNear(startTimeIso, 60)
-                    if (tpMatch) {
-                        tpStore.linkGarminActivity(tpMatch.workoutId, activityId)
-                        mdText = buildTpSection(tpMatch.fileContent) + '\n\n' + text
-                        console.log(`[startup-recovery] TP egyezés: ${activityId} <-> ${tpMatch.workoutId} (${startTimeIso})`)
-                    }
-                }
-
-                await writeFile(mdPath, mdText, 'utf-8')
+                await writeFile(mdPath, text, 'utf-8')
                 activityStore.markReceived(activityId, basename(fullPath))
                 if (startTimeIso) {
                     activityStore.updateDate(activityId, startTimeIso)
@@ -287,18 +234,8 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
                         console.warn(`[downloads] Dekódolási hibák (${activityId}):`, errors)
                     }
 
-                    let mdText = text
-                    if (startTimeIso && tpStore) {
-                        const tpMatch = tpStore.findByDateTimeNear(startTimeIso, 60)
-                        if (tpMatch) {
-                            tpStore.linkGarminActivity(tpMatch.workoutId, activityId)
-                            mdText = buildTpSection(tpMatch.fileContent) + '\n\n' + text
-                            console.log(`[downloads] TP egyezés: ${activityId} <-> ${tpMatch.workoutId} (${startTimeIso})`)
-                        }
-                    }
-
                     const mdPath = join(dirname(archivedPath), `${activityId}.md`)
-                    await writeFile(mdPath, mdText, 'utf-8')
+                    await writeFile(mdPath, text, 'utf-8')
 
                     if (startTimeIso) {
                         activityStore.updateDate(activityId, startTimeIso)
