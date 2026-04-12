@@ -51,21 +51,22 @@ async function cleanupOrphanedWorkouts(
 
     for (const r of records) {
         const dateFromRowKey = rowKeyToDate(r.rowKey)
-        const effectiveDate = dateFromRowKey || r.workoutStart
-        const expectedPath = dateToExpectedRelativePath(r.workoutId, effectiveDate)
+        const expectedPathDate = dateFromRowKey || r.workoutStart
+        const expectedPath = dateToExpectedRelativePath(r.workoutId, expectedPathDate)
         const oldAbsPath = join(dataDir, r.filePath)
         const expectedAbsPath = join(dataDir, expectedPath)
 
         if (r.filePath !== expectedPath && existsSync(oldAbsPath)) {
             mkdirSync(dirname(expectedAbsPath), { recursive: true })
             renameSync(oldAbsPath, expectedAbsPath)
-            workoutStore.updateRecordLocation(r.rowKey, effectiveDate, expectedPath)
+            // Fontos: a workout_start mező maradjon datetime (linkelés ehhez keres ±60s-ben).
+            workoutStore.updateRecordLocation(r.rowKey, r.workoutStart, expectedPath)
             migrated += 1
             console.log(`[tp-cleanup] migrálva: ${r.filePath} -> ${expectedPath}`)
         } else if (r.filePath !== expectedPath) {
             // Fájl már lehet új helyen (pl. kézi mozgatás), ilyenkor csak DB-t igazítunk.
             if (existsSync(expectedAbsPath)) {
-                workoutStore.updateRecordLocation(r.rowKey, effectiveDate, expectedPath)
+                workoutStore.updateRecordLocation(r.rowKey, r.workoutStart, expectedPath)
                 migrated += 1
                 console.log(`[tp-cleanup] db útvonal igazítva: ${r.filePath} -> ${expectedPath}`)
             }

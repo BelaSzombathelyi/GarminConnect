@@ -28,6 +28,7 @@ function fitUploadPlugin(): Plugin {
 
             registerSharedRoutes(server, {
                 archiveDir: GARMIN_DIR,
+                tpStore,
             })
         },
     }
@@ -35,7 +36,14 @@ function fitUploadPlugin(): Plugin {
 
 export default defineConfig({
     plugins: [fitUploadPlugin()],
-    test: {
-        environment: 'node',
+    server: {
+        host: '127.0.0.1',
+        port: 5173,
+        cors: {
+            origin: ['https://connect.garmin.com', 'https://app.trainingpeaks.com', 'http://localhost:3000'],
+            methods: ['GET', 'POST', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'X-Activity-Id'],
+            credentials: false,
+        },
     },
 })

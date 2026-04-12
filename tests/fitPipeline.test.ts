@@ -121,10 +121,11 @@ describe('fitPipeline TP enrich', () => {
         const runZip = readFileSync(activityFilePath('2026-04-05', '22417526163', 'zip'))
         const { text } = processBuffer(runZip, { activityId: '99000000004', tpStore })
 
-        expect(text.startsWith('## Summary')).toBe(true)
+        expect(text.startsWith('# Workout Summary:')).toBe(true)
+        expect(text).toContain('Aktivitás neve: 70 perc kötetlen')
         expect(text).toContain('TSS: 99 rTSS')
-        expect(text).toContain('Tervezett TSS: 99 rTSS')
-        expect(text).toContain('Edzői instrukciók:')
+        expect(text).toContain('Tervezett idő: 1:08:53')
+        expect(text).toContain('### Edzői instrukciók')
         expect(text).toContain('## Edzés összefoglaló')
 
         rmSync(tmpTpDir, { recursive: true, force: true })

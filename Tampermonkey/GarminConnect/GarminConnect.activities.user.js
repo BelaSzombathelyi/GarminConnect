@@ -14,7 +14,15 @@
 (function () {
     'use strict';
 
-    const API_BASE = 'http://localhost:5173/api';
+    // Dinamikus port detektálás: IPv4 explicit (nem 127.0.0.1, mert szerver ::1 IPv6-on hallgatózik)
+    let API_BASE = 'http://127.0.0.1:5173/api';
+    // Fallback: ha éppen a Garmin oldalon vagy, az első kéréskor detektálódik
+    function getApiBase() {
+        // Ha már van feldejtett port, használd azt
+        const stored = sessionStorage.getItem('gc_api_base');
+        if (stored) return stored;
+        return API_BASE;
+    }
     const UI_STATE = {
         runInProgress: false,
         knownReportedIds: new Set(),
@@ -54,27 +62,55 @@
 
     function httpRequest(method, url, data) {
         return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method,
-                url,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                data: data ? JSON.stringify(data) : undefined,
-                onload: (response) => {
-                    if (response.status < 200 || response.status >= 300) {
-                        reject(new Error(`HTTP ${response.status} ${url}: ${response.responseText}`));
-                        return;
+            console.log(`[GC] HTTP ${method} ${url}`);
+            
+            // Próbáld meg fetch API-val először (jobban működik localhost-tal)
+            const fetchRequest = async () => {
+                try {
+                    const response = await fetch(url, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: data ? JSON.stringify(data) : undefined,
+                    });
+
+                    if (!response.ok) {
+                        const text = await response.text();
+                        console.error(`[GC] HTTP ${response.status} ${url}:`, text);
+                        throw new Error(`HTTP ${response.status} ${url}: ${text}`);
                     }
 
-                    try {
-                        resolve(response.responseText ? JSON.parse(response.responseText) : {});
-                    } catch (err) {
+                    const parsed = await response.json();
+                    console.log(`[GC] HTTP ${method} ${url} siker:`, parsed);
+                    return parsed;
+                } catch (err) {
+                    console.error(`[GC] Fetch error:`, err);
+                    throw err;
+                }
+            };
+
+            // Timeout wrapper
+            let timedOut = false;
+            const timeoutId = setTimeout(() => {
+                timedOut = true;
+                console.error(`[GC] TIMEOUT: ${method} ${url} (10s)`);
+                reject(new Error(`Timeout: ${method} ${url} (10s után nem válaszolt)`));
+            }, 10000);
+
+            fetchRequest()
+                .then((result) => {
+                    if (!timedOut) {
+                        clearTimeout(timeoutId);
+                        resolve(result);
+                    }
+                })
+                .catch((err) => {
+                    if (!timedOut) {
+                        clearTimeout(timeoutId);
                         reject(err);
                     }
-                },
-                onerror: () => reject(new Error(`Hálózati hiba: ${url}`)),
-            });
+                });
         });
     }
 
@@ -233,12 +269,14 @@
             if (latest.activities.length === 0) return;
 
             try {
+                console.log(`[GC] Auto-report indul: ${latest.activities.length} activity`);
                 const res = await reportActivities(latest.activities);
                 markActivitiesAsReported(latest.activities);
                 applyReportResult(res);
                 UI_STATE.lastReportedSignature = latest.signature;
-            } catch {
-                // silent – next scroll/refresh újrapróbálja
+                console.log(`[GC] Auto-report siker, új activities: ${UI_STATE.serverNewIds.size}`);
+            } catch (err) {
+                console.error(`[GC] Auto-report hiba:`, err instanceof Error ? err.message : String(err));
             }
 
             refreshSyncButtonState();
@@ -251,9 +289,13 @@
             throw new Error('Nem találtam activity sorokat az oldalon.');
         }
 
+        const apiUrl = getApiBase();
         const payload = { activities };
-        const res = await httpRequest('POST', `${API_BASE}/report_activities`, payload);
-        console.log('[Activities Sync] report_activities:', res);
+        console.log(`[GC] reportActivities elindítva: ${activities.length} sor, ${apiUrl}`);
+        const res = await httpRequest('POST', `${apiUrl}/report_activities`, payload);
+        console.log('[GC] report_activities válasz:', res);
+        // Elmenti a működő port-ot
+        sessionStorage.setItem('gc_api_base', apiUrl);
         return res;
     }
 
@@ -574,10 +616,12 @@
 
             // Oldal megnyitásakor automatikus riport frissítés
             const initialActivities = collectActivitiesFromDom();
+            console.log(`[GC] Bootstrap: ${initialActivities.length} activity detektálva`);
             const result = await reportActivities(initialActivities);
             markActivitiesAsReported(initialActivities);
             applyReportResult(result);
             UI_STATE.lastReportedSignature = buildIdSignature(buildActivityIdSet(initialActivities));
+            console.log(`[GC] Bootstrap siker: ${UI_STATE.serverNewIds.size} új activity`);
             const statusEl = document.getElementById('gc-sync-status');
             if (statusEl) {
                 statusEl.textContent = `Automatikus riport kész (ÚJ: ${UI_STATE.serverNewIds.size})`;

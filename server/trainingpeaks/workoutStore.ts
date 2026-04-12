@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite'
+import Database from 'better-sqlite3'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
@@ -238,7 +238,7 @@ function buildFullJson(item: TrainingPeaksWorkoutInput, normalized: NormalizedWo
 export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: string) {
     mkdirSync(dirname(dbFilePath), { recursive: true })
 
-    const db = new DatabaseSync(dbFilePath)
+    const db = new Database(dbFilePath)
 
     const schemaSql = `
         CREATE TABLE IF NOT EXISTS trainingpeaks_workouts (
@@ -264,6 +264,45 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
         db.exec(`ALTER TABLE trainingpeaks_workouts ADD COLUMN garmin_activity_id TEXT NOT NULL DEFAULT ''`)
     } catch {
         // Már létezik – rendben.
+    }
+
+    // Migráció: legacy workout_start értékek normalizálása ISO datetime-re,
+    // mert a Garmin-TP párosítás ±másodperc tartományban datetime mezőre keres.
+    try {
+        const legacyRows = db.prepare(`
+            SELECT row_key, workout_start FROM trainingpeaks_workouts
+            WHERE workout_start NOT LIKE '____-__-__T__:%'
+        `).all() as Array<{ row_key: string; workout_start: string }>
+
+        let normalizedCount = 0
+        const updateWorkoutStartStmt = db.prepare(`
+            UPDATE trainingpeaks_workouts
+            SET workout_start = ?, updated_at = ?
+            WHERE row_key = ?
+        `)
+
+        db.exec('BEGIN')
+        try {
+            for (const row of legacyRows) {
+                const normalized =
+                    normalizeWorkoutStartDateTime(row.workout_start) ??
+                    normalizeWorkoutStartDateTime(rowKeyToWorkoutDay(row.row_key))
+                if (!normalized) continue
+
+                updateWorkoutStartStmt.run(normalized, nowIso(), row.row_key)
+                normalizedCount += 1
+            }
+            db.exec('COMMIT')
+        } catch (err) {
+            db.exec('ROLLBACK')
+            throw err
+        }
+
+        if (normalizedCount > 0) {
+            console.log(`[trainingpeaks-migration] ${normalizedCount}/${legacyRows.length} workout_start mező normalizálva`)
+        }
+    } catch (err) {
+        console.error('[trainingpeaks-migration] Hiba workout_start normalizálás közben:', err)
     }
 
     const selectByRowKeyStmt = db.prepare(`
@@ -512,6 +551,43 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
             }
 
             return true
+        },
+
+        getByWorkoutId(workoutId: string): {
+            rowKey: string
+            workoutId: string
+            workoutStart: string
+            garminActivityId: string
+            filePath: string
+            fileContent: Record<string, unknown> | null
+        } | null {
+            const row = db.prepare(
+                `SELECT row_key, workout_start, garmin_activity_id FROM trainingpeaks_workouts WHERE workout_id = ? LIMIT 1`,
+            ).get(workoutId) as
+                | { row_key: string; workout_start: string; garmin_activity_id: string }
+                | undefined
+
+            if (!row) return null
+
+            const filePath = buildRelativeWorkoutPath(row.workout_start, workoutId)
+            const absPath = join(dataDir, filePath)
+            let fileContent: Record<string, unknown> | null = null
+            if (existsSync(absPath)) {
+                try {
+                    fileContent = JSON.parse(readFileSync(absPath, 'utf-8')) as Record<string, unknown>
+                } catch {
+                    fileContent = null
+                }
+            }
+
+            return {
+                rowKey: row.row_key,
+                workoutId,
+                workoutStart: row.workout_start,
+                garminActivityId: String(row.garmin_activity_id ?? '').trim(),
+                filePath,
+                fileContent,
+            }
         },
     }
 }

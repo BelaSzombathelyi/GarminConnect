@@ -1,7 +1,7 @@
 import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
-import { dirname, join } from 'node:path'
-import { readFile, readdir, unlink, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
+import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import type { ViteDevServer } from 'vite'
 import { ActivityStatus, createActivityStore, type ActivityInput } from './activityStore'
 import { startDownloadWatcher } from './downloadWatcher'
@@ -94,21 +94,29 @@ function parseActivityDateToIso(rawDate: string): string | null {
 async function cleanupIncompleteActivities(
     activityStore: ReturnType<typeof createActivityStore>,
     archiveDir: string,
+    tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>,
 ): Promise<void> {
-    const incomplete = activityStore.getAllNonProcessed()
-    if (incomplete.length === 0) {
-        console.log('[cleanup] 0 félbehagyott rekord törölve')
-        return
+    function extractActivityIdFromZipName(fileName: string): string | null {
+        const match = fileName.match(/^(\d+)\.zip$/)
+        return match?.[1] ?? null
     }
 
-    const ids = incomplete.map((record) => record.activityId)
-    const expectedFiles = new Set<string>()
-    for (const id of ids) {
-        expectedFiles.add(`${id}.zip`)
-        expectedFiles.add(`${id}.md`)
+    async function exists(path: string): Promise<boolean> {
+        try {
+            await access(path)
+            return true
+        } catch {
+            return false
+        }
     }
 
-    async function walkAndDelete(dir: string): Promise<void> {
+    let scannedZipCount = 0
+    let generatedMdCount = 0
+    let alreadyPresentCount = 0
+    let skippedNoIdCount = 0
+    let errorCount = 0
+
+    async function walkAndRecover(dir: string): Promise<void> {
         let entries
         try {
             entries = await readdir(dir, { withFileTypes: true })
@@ -119,32 +127,60 @@ async function cleanupIncompleteActivities(
         for (const entry of entries) {
             const fullPath = join(dir, entry.name)
             if (entry.isDirectory()) {
-                await walkAndDelete(fullPath)
+                await walkAndRecover(fullPath)
                 continue
             }
 
-            if (!entry.isFile() || !expectedFiles.has(entry.name)) continue
+            if (!entry.isFile() || !entry.name.endsWith('.zip')) continue
+
+            scannedZipCount += 1
+            const activityId = extractActivityIdFromZipName(entry.name)
+            if (!activityId) {
+                skippedNoIdCount += 1
+                continue
+            }
+
+            const mdPath = join(dirname(fullPath), `${activityId}.md`)
+            if (await exists(mdPath)) {
+                alreadyPresentCount += 1
+                continue
+            }
 
             try {
-                await unlink(fullPath)
-            } catch {
-                // fájl nem létezik, nem baj
+                const buffer = await readFile(fullPath)
+                const { text, startTimeIso, errors: decodeErrors } = processBuffer(buffer, { activityId, tpStore })
+                if (decodeErrors.length > 0) {
+                    console.warn(`[startup-recovery] Dekódolási hibák (${activityId}):`, decodeErrors)
+                }
+
+                await writeFile(mdPath, text, 'utf-8')
+                activityStore.markReceived(activityId, basename(fullPath))
+                if (startTimeIso) {
+                    activityStore.updateDate(activityId, startTimeIso)
+                }
+                activityStore.markProcessed(activityId)
+                generatedMdCount += 1
+                console.log(`[startup-recovery] MD generálva: ${activityId} (${mdPath})`)
+            } catch (err) {
+                errorCount += 1
+                console.error(`[startup-recovery] Hiba (${activityId}):`, err)
             }
         }
     }
 
-    await walkAndDelete(archiveDir)
-
-    activityStore.deleteActivities(ids)
-    console.log(`[cleanup] ${ids.length} félbehagyott rekord törölve`)
+    await walkAndRecover(archiveDir)
+    console.log(
+        `[startup-recovery] ZIP: ${scannedZipCount}, generált MD: ${generatedMdCount}, ` +
+        `már megvolt: ${alreadyPresentCount}, ID nélkül kihagyva: ${skippedNoIdCount}, hibás: ${errorCount}`,
+    )
 }
 
 export function registerGarminRoutes(server: ViteDevServer, options: RegisterGarminRoutesOptions): void {
     const { dbFilePath, downloadsDir, archiveDir, tpStore } = options
     const activityStore = createActivityStore(dbFilePath)
 
-    cleanupIncompleteActivities(activityStore, archiveDir).catch((err) =>
-        console.error('[cleanup] Hiba az indításkori takarításban:', err)
+    cleanupIncompleteActivities(activityStore, archiveDir, tpStore).catch((err) =>
+        console.error('[startup-recovery] Hiba az indításkori recovery közben:', err)
     )
 
     // Startup migráció: régi lokál-formátumú dátumok átalakítása ISO-ra (YYYY-MM-DDT00:00:00).
@@ -198,18 +234,8 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
                         console.warn(`[downloads] Dekódolási hibák (${activityId}):`, errors)
                     }
 
-                    let mdText = text
-                    if (startTimeIso && tpStore) {
-                        const tpMatch = tpStore.findByDateTimeNear(startTimeIso, 60)
-                        if (tpMatch) {
-                            tpStore.linkGarminActivity(tpMatch.workoutId, activityId)
-                            mdText = buildTpSection(tpMatch.fileContent) + '\n\n' + text
-                            console.log(`[downloads] TP egyezés: ${activityId} <-> ${tpMatch.workoutId} (${startTimeIso})`)
-                        }
-                    }
-
                     const mdPath = join(dirname(archivedPath), `${activityId}.md`)
-                    await writeFile(mdPath, mdText, 'utf-8')
+                    await writeFile(mdPath, text, 'utf-8')
 
                     if (startTimeIso) {
                         activityStore.updateDate(activityId, startTimeIso)
@@ -341,6 +367,66 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
             res.statusCode = 422
             res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+        }
+    })
+
+    server.middlewares.use('/api/garmin/upload_activity_zip', async (req, res) => {
+        if (handleOptions(req, res)) return
+        setCorsHeaders(res)
+
+        if (req.method !== 'POST') {
+            res.statusCode = 405
+            res.end('Method Not Allowed')
+            return
+        }
+
+        try {
+            const payload = await readJsonBody(req)
+            const activityId = String(payload.activityId ?? '').trim()
+            const zipBase64 = String(payload.zipBase64 ?? '').trim()
+
+            if (!activityId || !zipBase64) {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'activityId és zipBase64 kötelező' }))
+                return
+            }
+
+            const zipBuffer = Buffer.from(zipBase64, 'base64')
+            if (zipBuffer.length === 0) {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'Üres ZIP payload' }))
+                return
+            }
+
+            const activity = activityStore.getById(activityId)
+            const isoDate = parseActivityDateToIso(activity?.date ?? '') ?? localTodayIso()
+            const relativeDir = `${isoDate.slice(0, 7)}/${isoDate.slice(8, 10)}`
+            const targetDir = join(archiveDir, relativeDir)
+            const zipFileName = `${activityId}.zip`
+            const targetZipPath = join(targetDir, zipFileName)
+
+            await mkdir(targetDir, { recursive: true })
+            await writeFile(targetZipPath, zipBuffer)
+
+            activityStore.markReceived(activityId, zipFileName)
+
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.statusCode = 200
+            res.end(JSON.stringify({
+                ok: true,
+                activityId,
+                relativeDir,
+                zipPath: targetZipPath,
+            }))
+        } catch (err) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+            }))
         }
     })
 

@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite'
+import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 
@@ -54,7 +54,7 @@ function normalizeActivity(activity: ActivityInput): Omit<ActivityRecord, 'statu
 export function createActivityStore(dbFilePath: string) {
     mkdirSync(dirname(dbFilePath), { recursive: true })
 
-    const db = new DatabaseSync(dbFilePath)
+    const db = new Database(dbFilePath)
     db.exec(`
         CREATE TABLE IF NOT EXISTS activities (
             activity_id TEXT PRIMARY KEY,
