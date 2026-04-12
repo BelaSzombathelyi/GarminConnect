@@ -123,6 +123,7 @@ describe('fitPipeline TP enrich', () => {
 
         expect(text.startsWith('# Workout Summary:')).toBe(true)
         expect(text).toContain('Aktivitás neve: 70 perc kötetlen')
+        expect(text).not.toContain('Title:')
         expect(text).toContain('TSS: 99 rTSS')
         expect(text).toContain('Tervezett idő: 1:08:53')
         expect(text).toContain('### Edzői instrukciók')

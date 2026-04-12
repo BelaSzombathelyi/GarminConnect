@@ -17,7 +17,7 @@ export function buildTextOutput(
     trainingPeaksData?: Record<string, unknown> | null,
 ): string {
     const sections: string[] = [];
-    const summary = extractSummary(data);
+    const summary = extractSummary(data, trainingPeaksData);
     if (summary) sections.push(summary);
 
     if (trainingPeaksData) {
@@ -99,7 +99,7 @@ function teShortLabel(val: number): string {
     return 'nincs';
 }
 
-function extractSummary(data: FitUploadResponse): string {
+function extractSummary(data: FitUploadResponse, trainingPeaksData?: Record<string, unknown> | null): string {
     const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0];
     if (!session) return '';
 
@@ -146,11 +146,13 @@ function extractSummary(data: FitUploadResponse): string {
 
     const headerParts = [startDateStr, durationLabel, wktName].filter(Boolean);
     const headerLine = "# Workout Summary: " + (headerParts.length > 0 ? headerParts.join(' | ') : 'Summary');
+    const tpActivityName = String(trainingPeaksData?.name ?? '').trim();
+    const shouldShowTitle = !tpActivityName;
 
     return [
         headerLine,
         '',
-        `Title: ${typeLabel}`,
+        ...(shouldShowTitle ? [`Title: ${typeLabel}`] : []),
         `Time: ${durationLabel}`,
         `Distance: ${distanceLabel}`,
         ...(shouldHideAscent ? [] : [`Elevation: ${ascent}`]),

@@ -22,7 +22,6 @@
 <a id="activity-2026-04-05-99000000004"></a>
 ### Workout Summary: 2026. 04. 05. 15:18 | 1:33 | 70 perc kötetlen *5 min, 04:05
 
-Title: futás
 Time: 1:33
 Distance: 14.19 km
 
@@ -117,7 +116,6 @@ nem feltétlenül egységes km-ek
 <a id="activity-2026-04-04-99000000005"></a>
 ### Workout Summary: 2026. 04. 04. 10:11 | 3:23 | 3,5 óra terepen 4*5 min, 04:05
 
-Title: terepfutás (hosszu)
 Time: 3:23
 Distance: 30.163 km
 Elevation: +1265 m
@@ -267,7 +265,6 @@ nem feltétlenül egységes km-ek
 <a id="activity-2026-04-01-99000000003"></a>
 ### Workout Summary: 2026. 04. 01. 06:17 | 1:06 | VO2 max - SUM 20p 4*5 min, 04:05
 
-Title: futás
 Time: 1:06
 Distance: 13.097 km
 
