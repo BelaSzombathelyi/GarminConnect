@@ -589,7 +589,49 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
                 fileContent,
             }
         },
+
+        getByGarminActivityId(garminActivityId: string): {
+            rowKey: string
+            workoutId: string
+            workoutStart: string
+            garminActivityId: string
+            filePath: string
+            fileContent: Record<string, unknown> | null
+        } | null {
+            const normalized = String(garminActivityId ?? '').trim()
+            if (!normalized) return null
+
+            const row = db.prepare(
+                `SELECT row_key, workout_id, workout_start, garmin_activity_id
+                 FROM trainingpeaks_workouts
+                 WHERE garmin_activity_id = ?
+                 LIMIT 1`,
+            ).get(normalized) as
+                | { row_key: string; workout_id: string; workout_start: string; garmin_activity_id: string }
+                | undefined
+
+            if (!row) return null
+
+            const filePath = buildRelativeWorkoutPath(row.workout_start, row.workout_id)
+            const absPath = join(dataDir, filePath)
+            let fileContent: Record<string, unknown> | null = null
+            if (existsSync(absPath)) {
+                try {
+                    fileContent = JSON.parse(readFileSync(absPath, 'utf-8')) as Record<string, unknown>
+                } catch {
+                    fileContent = null
+                }
+            }
+
+            return {
+                rowKey: row.row_key,
+                workoutId: row.workout_id,
+                workoutStart: row.workout_start,
+                garminActivityId: String(row.garmin_activity_id ?? '').trim(),
+                filePath,
+                fileContent,
+            }
+        },
     }
 }
-
 

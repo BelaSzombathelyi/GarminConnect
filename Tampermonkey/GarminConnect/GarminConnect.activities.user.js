@@ -37,6 +37,8 @@
         statusEl: null,
         observer: null,
         refreshTimer: null,
+        rowSyncingIds: new Set(),
+        rowDownloadIds: new Set(),
     };
 
     function waitForElement(selector, timeoutMs = 15000) {
@@ -150,6 +152,22 @@
         URL.revokeObjectURL(objectUrl);
     }
 
+    function triggerDownloadFromText(fileName, text) {
+        const blob = new Blob([String(text || '')], { type: 'text/markdown;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+    }
+
+    function isActivityDownloaded(activityId) {
+        return !UI_STATE.serverNewIds.has(String(activityId));
+    }
+
     function getActivityRows() {
         return Array.from(document.querySelectorAll('[class*="ActivityListItem_listItem"]'));
     }
@@ -188,6 +206,47 @@
         return Array.from(uniqueById.values());
     }
 
+    function ensureDownloadColumnHeader(row) {
+        if (!row || row.querySelector('.gc-download-header')) return;
+
+        const existingCells = row.querySelectorAll('div, span');
+        const anchorCell = Array.from(existingCells).find((el) =>
+            (el.textContent || '').trim().toLowerCase() === 'distance'
+            || (el.textContent || '').trim().toLowerCase() === 'távolság'
+        );
+
+        const headerCell = document.createElement('div');
+        headerCell.className = 'gc-download-header';
+        headerCell.textContent = 'Letöltés';
+        headerCell.style.fontWeight = '700';
+        headerCell.style.marginLeft = '12px';
+        headerCell.style.minWidth = '84px';
+
+        if (anchorCell?.parentElement) {
+            anchorCell.parentElement.appendChild(headerCell);
+            return;
+        }
+
+        row.appendChild(headerCell);
+    }
+
+    function ensureDownloadCell(row) {
+        let cell = row.querySelector('.gc-download-cell');
+        if (cell) return cell;
+
+        cell = document.createElement('div');
+        cell.className = 'gc-download-cell';
+        cell.style.marginLeft = '12px';
+        cell.style.minWidth = '84px';
+        cell.style.display = 'inline-flex';
+        cell.style.alignItems = 'center';
+        cell.style.justifyContent = 'flex-start';
+        cell.style.gap = '6px';
+
+        row.appendChild(cell);
+        return cell;
+    }
+
     function buildActivityIdSet(activities) {
         return new Set(activities.map((a) => String(a.activityId || '').trim()).filter(Boolean));
     }
@@ -204,6 +263,8 @@
         UI_STATE.knownReportedIds.clear();
         UI_STATE.serverNewIds.clear();
         UI_STATE.visibleActivityIds.clear();
+        UI_STATE.rowSyncingIds.clear();
+        UI_STATE.rowDownloadIds.clear();
         UI_STATE.lastVisibleSignature = '';
         UI_STATE.lastReportedSignature = '';
 
@@ -398,6 +459,112 @@
         }
     }
 
+    async function syncSingleActivityFromRow(activityId) {
+        const detailUrl = `https://connect.garmin.com/app/activity/${activityId}?auto_download=1&close_after_download=1`;
+        const child = window.open(detailUrl, '_blank');
+        if (!child) {
+            throw new Error(`Popup blokkolva: ${activityId}`);
+        }
+
+        await waitForActivitiesTabActive(child);
+    }
+
+    async function downloadActivityMarkdown(activityId) {
+        const res = await fetch(`${getApiBase()}/reprocess_workout_by_garmin_id?garminActivityId=${encodeURIComponent(activityId)}`, {
+            method: 'GET',
+        });
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        }
+        const text = await res.text();
+        triggerDownloadFromText(`garmin-${activityId}.md`, text);
+    }
+
+    function createActionButton(label, background, onClick) {
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.style.border = 'none';
+        btn.style.borderRadius = '6px';
+        btn.style.padding = '4px 8px';
+        btn.style.background = background;
+        btn.style.color = '#fff';
+        btn.style.cursor = 'pointer';
+        btn.style.fontSize = '12px';
+        btn.style.fontWeight = '600';
+        btn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onClick();
+        });
+        return btn;
+    }
+
+    function renderRowDownloadActions() {
+        const rows = getActivityRows();
+        if (rows.length > 0) {
+            ensureDownloadColumnHeader(rows[0].parentElement?.previousElementSibling || rows[0]);
+        }
+        for (const row of rows) {
+            const item = extractActivityFromRow(row);
+            if (!item) continue;
+
+            const activityId = String(item.activityId);
+            const cell = ensureDownloadCell(row);
+            cell.innerHTML = '';
+
+            const syncing = UI_STATE.rowSyncingIds.has(activityId);
+            const downloading = UI_STATE.rowDownloadIds.has(activityId);
+            const downloaded = isActivityDownloaded(activityId);
+
+            if (!downloaded) {
+                const syncBtn = createActionButton(syncing ? 'Sync...' : 'Sync', '#16a34a', async () => {
+                    if (UI_STATE.rowSyncingIds.has(activityId) || UI_STATE.rowDownloadIds.has(activityId)) return;
+
+                    UI_STATE.rowSyncingIds.add(activityId);
+                    renderRowDownloadActions();
+                    try {
+                        await syncSingleActivityFromRow(activityId);
+                        const latest = syncVisibleActivityState();
+                        const res = await reportActivities(latest.activities);
+                        markActivitiesAsReported(latest.activities);
+                        applyReportResult(res);
+                        UI_STATE.lastReportedSignature = latest.signature;
+                    } catch (err) {
+                        alert(`Sync hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
+                    } finally {
+                        UI_STATE.rowSyncingIds.delete(activityId);
+                        scheduleUiRefresh();
+                    }
+                });
+                if (syncing) {
+                    syncBtn.disabled = true;
+                    syncBtn.style.opacity = '0.75';
+                }
+                cell.appendChild(syncBtn);
+                continue;
+            }
+
+            const downloadBtn = createActionButton(downloading ? '...' : '⬇️', '#0ea5e9', async () => {
+                if (UI_STATE.rowDownloadIds.has(activityId) || UI_STATE.rowSyncingIds.has(activityId)) return;
+                UI_STATE.rowDownloadIds.add(activityId);
+                renderRowDownloadActions();
+                try {
+                    await downloadActivityMarkdown(activityId);
+                } catch (err) {
+                    alert(`Download hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
+                } finally {
+                    UI_STATE.rowDownloadIds.delete(activityId);
+                    renderRowDownloadActions();
+                }
+            });
+            if (downloading) {
+                downloadBtn.disabled = true;
+                downloadBtn.style.opacity = '0.75';
+            }
+            cell.appendChild(downloadBtn);
+        }
+    }
+
     function scheduleUiRefresh() {
         if (UI_STATE.refreshTimer !== null) {
             clearTimeout(UI_STATE.refreshTimer);
@@ -407,6 +574,7 @@
             UI_STATE.refreshTimer = null;
             handleRouteChangeIfNeeded();
             const snapshot = syncVisibleActivityState();
+            renderRowDownloadActions();
             refreshSyncButtonState(snapshot.activities.length);
             if (snapshot.changed) {
                 scheduleAutoReport(true);

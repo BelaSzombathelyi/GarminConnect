@@ -172,25 +172,37 @@
         URL.revokeObjectURL(objectUrl);
     }
 
-    async function downloadCurrentWorkoutFromEndpoint() {
+    async function syncCurrentWorkoutZipToServer() {
         const activityId = getActivityIdFromUrl();
         if (!activityId) {
             throw new Error('Nincs activity ID az URL-ben');
         }
 
         const zipBlob = await fetchZipBlobViaApi(activityId);
-        downloadBlob(`activity-${activityId}.zip`, zipBlob);
-
         const zipBase64 = await blobToBase64(zipBlob);
         await httpRequestJson('POST', `${API_BASE}/garmin/upload_activity_zip`, {
             activityId,
             zipBase64,
         });
 
+        return { activityId, zipBlob };
+    }
+
+    async function downloadCurrentWorkoutFromEndpoint() {
+        const { activityId, zipBlob } = await syncCurrentWorkoutZipToServer();
+        downloadBlob(`activity-${activityId}.zip`, zipBlob);
+
         const endpoint = `${API_BASE}/reprocess_workout_by_garmin_id?garminActivityId=${encodeURIComponent(activityId)}`;
         const markdown = await httpRequestText('GET', endpoint);
         downloadText(`garmin-${activityId}.md`, markdown);
         return activityId;
+    }
+
+    async function getLinkedTpWorkoutId(activityId) {
+        const res = await fetch(`${API_BASE}/workout_links?garminActivityId=${encodeURIComponent(activityId)}`);
+        if (!res.ok) return '';
+        const payload = await res.json().catch(() => ({}));
+        return String(payload.tpWorkoutId ?? '').trim();
     }
 
     function ensureQuickPanel() {
@@ -222,8 +234,20 @@
             ? 'URL param hiany: auto_download / close_after_download (defaultok futnak)'
             : 'Kesz';
 
+        const syncBtn = document.createElement('button');
+        syncBtn.textContent = 'Sync current workout';
+        syncBtn.style.border = 'none';
+        syncBtn.style.borderRadius = '8px';
+        syncBtn.style.background = '#16a34a';
+        syncBtn.style.color = 'white';
+        syncBtn.style.padding = '8px 10px';
+        syncBtn.style.cursor = 'pointer';
+        syncBtn.style.fontWeight = '600';
+        syncBtn.style.display = 'block';
+        syncBtn.style.width = '100%';
+
         const downloadBtn = document.createElement('button');
-        downloadBtn.textContent = 'Download current workout';
+        downloadBtn.textContent = 'Download MD';
         downloadBtn.style.border = 'none';
         downloadBtn.style.borderRadius = '8px';
         downloadBtn.style.background = '#0ea5e9';
@@ -233,11 +257,45 @@
         downloadBtn.style.fontWeight = '600';
         downloadBtn.style.display = 'block';
         downloadBtn.style.width = '100%';
+        downloadBtn.style.marginTop = '8px';
+
+        const tpLinkBtn = document.createElement('a');
+        tpLinkBtn.textContent = 'Open linked TP workout';
+        tpLinkBtn.href = '#';
+        tpLinkBtn.target = '_blank';
+        tpLinkBtn.rel = 'noreferrer';
+        tpLinkBtn.style.display = 'none';
+        tpLinkBtn.style.marginTop = '8px';
+        tpLinkBtn.style.color = '#93c5fd';
+        tpLinkBtn.style.fontWeight = '600';
+
+        syncBtn.addEventListener('click', async () => {
+            const originalLabel = syncBtn.textContent;
+            syncBtn.disabled = true;
+            downloadBtn.disabled = true;
+            syncBtn.style.opacity = '0.7';
+            downloadBtn.style.opacity = '0.7';
+            syncBtn.textContent = 'Sync folyamatban...';
+            try {
+                const { activityId } = await syncCurrentWorkoutZipToServer();
+                status.textContent = `Sync kesz: Garmin ${activityId}`;
+            } catch (err) {
+                status.textContent = `Sync hiba: ${err instanceof Error ? err.message : String(err)}`;
+            } finally {
+                syncBtn.disabled = false;
+                downloadBtn.disabled = false;
+                syncBtn.style.opacity = '1';
+                downloadBtn.style.opacity = '1';
+                syncBtn.textContent = originalLabel;
+            }
+        });
 
         downloadBtn.addEventListener('click', async () => {
             const originalLabel = downloadBtn.textContent;
             downloadBtn.disabled = true;
+            syncBtn.disabled = true;
             downloadBtn.style.opacity = '0.7';
+            syncBtn.style.opacity = '0.7';
             downloadBtn.textContent = 'Download folyamatban...';
             try {
                 const activityId = await downloadCurrentWorkoutFromEndpoint();
@@ -246,15 +304,33 @@
                 status.textContent = `Download hiba: ${err instanceof Error ? err.message : String(err)}`;
             } finally {
                 downloadBtn.disabled = false;
+                syncBtn.disabled = false;
                 downloadBtn.style.opacity = '1';
+                syncBtn.style.opacity = '1';
                 downloadBtn.textContent = originalLabel;
             }
         });
 
         panel.appendChild(title);
         panel.appendChild(status);
+        panel.appendChild(syncBtn);
         panel.appendChild(downloadBtn);
+        panel.appendChild(tpLinkBtn);
         document.body.appendChild(panel);
+
+        const activityId = getActivityIdFromUrl();
+        if (activityId) {
+            getLinkedTpWorkoutId(activityId)
+                .then((tpWorkoutId) => {
+                    if (!tpWorkoutId) return;
+                    tpLinkBtn.href = `https://app.trainingpeaks.com/athlete/workout/${encodeURIComponent(tpWorkoutId)}`;
+                    tpLinkBtn.textContent = `Open linked TP workout (${tpWorkoutId})`;
+                    tpLinkBtn.style.display = 'inline-block';
+                })
+                .catch(() => {
+                    // Nem kritikus.
+                });
+        }
     }
 
     async function downloadViaApiFallback() {

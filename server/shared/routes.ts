@@ -121,6 +121,62 @@ function getQueryParam(req: any, key: string): string {
 export function registerSharedRoutes(server: ViteDevServer, options: RegisterSharedRoutesOptions): void {
     const { archiveDir, tpStore } = options
 
+    server.middlewares.use('/api/workout_links', async (req, res) => {
+        if (handleOptions(req, res)) return
+        setCorsHeaders(res)
+
+        if (req.method !== 'GET') {
+            res.statusCode = 405
+            res.end('Method Not Allowed')
+            return
+        }
+
+        if (!tpStore) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({ ok: false, error: 'TrainingPeaks store nincs konfigurálva' }))
+            return
+        }
+
+        try {
+            const tpWorkoutId = getQueryParam(req, 'tpWorkoutId')
+            const garminActivityId = getQueryParam(req, 'garminActivityId')
+
+            if (!tpWorkoutId && !garminActivityId) {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'tpWorkoutId vagy garminActivityId kötelező' }))
+                return
+            }
+
+            let resolvedTpWorkoutId = tpWorkoutId
+            let resolvedGarminActivityId = garminActivityId
+
+            if (tpWorkoutId) {
+                const workout = tpStore.getByWorkoutId(tpWorkoutId)
+                resolvedGarminActivityId = String(workout?.garminActivityId ?? '').trim()
+            } else if (garminActivityId) {
+                const workout = tpStore.getByGarminActivityId(garminActivityId)
+                resolvedTpWorkoutId = String(workout?.workoutId ?? '').trim()
+            }
+
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({
+                ok: true,
+                tpWorkoutId: resolvedTpWorkoutId || '',
+                garminActivityId: resolvedGarminActivityId || '',
+            }))
+        } catch (err) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+            }))
+        }
+    })
+
     server.middlewares.use('/api/reprocess_workout_by_garmin_id', async (req, res) => {
         if (handleOptions(req, res)) return
         setCorsHeaders(res)
