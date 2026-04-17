@@ -8,6 +8,8 @@
 // @grant        GM_xmlhttpRequest
 // @connect      localhost
 // @connect      127.0.0.1
+// @updateURL    https://raw.githubusercontent.com/BelaSzombathelyi/GarminConnect/main/Tampermonkey/GarminConnect/GarminConnect.user.js
+// @downloadURL  https://raw.githubusercontent.com/BelaSzombathelyi/GarminConnect/main/Tampermonkey/GarminConnect/GarminConnect.user.js
 // ==/UserScript==
 
 (function () {
