@@ -231,7 +231,6 @@ function buildFullJson(item: TrainingPeaksWorkoutInput, normalized: NormalizedWo
         description: String(item.description ?? '').trim(),
         comments: normalizeComments(item.comments),
         source: 'trainingpeaks',
-        savedAt: nowIso(),
     }
 }
 
