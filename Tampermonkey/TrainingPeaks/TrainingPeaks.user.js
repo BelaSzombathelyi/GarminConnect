@@ -28,8 +28,12 @@
     observer: null,
     detailStateTimer: null,
     syncBtn: null,
+    detailSyncBtn: null,
     downloadBtn: null,
+    openGarminBtn: null,
     statusEl: null,
+    rowSyncingKeys: new Set(),
+    rowDownloadingKeys: new Set(),
   };
   const SELECTORS = {
     searchButton: ".workoutSearch",
@@ -149,6 +153,27 @@
     const markdown = await httpRequestText("POST", endpoint, { tpWorkoutId });
     triggerTextDownload(`tp-workout-${tpWorkoutId}.md`, markdown);
     return tpWorkoutId;
+  }
+
+  async function fetchWorkoutLinks(params) {
+    const query = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE}/workout_links?${query}`, { method: "GET" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} workout_links`);
+    }
+    return response.json();
+  }
+
+  async function downloadWorkoutMarkdownById(tpWorkoutId) {
+    const endpoint = `${API_BASE}/reprocess_workout_by_tp_id`;
+    const markdown = await httpRequestText("POST", endpoint, { tpWorkoutId });
+    triggerTextDownload(`tp-workout-${tpWorkoutId}.md`, markdown);
+  }
+
+  async function syncCurrentWorkoutDetail() {
+    const workout = await collectCurrentWorkoutPayload();
+    await reportWorkoutsToLocalApi([workout]);
+    return String(workout?.raw?.workoutId ?? "").trim();
   }
 
   function inferWorkoutNameFromDetail() {
@@ -1143,6 +1168,41 @@
     );
   }
 
+  async function updateDetailGarminLink() {
+    const openGarminBtn = UI_STATE.openGarminBtn;
+    if (!openGarminBtn) return;
+
+    if (!isWorkoutDetailVisible()) {
+      openGarminBtn.style.display = "none";
+      return;
+    }
+
+    const tpWorkoutId =
+      getWorkoutIdFromRoute() ||
+      getWorkoutIdFromDomContext(getWorkoutQuickViewRoot()) ||
+      getWorkoutIdFromNetworkEntries(120000);
+
+    if (!tpWorkoutId) {
+      openGarminBtn.style.display = "none";
+      return;
+    }
+
+    try {
+      const links = await fetchWorkoutLinks({ tpWorkoutId });
+      const garminActivityId = String(links?.garminActivityId ?? "").trim();
+      if (!garminActivityId) {
+        openGarminBtn.style.display = "none";
+        return;
+      }
+
+      openGarminBtn.href = `https://connect.garmin.com/app/activity/${encodeURIComponent(garminActivityId)}`;
+      openGarminBtn.textContent = `Open Garmin Activity (${garminActivityId})`;
+      openGarminBtn.style.display = "inline-block";
+    } catch {
+      openGarminBtn.style.display = "none";
+    }
+  }
+
   function startDetailStateWatcher() {
     if (UI_STATE.detailStateTimer !== null) {
       return;
@@ -1150,6 +1210,7 @@
 
     UI_STATE.detailStateTimer = setInterval(() => {
       refreshSyncButtonState();
+      updateDetailGarminLink();
     }, 500);
   }
 
@@ -1541,8 +1602,154 @@
     return items.map((it) => it.key).sort().join("\n");
   }
 
+  function ensureTpDownloadHeader() {
+    const root = document.querySelector(SELECTORS.advancedResultsRoot);
+    if (!root) return;
+    const headerRow = root.querySelector("thead tr");
+    if (!headerRow || headerRow.querySelector(".tp-download-col-header")) return;
+
+    const th = document.createElement("th");
+    th.className = "tp-download-col-header";
+    th.textContent = "Letöltés";
+    th.style.minWidth = "110px";
+    th.style.textAlign = "center";
+    headerRow.appendChild(th);
+  }
+
+  function ensureTpDownloadCell(row) {
+    let cell = row.querySelector("td.tp-download-cell");
+    if (cell) return cell;
+
+    cell = document.createElement("td");
+    cell.className = "tp-download-cell";
+    cell.style.textAlign = "center";
+    cell.style.minWidth = "110px";
+    row.appendChild(cell);
+    return cell;
+  }
+
+  function createMiniActionButton(label, bgColor, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.style.border = "none";
+    btn.style.borderRadius = "6px";
+    btn.style.background = bgColor;
+    btn.style.color = "#fff";
+    btn.style.padding = "3px 8px";
+    btn.style.cursor = "pointer";
+    btn.style.fontSize = "12px";
+    btn.style.fontWeight = "600";
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onClick();
+    });
+    return btn;
+  }
+
+  async function syncSingleListWorkout(item) {
+    const row = item?.row;
+    if (!row) return;
+
+    const routeBeforeOpen = currentRouteSignature();
+    row.scrollIntoView({ block: "center", behavior: "instant" });
+    row.click();
+
+    await waitForWorkoutDetailOpen(routeBeforeOpen, 12000);
+    await waitForWorkoutDetailDateReady(12000);
+    await waitForWorkoutDetailData(15000);
+
+    const workoutId = await resolveWorkoutId(row, 4000);
+    const workoutStart = resolveWorkoutStartDate(getWorkoutStartDateText(), item.workoutStart);
+    const payload = {
+      rowKey: item.rowKey,
+      name: item.name,
+      workoutStart,
+      workoutType: item.workoutType,
+      totalTime: item.totalTime,
+      distance: textByCell(row, "distance"),
+      tssValue: cellPartText(row, "tssActual", "value"),
+      tssUnit: cellPartText(row, "tssActual", "units"),
+      plannedTssValue: cellPartText(row, "tssPlanned", "value"),
+      plannedTssUnit: cellPartText(row, "tssPlanned", "units"),
+      description: extractWorkoutDescription(),
+      comments: extractComments(),
+      source: "trainingpeaks",
+      raw: {
+        route: currentRouteSignature(),
+        workoutId,
+      },
+    };
+
+    await reportWorkoutsToLocalApi([payload]);
+    await closeWorkoutDetail(routeBeforeOpen, 12000);
+  }
+
+  function renderResultRowDownloadActions() {
+    ensureTpDownloadHeader();
+    const items = collectResultListWorkouts(INCLUDE_FUTURE_ROWS);
+    for (const item of items) {
+      const key = String(item.key || "");
+      const row = item.row;
+      const cell = ensureTpDownloadCell(row);
+      cell.innerHTML = "";
+
+      const isPending = UI_STATE.pendingWorkoutKeys.has(key);
+      const syncing = UI_STATE.rowSyncingKeys.has(key);
+      const downloading = UI_STATE.rowDownloadingKeys.has(key);
+
+      if (isPending) {
+        const syncBtn = createMiniActionButton(syncing ? "Sync..." : "Sync", "#16a34a", async () => {
+          if (UI_STATE.rowSyncingKeys.has(key) || UI_STATE.rowDownloadingKeys.has(key)) return;
+          UI_STATE.rowSyncingKeys.add(key);
+          renderResultRowDownloadActions();
+          try {
+            await syncSingleListWorkout(item);
+            await refreshPendingFromServer(true);
+          } catch (err) {
+            alert(`Sync hiba: ${err instanceof Error ? err.message : String(err)}`);
+          } finally {
+            UI_STATE.rowSyncingKeys.delete(key);
+            renderResultRowDownloadActions();
+          }
+        });
+        if (syncing) {
+          syncBtn.disabled = true;
+          syncBtn.style.opacity = "0.75";
+        }
+        cell.appendChild(syncBtn);
+        continue;
+      }
+
+      const downloadBtn = createMiniActionButton(downloading ? "..." : "⬇️", "#0ea5e9", async () => {
+        if (UI_STATE.rowSyncingKeys.has(key) || UI_STATE.rowDownloadingKeys.has(key)) return;
+        UI_STATE.rowDownloadingKeys.add(key);
+        renderResultRowDownloadActions();
+        try {
+          const tpWorkoutId = await resolveWorkoutId(row, 5000);
+          if (!tpWorkoutId) {
+            throw new Error("Nem találtam TP workout ID-t a sorhoz");
+          }
+          await downloadWorkoutMarkdownById(tpWorkoutId);
+        } catch (err) {
+          alert(`Download hiba: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+          UI_STATE.rowDownloadingKeys.delete(key);
+          renderResultRowDownloadActions();
+        }
+      });
+      if (downloading) {
+        downloadBtn.disabled = true;
+        downloadBtn.style.opacity = "0.75";
+      }
+      cell.appendChild(downloadBtn);
+    }
+  }
+
   function refreshSyncButtonState(loadedCountOverride) {
     const syncBtn = UI_STATE.syncBtn;
+    const detailSyncBtn = UI_STATE.detailSyncBtn;
     const downloadBtn = UI_STATE.downloadBtn;
     const statusEl = UI_STATE.statusEl;
     if (!syncBtn || !statusEl) {
@@ -1554,9 +1761,16 @@
       : collectResultListWorkouts(INCLUDE_FUTURE_ROWS).length;
     const pendingCount = UI_STATE.pendingWorkoutKeys.size;
     const detailVisible = isWorkoutDetailVisible();
+    const openGarminBtn = UI_STATE.openGarminBtn;
 
     if (downloadBtn) {
       downloadBtn.style.display = detailVisible ? "block" : "none";
+    }
+    if (detailSyncBtn) {
+      detailSyncBtn.style.display = detailVisible ? "block" : "none";
+    }
+    if (openGarminBtn) {
+      openGarminBtn.style.display = detailVisible ? "inline-block" : "none";
     }
 
     if (UI_STATE.runInProgress) {
@@ -1566,6 +1780,10 @@
       if (downloadBtn) {
         downloadBtn.disabled = true;
         downloadBtn.style.opacity = "0.7";
+      }
+      if (detailSyncBtn) {
+        detailSyncBtn.disabled = true;
+        detailSyncBtn.style.opacity = "0.7";
       }
       return;
     }
@@ -1577,6 +1795,10 @@
         downloadBtn.disabled = true;
         downloadBtn.style.opacity = "0.7";
         downloadBtn.textContent = "Download folyamatban...";
+      }
+      if (detailSyncBtn) {
+        detailSyncBtn.disabled = true;
+        detailSyncBtn.style.opacity = "0.7";
       }
       return;
     }
@@ -1590,7 +1812,12 @@
         downloadBtn.style.opacity = detailVisible ? "1" : "0.7";
         downloadBtn.textContent = "Download current workout";
       }
+      if (detailSyncBtn) {
+        detailSyncBtn.disabled = !detailVisible;
+        detailSyncBtn.style.opacity = detailVisible ? "1" : "0.7";
+      }
       statusEl.textContent = `Lista: ${loadedCount}, nem riportalt: ${pendingCount}`;
+      renderResultRowDownloadActions();
       return;
     }
 
@@ -1602,7 +1829,12 @@
       downloadBtn.style.opacity = detailVisible ? "1" : "0.7";
       downloadBtn.textContent = "Download current workout";
     }
+    if (detailSyncBtn) {
+      detailSyncBtn.disabled = !detailVisible;
+      detailSyncBtn.style.opacity = detailVisible ? "1" : "0.7";
+    }
     statusEl.textContent = `Lista: ${loadedCount}, minden riportalva`;
+    renderResultRowDownloadActions();
   }
 
   async function refreshPendingFromServer(force = false) {
@@ -1612,6 +1844,8 @@
 
     if (!listVisible) {
       UI_STATE.pendingWorkoutKeys = new Set();
+      UI_STATE.rowSyncingKeys.clear();
+      UI_STATE.rowDownloadingKeys.clear();
       UI_STATE.visibleSignature = "";
       UI_STATE.lastServerCheckSignature = "";
       refreshSyncButtonState(0);
@@ -1825,6 +2059,51 @@
     downloadBtn.style.width = "100%";
     downloadBtn.style.marginTop = "8px";
 
+    const detailSyncBtn = document.createElement("button");
+    detailSyncBtn.textContent = "Sync current workout";
+    detailSyncBtn.style.border = "none";
+    detailSyncBtn.style.borderRadius = "8px";
+    detailSyncBtn.style.background = "#22c55e";
+    detailSyncBtn.style.color = "white";
+    detailSyncBtn.style.padding = "8px 10px";
+    detailSyncBtn.style.cursor = "pointer";
+    detailSyncBtn.style.fontWeight = "600";
+    detailSyncBtn.style.display = "block";
+    detailSyncBtn.style.width = "100%";
+    detailSyncBtn.style.marginTop = "8px";
+
+    const openGarminBtn = document.createElement("a");
+    openGarminBtn.href = "#";
+    openGarminBtn.target = "_blank";
+    openGarminBtn.rel = "noreferrer";
+    openGarminBtn.textContent = "Open Garmin Activity";
+    openGarminBtn.style.display = "none";
+    openGarminBtn.style.marginTop = "8px";
+    openGarminBtn.style.color = "#93c5fd";
+    openGarminBtn.style.fontWeight = "600";
+
+    detailSyncBtn.addEventListener("click", async () => {
+      if (UI_STATE.runInProgress || UI_STATE.downloadInProgress) {
+        return;
+      }
+
+      UI_STATE.downloadInProgress = true;
+      refreshSyncButtonState();
+
+      try {
+        const tpWorkoutId = await syncCurrentWorkoutDetail();
+        status.textContent = `Sync kesz: TP ${tpWorkoutId || "-"}`;
+        await refreshPendingFromServer(true);
+      } catch (err) {
+        const errorText = err instanceof Error ? err.message : String(err);
+        status.textContent = `Sync hiba: ${errorText}`;
+        log("Detail sync hiba", err);
+      } finally {
+        UI_STATE.downloadInProgress = false;
+        refreshSyncButtonState();
+      }
+    });
+
     downloadBtn.addEventListener("click", async () => {
       if (UI_STATE.runInProgress || UI_STATE.downloadInProgress) {
         return;
@@ -1838,8 +2117,7 @@
         // Ha az adatgyűjtés nem sikerül (pl. hiányos DOM), akkor is próbálunk letölteni –
         // a szerveren lehet már meglévő rekord.
         try {
-          const workout = await collectCurrentWorkoutPayload();
-          await reportWorkoutsToLocalApi([workout]);
+          await syncCurrentWorkoutDetail();
         } catch (reportErr) {
           log("Workout riportalas nem sikerult (folytatjuk a letoltessel)", reportErr);
         }
@@ -1858,13 +2136,17 @@
     });
 
     UI_STATE.syncBtn = syncBtn;
+    UI_STATE.detailSyncBtn = detailSyncBtn;
     UI_STATE.downloadBtn = downloadBtn;
+    UI_STATE.openGarminBtn = openGarminBtn;
     UI_STATE.statusEl = status;
 
     panel.appendChild(title);
     panel.appendChild(status);
     panel.appendChild(syncBtn);
+    panel.appendChild(detailSyncBtn);
     panel.appendChild(downloadBtn);
+    panel.appendChild(openGarminBtn);
     document.body.appendChild(panel);
 
     refreshSyncButtonState();
