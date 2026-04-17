@@ -1,5 +1,5 @@
 import type { ViteDevServer } from 'vite'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { buildResultsMarkdown, collectResultTextEntries } from './resultsExporter'
 import { handleOptions, readJsonBody, setCorsHeaders } from './http'
@@ -37,6 +37,57 @@ async function findZipByGarminActivityId(archiveDir: string, garminActivityId: s
     }
 
     return walk(archiveDir)
+}
+
+async function collectZipPathsRecursively(dir: string): Promise<string[]> {
+    let entries
+    try {
+        entries = await readdir(dir, { withFileTypes: true })
+    } catch {
+        return []
+    }
+
+    const nested = await Promise.all(
+        entries
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => collectZipPathsRecursively(join(dir, entry.name))),
+    )
+
+    const localZips = entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.zip'))
+        .map((entry) => join(dir, entry.name))
+
+    return [...localZips, ...nested.flat()]
+}
+
+async function tryLinkTpWorkoutToGarminActivity(
+    archiveDir: string,
+    tpWorkoutId: string,
+    tpStore: ReturnType<typeof createTrainingPeaksWorkoutStore>,
+): Promise<string | null> {
+    const alreadyLinked = String(tpStore.getByWorkoutId(tpWorkoutId)?.garminActivityId ?? '').trim()
+    if (alreadyLinked) return alreadyLinked
+
+    const zipPaths = await collectZipPathsRecursively(archiveDir)
+    for (const zipPath of zipPaths) {
+        const fileName = basename(zipPath)
+        const activityId = fileName.match(/^(\d+)\.zip$/)?.[1] ?? ''
+        if (!activityId) continue
+
+        try {
+            const buffer = await readFile(zipPath)
+            processBuffer(buffer, { activityId, tpStore })
+        } catch {
+            continue
+        }
+
+        const linkedAfterScan = String(tpStore.getByWorkoutId(tpWorkoutId)?.garminActivityId ?? '').trim()
+        if (linkedAfterScan) {
+            return linkedAfterScan
+        }
+    }
+
+    return null
 }
 
 export async function reprocessWorkoutByGarminId(
@@ -149,7 +200,11 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
                 return
             }
 
-            const garminActivityId = String(workout.garminActivityId ?? '').trim()
+            let garminActivityId = String(workout.garminActivityId ?? '').trim()
+            if (!garminActivityId) {
+                garminActivityId = (await tryLinkTpWorkoutToGarminActivity(archiveDir, tpWorkoutId, tpStore)) ?? ''
+            }
+
             if (!garminActivityId) {
                 res.statusCode = 409
                 res.setHeader('Content-Type', 'application/json; charset=utf-8')

@@ -24,6 +24,7 @@
     pendingWorkoutKeys: new Set(),
     refreshTimer: null,
     observer: null,
+    detailStateTimer: null,
     syncBtn: null,
     downloadBtn: null,
     statusEl: null,
@@ -47,6 +48,8 @@
   const WORKOUT_ID_PATTERNS = [
     /\/fitness\/v\d+\/athletes\/\d+\/workouts\/(\d+)(?:[/?#]|$)/i,
     /\/notification\/v\d+\/markworkoutread\/(\d+)(?:[/?#]|$)/i,
+    /[?&](?:workoutId|workout_id|tpWorkoutId)=(\d+)(?:[&#]|$)/i,
+    /["']?workoutId["']?\s*[:=]\s*["']?(\d+)["']?/i,
     /\/workouts\/(\d+)(?:[/?#]|$)/i,
   ];
 
@@ -411,9 +414,44 @@
       document,
     ];
 
-    const attrNames = ["data-workout-id", "data-id", "data-key", "id", "href"];
+    const attrNames = [
+      "data-workout-id",
+      "data-workoutid",
+      "data-id",
+      "data-key",
+      "id",
+      "href",
+      "src",
+      "action",
+      "data-url",
+    ];
     for (const candidate of candidates) {
-      if (!candidate || typeof candidate.querySelectorAll !== "function") {
+      if (!candidate) {
+        continue;
+      }
+
+      // 1) A candidate saját attribútumai (nem csak a leszármazottaké).
+      if (typeof candidate.getAttribute === "function") {
+        for (const attr of attrNames) {
+          const value = candidate.getAttribute(attr);
+          const id = extractWorkoutIdFromText(value);
+          if (id) {
+            return id;
+          }
+        }
+      }
+
+      // 2) Gyors textual fallback a candidate saját HTML-jére/szövegére.
+      const ownHtmlId = extractWorkoutIdFromText(candidate.outerHTML || "");
+      if (ownHtmlId) {
+        return ownHtmlId;
+      }
+      const ownTextId = extractWorkoutIdFromText(candidate.textContent || "");
+      if (ownTextId) {
+        return ownTextId;
+      }
+
+      if (typeof candidate.querySelectorAll !== "function") {
         continue;
       }
 
@@ -426,6 +464,28 @@
             return id;
           }
         }
+      }
+
+      // 3) Detail nézetben gyakori hidden/input mezők célzott keresése.
+      const specialNodes = candidate.querySelectorAll(
+        "input[name='workoutId'], input[name='workout_id'], input[id*='workoutId'], [data-workout-id], [data-workoutid]",
+      );
+      for (const node of specialNodes) {
+        const id =
+          extractWorkoutIdFromText(node.value) ||
+          extractWorkoutIdFromText(node.getAttribute("value")) ||
+          extractWorkoutIdFromText(node.getAttribute("data-workout-id")) ||
+          extractWorkoutIdFromText(node.getAttribute("data-workoutid")) ||
+          extractWorkoutIdFromText(node.id);
+        if (id) {
+          return id;
+        }
+      }
+
+      // 4) Utolsó fallback: a candidate teljes HTML-jében regex keresés.
+      const deepHtmlId = extractWorkoutIdFromText(candidate.innerHTML || "");
+      if (deepHtmlId) {
+        return deepHtmlId;
       }
     }
 
@@ -452,8 +512,25 @@
   }
 
   function getWorkoutQuickViewRoot() {
-    const root = document.querySelector(SELECTORS.workoutQuickViewRoot);
-    return root && isVisible(root) ? root : null;
+    const candidates = [
+      SELECTORS.workoutQuickViewRoot,
+      "#workoutQuickView",
+      ".workOutQuickView",
+      ".workoutQuickView",
+      "[data-test='workout-quick-view']",
+      "[data-testid='workout-quick-view']",
+      "[data-test='workout-detail']",
+      "[data-testid='workout-detail']",
+    ];
+
+    for (const selector of candidates) {
+      const root = document.querySelector(selector);
+      if (root && isVisible(root)) {
+        return root;
+      }
+    }
+
+    return null;
   }
 
   function textByCell(row, className) {
@@ -1053,13 +1130,25 @@
     const closeIcon = root?.querySelector(SELECTORS.workoutDetailCloseIcon);
     const dayName = root?.querySelector(SELECTORS.workoutDetailDayName);
     const detailShell = root?.querySelector(".dateAndTime");
+    const routeHasWorkout = /\/workouts\/\d+(?:[/?#]|$)/i.test(currentRouteSignature());
 
     return Boolean(
       root ||
       (closeIcon && isVisible(closeIcon)) ||
       (dayName && isVisible(dayName)) ||
-      (detailShell && isVisible(detailShell)),
+      (detailShell && isVisible(detailShell)) ||
+      routeHasWorkout,
     );
+  }
+
+  function startDetailStateWatcher() {
+    if (UI_STATE.detailStateTimer !== null) {
+      return;
+    }
+
+    UI_STATE.detailStateTimer = setInterval(() => {
+      refreshSyncButtonState();
+    }, 500);
   }
 
   function clickElementRobust(el) {
@@ -1819,6 +1908,7 @@
       logResultRows();
 
       ensureUi();
+      startDetailStateWatcher();
       startResultListObserver();
       await refreshPendingFromServer(true);
       log("TP sync panel kesz, listafigyeles aktiv");
