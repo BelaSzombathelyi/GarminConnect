@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Garmin Connect Activities Sync
 // @namespace    https://connect.garmin.com/
-// @version      2.0
+// @version      2.1
 // @description  Activities lista riport + ÚJ aktivitások egyszerre megnyitása auto letöltéshez
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
@@ -471,14 +471,34 @@
         await waitForActivitiesTabActive(child);
     }
 
-    async function downloadActivityMarkdown(activityId) {
+    async function fetchActivityMarkdown(activityId) {
         const res = await fetch(`${getApiBase()}/reprocess_workout_by_garmin_id?garminActivityId=${encodeURIComponent(activityId)}`, {
             method: 'GET',
         });
         if (!res.ok) {
             throw new Error(`HTTP ${res.status}: ${await res.text()}`);
         }
+
+        const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+        if (!contentType.includes('text/markdown')) {
+            const errorBody = await res.text();
+            throw new Error(`Érvénytelen válasz content-type (${contentType || 'ismeretlen'}): ${errorBody}`);
+        }
+
         const text = await res.text();
+        if (!text.trim()) {
+            throw new Error(`Üres markdown válasz activityId=${activityId}`);
+        }
+
+        if (!text.includes('## Edzés összefoglaló')) {
+            console.warn(`[GC] Reprocess markdown formátum gyanús (${activityId}), hiányzik az összefoglaló szekció.`);
+        }
+
+        return text;
+    }
+
+    async function downloadActivityMarkdown(activityId) {
+        const text = await fetchActivityMarkdown(activityId);
         triggerDownloadFromText(`garmin-${activityId}.md`, text);
     }
 
@@ -518,10 +538,9 @@
             const downloading = UI_STATE.rowDownloadIds.has(activityId);
             const downloaded = isActivityDownloaded(activityId);
 
-            if (!downloaded) {
-                const syncBtn = createActionButton(syncing ? 'Sync...' : 'Sync', '#16a34a', async () => {
-                    if (UI_STATE.rowSyncingIds.has(activityId) || UI_STATE.rowDownloadIds.has(activityId)) return;
-
+            const downloadBtn = createActionButton(syncing || downloading ? '...' : 'Download', downloaded ? '#0ea5e9' : '#16a34a', async () => {
+                if (UI_STATE.rowDownloadIds.has(activityId) || UI_STATE.rowSyncingIds.has(activityId)) return;
+                if (!downloaded) {
                     UI_STATE.rowSyncingIds.add(activityId);
                     renderRowDownloadActions();
                     try {
@@ -532,34 +551,26 @@
                         applyReportResult(res);
                         UI_STATE.lastReportedSignature = latest.signature;
                     } catch (err) {
-                        alert(`Sync hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
+                        alert(`Letöltés indítási hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
                     } finally {
                         UI_STATE.rowSyncingIds.delete(activityId);
                         scheduleUiRefresh();
                     }
-                });
-                if (syncing) {
-                    syncBtn.disabled = true;
-                    syncBtn.style.opacity = '0.75';
+                    return;
                 }
-                cell.appendChild(syncBtn);
-                continue;
-            }
 
-            const downloadBtn = createActionButton(downloading ? '...' : '⬇️', '#0ea5e9', async () => {
-                if (UI_STATE.rowDownloadIds.has(activityId) || UI_STATE.rowSyncingIds.has(activityId)) return;
                 UI_STATE.rowDownloadIds.add(activityId);
                 renderRowDownloadActions();
                 try {
                     await downloadActivityMarkdown(activityId);
                 } catch (err) {
-                    alert(`Download hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
+                    alert(`Reprocess + MD letöltési hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
                 } finally {
                     UI_STATE.rowDownloadIds.delete(activityId);
                     renderRowDownloadActions();
                 }
             });
-            if (downloading) {
+            if (downloading || syncing) {
                 downloadBtn.disabled = true;
                 downloadBtn.style.opacity = '0.75';
             }
