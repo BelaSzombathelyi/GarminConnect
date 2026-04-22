@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TrainingPeaks - Advanced Search Logger
 // @namespace    https://trainingpeaks.com/
-// @version      0.2.0
+// @version      0.2.1
 // @description  Opens workout search and reports extracted workouts to localhost API.
 // @match        https://app.trainingpeaks.com/*
 // @grant        GM_xmlhttpRequest
@@ -30,6 +30,7 @@
     syncBtn: null,
     detailSyncBtn: null,
     downloadBtn: null,
+    inlineDownloadBtn: null,
     openGarminBtn: null,
     statusEl: null,
     rowSyncingKeys: new Set(),
@@ -152,6 +153,28 @@
     const endpoint = `${API_BASE}/reprocess_workout_by_tp_id`;
     const markdown = await httpRequestText("POST", endpoint, { tpWorkoutId });
     triggerTextDownload(`tp-workout-${tpWorkoutId}.md`, markdown);
+    return tpWorkoutId;
+  }
+
+  function toDisplayErrorMessage(err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    if (/még nincs társítva Garmin ID/i.test(raw)) {
+      return "Nem találtam egyező Garmin aktivitást ehhez a TP workouthoz.";
+    }
+    return raw;
+  }
+
+  async function runCurrentWorkoutDownloadFlow(statusTarget = null) {
+    try {
+      await syncCurrentWorkoutDetail();
+    } catch (reportErr) {
+      log("Workout riportalas nem sikerult (folytatjuk a letoltessel)", reportErr);
+    }
+
+    const tpWorkoutId = await downloadCurrentWorkoutMarkdown();
+    if (statusTarget) {
+      statusTarget.textContent = `MD letoltes kesz: TP ${tpWorkoutId}`;
+    }
     return tpWorkoutId;
   }
 
@@ -1209,9 +1232,81 @@
     }
 
     UI_STATE.detailStateTimer = setInterval(() => {
+      ensureInlineDetailDownloadButton();
       refreshSyncButtonState();
       updateDetailGarminLink();
     }, 500);
+  }
+
+  function getWorkoutDetailDateAnchor() {
+    const root = getWorkoutQuickViewRoot();
+    const dayName =
+      (root && root.querySelector(SELECTORS.workoutDetailDayName)) ||
+      document.querySelector(SELECTORS.workoutDetailDayName);
+    if (dayName && isVisible(dayName)) {
+      return dayName;
+    }
+    return null;
+  }
+
+  function ensureInlineDetailDownloadButton() {
+    const anchor = getWorkoutDetailDateAnchor();
+    const existing = UI_STATE.inlineDownloadBtn;
+
+    if (!anchor) {
+      if (existing) {
+        existing.remove();
+      }
+      UI_STATE.inlineDownloadBtn = null;
+      return;
+    }
+
+    if (existing && existing.isConnected) {
+      return;
+    }
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "⬇ Download MD";
+    btn.style.marginLeft = "8px";
+    btn.style.padding = "2px 8px";
+    btn.style.borderRadius = "999px";
+    btn.style.border = "none";
+    btn.style.background = "#0ea5e9";
+    btn.style.color = "#fff";
+    btn.style.fontSize = "12px";
+    btn.style.fontWeight = "700";
+    btn.style.cursor = "pointer";
+    btn.style.verticalAlign = "middle";
+
+    btn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (UI_STATE.runInProgress || UI_STATE.downloadInProgress) {
+        return;
+      }
+
+      UI_STATE.downloadInProgress = true;
+      refreshSyncButtonState();
+
+      try {
+        await runCurrentWorkoutDownloadFlow(UI_STATE.statusEl);
+      } catch (err) {
+        const errorText = toDisplayErrorMessage(err);
+        if (UI_STATE.statusEl) {
+          UI_STATE.statusEl.textContent = `Download hiba: ${errorText}`;
+        }
+        alert(`Download hiba: ${errorText}`);
+        log("Inline download hiba", err);
+      } finally {
+        UI_STATE.downloadInProgress = false;
+        refreshSyncButtonState();
+      }
+    });
+
+    anchor.insertAdjacentElement("afterend", btn);
+    UI_STATE.inlineDownloadBtn = btn;
   }
 
   function clickElementRobust(el) {
@@ -1762,6 +1857,7 @@
     const pendingCount = UI_STATE.pendingWorkoutKeys.size;
     const detailVisible = isWorkoutDetailVisible();
     const openGarminBtn = UI_STATE.openGarminBtn;
+    const inlineDownloadBtn = UI_STATE.inlineDownloadBtn;
 
     if (downloadBtn) {
       downloadBtn.style.display = detailVisible ? "block" : "none";
@@ -1771,6 +1867,9 @@
     }
     if (openGarminBtn) {
       openGarminBtn.style.display = detailVisible ? "inline-block" : "none";
+    }
+    if (inlineDownloadBtn) {
+      inlineDownloadBtn.style.display = detailVisible ? "inline-block" : "none";
     }
 
     if (UI_STATE.runInProgress) {
@@ -1784,6 +1883,10 @@
       if (detailSyncBtn) {
         detailSyncBtn.disabled = true;
         detailSyncBtn.style.opacity = "0.7";
+      }
+      if (inlineDownloadBtn) {
+        inlineDownloadBtn.disabled = true;
+        inlineDownloadBtn.style.opacity = "0.7";
       }
       return;
     }
@@ -1799,6 +1902,10 @@
       if (detailSyncBtn) {
         detailSyncBtn.disabled = true;
         detailSyncBtn.style.opacity = "0.7";
+      }
+      if (inlineDownloadBtn) {
+        inlineDownloadBtn.disabled = true;
+        inlineDownloadBtn.style.opacity = "0.7";
       }
       return;
     }
@@ -1816,6 +1923,10 @@
         detailSyncBtn.disabled = !detailVisible;
         detailSyncBtn.style.opacity = detailVisible ? "1" : "0.7";
       }
+      if (inlineDownloadBtn) {
+        inlineDownloadBtn.disabled = !detailVisible;
+        inlineDownloadBtn.style.opacity = detailVisible ? "1" : "0.7";
+      }
       statusEl.textContent = `Lista: ${loadedCount}, nem riportalt: ${pendingCount}`;
       renderResultRowDownloadActions();
       return;
@@ -1832,6 +1943,10 @@
     if (detailSyncBtn) {
       detailSyncBtn.disabled = !detailVisible;
       detailSyncBtn.style.opacity = detailVisible ? "1" : "0.7";
+    }
+    if (inlineDownloadBtn) {
+      inlineDownloadBtn.disabled = !detailVisible;
+      inlineDownloadBtn.style.opacity = detailVisible ? "1" : "0.7";
     }
     statusEl.textContent = `Lista: ${loadedCount}, minden riportalva`;
     renderResultRowDownloadActions();
@@ -2113,19 +2228,9 @@
       refreshSyncButtonState();
 
       try {
-        // Mindig leküldjük a workout adatokat a szervernek, mielőtt MD-t kérnénk.
-        // Ha az adatgyűjtés nem sikerül (pl. hiányos DOM), akkor is próbálunk letölteni –
-        // a szerveren lehet már meglévő rekord.
-        try {
-          await syncCurrentWorkoutDetail();
-        } catch (reportErr) {
-          log("Workout riportalas nem sikerult (folytatjuk a letoltessel)", reportErr);
-        }
-
-        const tpWorkoutId = await downloadCurrentWorkoutMarkdown();
-        status.textContent = `MD letoltes kesz: TP ${tpWorkoutId}`;
+        await runCurrentWorkoutDownloadFlow(status);
       } catch (err) {
-        const errorText = err instanceof Error ? err.message : String(err);
+        const errorText = toDisplayErrorMessage(err);
         status.textContent = `Download hiba: ${errorText}`;
         alert(`Download hiba: ${errorText}`);
         log("Download hiba", err);
