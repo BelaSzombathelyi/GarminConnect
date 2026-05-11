@@ -355,15 +355,17 @@
     }
 
     // 3) Vegigseprunk a charton es gyujtjuk az egyedi szegmenseket.
+    //    A tomahawk mindig csak az aktualis x alatti szegmenst mutatja, ezert
+    //    sweep kell. Rovid lepessel + dedup-pal gyors es teljes.
     const segments = new Map();
     const stepPx = 4;
-    const dwellMs = 18;
+    const dwellMs = 14;
     log("Workout structure extrakt indul", {
       width: rect.width,
       height: rect.height,
     });
 
-    for (let x = 1; x < 2; x += stepPx) {
+    for (let x = 1; x < rect.width - 1; x += stepPx) {
       if (Date.now() - startedAt > timeoutMs) {
         log("Workout structure extrakt: timeout, korai megallas");
         break;
