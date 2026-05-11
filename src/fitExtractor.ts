@@ -43,12 +43,12 @@ function buildTpMetaLines(tp: Record<string, unknown>): string[] {
     const rows: [string, string][] = []
     if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
 
-    const tssValue = String(tp.tssValue ?? '').trim()
-    const tssUnit = String(tp.tssUnit ?? '').trim()
+    const tssValue = String(tp.completedTssValue ?? '').trim()
+    const tssUnit = String(tp.completedTssUnit ?? '').trim()
     if (tssValue) rows.push(['TSS', tssUnit ? `${tssValue} ${tssUnit}` : tssValue])
 
     if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
-    if (tp.totalTime) rows.push(['Tervezett idő', String(tp.totalTime)])
+    if (tp.completedTotalTime) rows.push(['Tervezett idő', String(tp.completedTotalTime)])
 
     return rows.map(([key, value]) => `${key}: ${value}`)
 }

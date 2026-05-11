@@ -4,12 +4,14 @@
   "name": "VO2 max - SUM 20p 4*5 min, 04:05 iram",
   "workoutStart": "2026-04-01T06:17:28",
   "workoutType": "Run",
-  "totalTime": "1:06:15",
-  "distance": "13.1",
-  "tssValue": "86",
-  "tssUnit": "rTSS",
+  "completedTotalTime": "1:06:15",
+  "completedDistance": "13.1",
+  "completedTssValue": "86",
+  "completedTssUnit": "rTSS",
   "plannedTssValue": "",
   "plannedTssUnit": "",
+  "plannedIfValue": "",
+  "completedIfValue": "",
   "description": "",
   "comments": [
     {
@@ -18,5 +20,5 @@
       "user": "Szombathelyi Bela"
     }
   ],
-  "source": "trainingpeaks"
+  "workoutStructure": []
 }

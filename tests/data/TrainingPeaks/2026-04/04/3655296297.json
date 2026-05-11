@@ -4,12 +4,14 @@
   "name": "3,5 óra terepen",
   "workoutStart": "2026-04-04T10:11:25",
   "workoutType": "Run",
-  "totalTime": "3:18:21",
-  "distance": "30.2",
-  "tssValue": "220",
-  "tssUnit": "rTSS",
+  "completedTotalTime": "3:18:21",
+  "completedDistance": "30.2",
+  "completedTssValue": "220",
+  "completedTssUnit": "rTSS",
   "plannedTssValue": "",
   "plannedTssUnit": "",
+  "plannedIfValue": "",
+  "completedIfValue": "",
   "description": "Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.",
   "comments": [
     {
@@ -18,5 +20,5 @@
       "user": "Szombathelyi Bela"
     }
   ],
-  "source": "trainingpeaks"
+  "workoutStructure": []
 }

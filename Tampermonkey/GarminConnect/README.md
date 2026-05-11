@@ -61,7 +61,7 @@ A szkript az URL alapján szétválasztja a kódágakat. Az iframe-ben futó pé
 1. **Activities lista oldal** (`/app/activities*`, top frame)
    - DOM-ból kiolvassa az aktivitásokat → `POST /api/report_activities`
    - Jobb alsó sarokban panel: `Sync` + `Export` gombok, soronkénti `Download` gomb
-   - A `Sync` gomb a szerver által új-ként jelzett ID-kat **látható modal iframe-eken keresztül** szinkronizálja (egyszerre `IFRAME_MAX_CONCURRENT = 1` — debug-barát, nincs többszálú letöltés ami a Chrome-ot zavarná)
+   - A `Sync` gomb a szerver által új-ként jelzett ID-kat **rejtett (off-screen 1×1 px) iframe-eken keresztül** szinkronizálja (`IFRAME_MAX_CONCURRENT = 1`, hogy a Chrome ne blokkolja a párhuzamos letöltéseket)
    - **Nem nyit új tabot/ablakot** — minden iframe-ben fut, `postMessage`-zel jelez vissza
 
 2. **Activity detail oldal iframe-ben** (`/app/activity/{id}?iframe_sync=1` vagy `window.top !== window.self`)
@@ -82,7 +82,7 @@ A szkript az URL alapján szétválasztja a kódágakat. Az iframe-ben futó pé
 
 | Lépés | Parent (`/app/activities`) | Iframe (`/app/activity/{id}?iframe_sync=1`) |
 |------|----------------------------|---------------------------------------------|
-| 1 | Létrehoz **látható, középre pozícionált** `<iframe>`-et (`50vw × 50vh`, zöld kerettel, `zIndex 2147483646`, `allow="downloads"`). `IFRAME_MAX_CONCURRENT = 1` | — |
+| 1 | Létrehoz **rejtett** `<iframe>`-et off-screen pozícióban (`left/top: -10000px`, `1×1 px`, `opacity: 0`, `pointer-events: none`, `allow="downloads"`). `IFRAME_MAX_CONCURRENT = 1` | — |
 | 2 | `window.addEventListener('message', ...)` | A userscript automatikusan elindul az iframe-ben is |
 | 3 | Mirroring: a `gc-iframe-log` üzeneteket `[GC iframe {id}] ...` prefixszel a parent konzolra is kiírja | Megvárja a fogaskerék gombot, kattint rá, vár 100 ms-t |
 | 4 | — | Megkeresi az „Export File” menüpontot, és **valódi MouseEvent sequence-t** (`mousedown`/`mouseup`/`click`) dispatch-el rá → natív letöltés indul |

@@ -233,4 +233,59 @@ export function registerTrainingPeaksRoutes(
             }))
         }
     })
+
+    server.middlewares.use('/api/trainingpeaks/get_workout_json', async (req, res) => {
+        if (handleOptions(req, res)) return
+        setCorsHeaders(res)
+
+        if (req.method !== 'GET') {
+            res.statusCode = 405
+            res.end('Method Not Allowed')
+            return
+        }
+
+        try {
+            const url = new URL(req.url ?? '', 'http://localhost')
+            const tpWorkoutId = String(url.searchParams.get('tpWorkoutId') ?? '').trim()
+            if (!tpWorkoutId) {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'tpWorkoutId kötelező' }))
+                return
+            }
+
+            const record = workoutStore.getByWorkoutId(tpWorkoutId)
+            if (!record) {
+                res.statusCode = 404
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: `TP workout nem található: ${tpWorkoutId}` }))
+                return
+            }
+
+            if (!record.fileContent) {
+                res.statusCode = 404
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: `TP workout JSON fájl hiányzik: ${tpWorkoutId}` }))
+                return
+            }
+
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.setHeader('X-TP-Workout-Id', tpWorkoutId)
+            res.setHeader('X-TP-File-Path', record.filePath)
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename="tp-workout-${tpWorkoutId}.json"`,
+            )
+            res.end(JSON.stringify(record.fileContent, null, 2))
+        } catch (err) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+            }))
+        }
+    })
+
     return workoutStore}

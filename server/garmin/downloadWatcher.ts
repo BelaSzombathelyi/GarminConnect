@@ -47,22 +47,48 @@ async function moveFile(sourcePath: string, targetPath: string): Promise<boolean
     } catch (err) {
         const e = err as NodeJS.ErrnoException
         if (e?.code === 'ENOENT') return false
-        if (!e || e.code !== 'EXDEV') throw err
+        // Csak EXDEV (cross-device) és EPERM (Windows: pl. Defender hold) esetén
+        // próbálkozzunk a copy+unlink fallback-kel. Egyéb hibát továbbdobunk.
+        if (e?.code !== 'EXDEV' && e?.code !== 'EPERM' && e?.code !== 'EACCES') throw err
     }
 
-    try {
-        await copyFile(sourcePath, targetPath)
-        await unlink(sourcePath)
-        return true
-    } catch (err) {
-        const e = err as NodeJS.ErrnoException
-        if (e?.code === 'ENOENT') return false
-        throw err
+    // Windows-on a frissen letöltött fájlt a Defender/SmartScreen néha 1-3 mp-ig
+    // exkluzívan szkenneli → EPERM/EBUSY copyFile-nál. Backoff retry-jal
+    // próbálkozunk, mielőtt feladnánk.
+    const maxAttempts = 6
+    let lastErr: unknown
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            await copyFile(sourcePath, targetPath)
+            try {
+                await unlink(sourcePath)
+            } catch (unlinkErr) {
+                const ue = unlinkErr as NodeJS.ErrnoException
+                if (ue?.code !== 'ENOENT') {
+                    // A forrás már nem ott van, vagy nem törölhető — nem kritikus,
+                    // a célfájl megvan, csak log.
+                    console.warn('[downloads] Forrás unlink nem sikerült:', ue?.code || unlinkErr)
+                }
+            }
+            return true
+        } catch (err) {
+            const e = err as NodeJS.ErrnoException
+            if (e?.code === 'ENOENT') return false
+            if (e?.code !== 'EPERM' && e?.code !== 'EBUSY' && e?.code !== 'EACCES') throw err
+            lastErr = err
+            // 500ms, 1s, 1.5s, 2s, 2.5s, 3s → összesen ~10.5s backoff
+            await sleep(500 * attempt)
+        }
     }
+
+    throw lastErr instanceof Error ? lastErr : new Error('copyFile retry kifogyott')
 }
 
-async function waitForStableFile(filePath: string, retries = 8, delayMs = 1000): Promise<boolean> {
+async function waitForStableFile(filePath: string, retries = 20, delayMs = 500): Promise<boolean> {
+    // Növelt retries (20 × 500ms = 10s összesen), hogy a frissen letöltött
+    // ZIP-et a Defender/SmartScreen befejezhesse szkennelni, mielőtt move-oljuk.
     let previous: { size: number; mtimeMs: number } | null = null
+    let stableCount = 0
 
     for (let i = 0; i < retries; i += 1) {
         let current
@@ -73,8 +99,13 @@ async function waitForStableFile(filePath: string, retries = 8, delayMs = 1000):
             continue
         }
 
-        if (previous && previous.size === current.size && previous.mtimeMs === current.mtimeMs) {
-            return true
+        if (previous && previous.size === current.size && previous.mtimeMs === current.mtimeMs && current.size > 0) {
+            stableCount += 1
+            // Kérünk 2 egymás utáni stabil mintát — egy nem elég, mert a
+            // Chrome néha „pause"-ol írás közben.
+            if (stableCount >= 2) return true
+        } else {
+            stableCount = 0
         }
 
         previous = { size: current.size, mtimeMs: current.mtimeMs }

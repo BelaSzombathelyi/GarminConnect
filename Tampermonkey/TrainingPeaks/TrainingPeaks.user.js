@@ -1,21 +1,19 @@
 // ==UserScript==
 // @name         TrainingPeaks - Advanced Search Logger
 // @namespace    https://trainingpeaks.com/
-// @version      0.2.0
-// @description  Opens workout search and reports extracted workouts to localhost API.
+// @version      1
+// @description  Opens workout search and reports extracted workouts to localhost API. Adds a download icon into the workout detail (#workOutQuickView .closeAndSettings) toolbar that processes the workout and downloads its JSON file.
 // @match        https://app.trainingpeaks.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      localhost
 // @connect      127.0.0.1
-// @updateURL    https://raw.githubusercontent.com/BelaSzombathelyi/GarminConnect/main/Tampermonkey/TrainingPeaks/TrainingPeaks.user.js
-// @downloadURL  https://raw.githubusercontent.com/BelaSzombathelyi/GarminConnect/main/Tampermonkey/TrainingPeaks/TrainingPeaks.user.js
 // ==/UserScript==
 
 (function () {
   "use strict";
 
   const LOG_PREFIX = "[TP Search]";
-  const API_BASE = "http://127.0.0.1:5173/api";
+  const API_BASE = "http://localhost:5173/api";
   const HANDLE_FUTURE_EVENTS = false;
   const INCLUDE_FUTURE_ROWS = HANDLE_FUTURE_EVENTS;
   const UI_STATE = {
@@ -26,14 +24,9 @@
     pendingWorkoutKeys: new Set(),
     refreshTimer: null,
     observer: null,
-    detailStateTimer: null,
     syncBtn: null,
-    detailSyncBtn: null,
     downloadBtn: null,
-    openGarminBtn: null,
     statusEl: null,
-    rowSyncingKeys: new Set(),
-    rowDownloadingKeys: new Set(),
   };
   const SELECTORS = {
     searchButton: ".workoutSearch",
@@ -54,8 +47,6 @@
   const WORKOUT_ID_PATTERNS = [
     /\/fitness\/v\d+\/athletes\/\d+\/workouts\/(\d+)(?:[/?#]|$)/i,
     /\/notification\/v\d+\/markworkoutread\/(\d+)(?:[/?#]|$)/i,
-    /[?&](?:workoutId|workout_id|tpWorkoutId)=(\d+)(?:[&#]|$)/i,
-    /["']?workoutId["']?\s*[:=]\s*["']?(\d+)["']?/i,
     /\/workouts\/(\d+)(?:[/?#]|$)/i,
   ];
 
@@ -127,8 +118,9 @@
     });
   }
 
-  function triggerTextDownload(fileName, text) {
-    const blob = new Blob([String(text || "")], { type: "text/markdown;charset=utf-8" });
+  function triggerTextDownload(fileName, text, mimeType) {
+    const type = mimeType || "text/markdown;charset=utf-8";
+    const blob = new Blob([String(text || "")], { type });
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = objectUrl;
@@ -155,29 +147,24 @@
     return tpWorkoutId;
   }
 
-  async function fetchWorkoutLinks(params) {
-    const query = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE}/workout_links?${query}`, { method: "GET" });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} workout_links`);
-    }
-    return response.json();
-  }
-
-  async function downloadWorkoutMarkdownById(tpWorkoutId) {
-    const endpoint = `${API_BASE}/reprocess_workout_by_tp_id`;
-    const markdown = await httpRequestText("POST", endpoint, { tpWorkoutId });
-    triggerTextDownload(`tp-workout-${tpWorkoutId}.md`, markdown);
-  }
-
-  async function syncCurrentWorkoutDetail() {
-    const workout = await collectCurrentWorkoutPayload();
-    await reportWorkoutsToLocalApi([workout]);
-    return String(workout?.raw?.workoutId ?? "").trim();
-  }
-
   function inferWorkoutNameFromDetail() {
     const root = getWorkoutQuickViewRoot() || document;
+
+    // 1) A workout cim egy szerkesztheto <input class="title workoutTitle">,
+    //    ennek a value-jat (vagy a value attributumat) olvassuk eloszor.
+    const titleInput = root.querySelector(
+      "input.workoutTitle, input.title.workoutTitle, input.title",
+    );
+    if (titleInput) {
+      const val = normalizedText(
+        titleInput.value || titleInput.getAttribute("value") || "",
+      );
+      if (val && !/search|filter|advanced/i.test(val)) {
+        return val;
+      }
+    }
+
+    // 2) Fallback: szoveges elemek a popupon belul.
     const selectors = [
       "h1",
       "h2",
@@ -195,7 +182,15 @@
       }
     }
 
-    return normalizedText(document.title.replace(/\s*-\s*TrainingPeaks\s*$/i, ""));
+    // 3) Vegso fallback: a dokumentum cime (de a TrainingPeaks generikus
+    //    title-jat nem fogadjuk el, az ures string lesz a payload-ban).
+    const docTitle = normalizedText(
+      document.title.replace(/\s*-\s*TrainingPeaks\s*$/i, ""),
+    );
+    if (/^TrainingPeaks/i.test(docTitle)) {
+      return "";
+    }
+    return docTitle;
   }
 
   function getWorkoutDayTokenFromStart(workoutStart) {
@@ -205,6 +200,230 @@
       return `${Number(iso[3])}/${Number(iso[2])}/${iso[1]}`;
     }
     return value;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Workout structure / intervallum kinyeres a fejlec alatti chart-rol
+  // (.workoutStructureGraphRegion .flot-overlay). A flot canvas-on vegig
+  // mozgatjuk az egeret, minden uj tomahawk megjelenesekor parse-oljuk a
+  // tartalmat (`.tomahawkContent`), deduplikalunk a startAt/endAt + tipus
+  // alapjan, es szegmensek listajat adjuk vissza.
+  // ────────────────────────────────────────────────────────────────────────────
+
+  function parseDurationToMinutes(text) {
+    const value = normalizedText(text);
+    if (!value) return null;
+    const hrMatch = value.match(/(\d+)\s*hr/i);
+    const minMatch = value.match(/(\d+)\s*min/i);
+    const secMatch = value.match(/(\d+)\s*sec/i);
+    if (!hrMatch && !minMatch && !secMatch) return null;
+    return (
+      (hrMatch ? Number(hrMatch[1]) * 60 : 0) +
+      (minMatch ? Number(minMatch[1]) : 0) +
+      (secMatch ? Number(secMatch[1]) / 60 : 0)
+    );
+  }
+
+  function parseTomahawkContentNode(el) {
+    if (!el) return null;
+    const stepLengthText = normalizedText(
+      el.querySelector(".stepLengthDetails")?.textContent || "",
+    );
+    const stepLengthMatch = stepLengthText.match(
+      /Starting at:\s*(.+?)\s*,\s*Ending at:\s*(.+?)$/i,
+    );
+    // startAt/endAt csak a dedup-hoz hasznaljuk, a kimenetben nem szerepel
+    const startAt = stepLengthMatch?.[1]?.trim() || "";
+    const endAt = stepLengthMatch?.[2]?.trim() || "";
+    const startAtMinutes = parseDurationToMinutes(startAt);
+
+    function parseStepInner(stepEl) {
+      const title = normalizedText(
+        stepEl.querySelector(".stepTitle")?.textContent,
+      );
+      const di = normalizedText(
+        stepEl.querySelector(".durationIntensity")?.textContent,
+      );
+      return {
+        description: title,
+        durationIntensity: di,
+      };
+    }
+
+    const repetitionEl = el.querySelector(".repetition");
+    if (repetitionEl) {
+      const repeatsText = normalizedText(
+        repetitionEl.querySelector(".repeats")?.textContent || "",
+      );
+      const repeatsMatch = repeatsText.match(/Repeat\s+(\d+)\s+times?/i);
+      const repeats = repeatsMatch ? Number(repeatsMatch[1]) : null;
+      const steps = Array.from(
+        repetitionEl.querySelectorAll(".numberedStep"),
+      ).map((numberedEl) => {
+        const stepInner = numberedEl.querySelector(".step");
+        return stepInner
+          ? parseStepInner(stepInner)
+          : { description: "", durationIntensity: "" };
+      });
+      return {
+        repeats,
+        steps,
+        _startAt: startAt,
+        _endAt: endAt,
+        _startAtMinutes: startAtMinutes,
+      };
+    }
+
+    const stepEl = el.querySelector(".step");
+    if (stepEl) {
+      return {
+        ...parseStepInner(stepEl),
+        _startAt: startAt,
+        _endAt: endAt,
+        _startAtMinutes: startAtMinutes,
+      };
+    }
+    return null;
+  }
+
+  function buildStructureDedupKey(parsed) {
+    if (!parsed) return "";
+    if (Array.isArray(parsed.steps)) {
+      const stepsKey = parsed.steps
+        .map((s) => `${s.description}:${s.durationIntensity}`)
+        .join(";");
+      return `rep|${parsed.repeats ?? ""}|${stepsKey}|${parsed._startAt}|${parsed._endAt}`;
+    }
+    return `step|${parsed.description}:${parsed.durationIntensity}|${parsed._startAt}|${parsed._endAt}`;
+  }
+
+  function stripStructureInternals(parsed) {
+    if (!parsed) return parsed;
+    const { _startAt, _endAt, _startAtMinutes, ...rest } = parsed;
+    return rest;
+  }
+
+  async function extractWorkoutStructure(timeoutMs = 12000) {
+    const startedAt = Date.now();
+
+    // 1) Varjunk a regio + overlay canvas megjelenesere (popup nyilas utan
+    //    a chart kesobb renderelodik mint a header).
+    let region = null;
+    let overlay = null;
+    while (Date.now() - startedAt < 4000) {
+      region = document.querySelector(".workoutStructureGraphRegion");
+      overlay = region?.querySelector("canvas.flot-overlay");
+      if (region && overlay && isVisible(region)) {
+        const r = overlay.getBoundingClientRect();
+        if (r.width >= 20 && r.height >= 5) break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!region || !overlay || !isVisible(region)) {
+      log("Workout structure extrakt: nincs lathato chart");
+      return [];
+    }
+    const rect = overlay.getBoundingClientRect();
+    if (rect.width < 20 || rect.height < 5) {
+      log("Workout structure extrakt: chart meret 0");
+      return [];
+    }
+
+    // 2) Probaljuk dispatchelni a mousemove-ot kozepen es vizsgaljuk, megjelenik-e
+    //    a tomahawk. A flot hover handler kesik a chart init utan, ezert polling.
+    const tomahawkRoot =
+      region.querySelector(".workoutStructureViewerGraph") || region;
+    let tomahawkSeen = false;
+    while (Date.now() - startedAt < 7000) {
+      overlay.dispatchEvent(
+        new MouseEvent("mousemove", {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      if (tomahawkRoot.querySelector(".tomahawk .tomahawkContent")) {
+        tomahawkSeen = true;
+        break;
+      }
+    }
+    if (!tomahawkSeen) {
+      log("Workout structure extrakt: tomahawk nem jelent meg, kihagyas");
+      return [];
+    }
+
+    // 3) Vegigseprunk a charton es gyujtjuk az egyedi szegmenseket.
+    const segments = new Map();
+    const stepPx = 4;
+    const dwellMs = 18;
+    log("Workout structure extrakt indul", {
+      width: rect.width,
+      height: rect.height,
+    });
+
+    for (let x = 1; x < 2; x += stepPx) {
+      if (Date.now() - startedAt > timeoutMs) {
+        log("Workout structure extrakt: timeout, korai megallas");
+        break;
+      }
+      overlay.dispatchEvent(
+        new MouseEvent("mousemove", {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + x,
+          clientY: rect.top + rect.height / 2,
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, dwellMs));
+      const contentEl = tomahawkRoot.querySelector(
+        ".tomahawk .tomahawkContent",
+      );
+      if (!contentEl) continue;
+      const parsed = parseTomahawkContentNode(contentEl);
+      if (!parsed) continue;
+      const key = buildStructureDedupKey(parsed);
+      if (!key) continue;
+      if (!segments.has(key)) {
+        segments.set(key, parsed);
+      }
+    }
+
+    overlay.dispatchEvent(
+      new MouseEvent("mouseout", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    overlay.dispatchEvent(
+      new MouseEvent("mouseleave", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    region.dispatchEvent(
+      new MouseEvent("mouseleave", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    // Ha flot megis bennhagyna a tomahawk node-ot, tuntessuk el DOM-szinten,
+    // hogy ne maradjon zavaro buborek a kepernyon.
+    const lingering = tomahawkRoot.querySelector(".tomahawk");
+    if (lingering) {
+      lingering.style.display = "none";
+    }
+
+    const sorted = Array.from(segments.values())
+      .sort((a, b) => {
+        const av = Number.isFinite(a._startAtMinutes) ? a._startAtMinutes : Infinity;
+        const bv = Number.isFinite(b._startAtMinutes) ? b._startAtMinutes : Infinity;
+        return av - bv;
+      })
+      .map(stripStructureInternals);
+    log(`Workout structure extrakt kesz: ${sorted.length} szegmens`);
+    return sorted;
   }
 
   async function collectCurrentWorkoutPayload() {
@@ -219,20 +438,90 @@
     }
 
     const workoutStart = resolveWorkoutStartDate(getWorkoutStartDateText(), "");
-    const workoutType = normalizedText(
-      root.querySelector("[data-test='workout-type'], [data-testid='workout-type'], .workoutType, .type")?.textContent,
+    // workoutType: a `.workout` div masodik osztalya (pl. "workout Run" -> "Run").
+    // Fallback: a header alatti MuiStack-h6 szovege.
+    let workoutType = "";
+    const workoutTypeEl = root.querySelector(".workout[class*=' ']");
+    if (workoutTypeEl) {
+      const classes = Array.from(workoutTypeEl.classList).filter(
+        (c) => c !== "workout",
+      );
+      if (classes.length > 0) {
+        workoutType = classes[0];
+      }
+    }
+    if (!workoutType) {
+      workoutType = normalizedText(
+        root.querySelector(".workoutIconAndKeyStats + .MuiStack-root h6, .MuiStack-root h6")?.textContent,
+      );
+    }
+    if (!workoutType) {
+      workoutType = normalizedText(
+        root.querySelector("[data-test='workout-type'], [data-testid='workout-type'], .workoutType, .type")?.textContent,
+      );
+    }
+    // completedTotalTime: a header .keyStats .duration .value
+    let completedTotalTime = normalizedText(
+      root.querySelector(".keyStats .duration .value")?.textContent,
     );
-    const totalTime = normalizedText(
-      root.querySelector("[data-test='workout-total-time'], [data-testid='workout-total-time'], .totalTime")?.textContent,
+    if (!completedTotalTime) {
+      completedTotalTime = normalizedText(
+        root.querySelector("[data-test='workout-total-time'], [data-testid='workout-total-time'], .totalTime")?.textContent,
+      );
+    }
+    const completedDistance = normalizedText(
+      root.querySelector(".keyStats .distance, [data-test='workout-distance'], [data-testid='workout-distance'], .distance")?.textContent,
     );
-    const distance = normalizedText(
-      root.querySelector("[data-test='workout-distance'], [data-testid='workout-distance'], .distance")?.textContent,
+    const completedTssValue = normalizedText(
+      root.querySelector(".keyStats .tss .value, [data-test='workout-tss-value'], [data-testid='workout-tss-value'], .tss .value")?.textContent,
     );
-    const tssValue = normalizedText(
-      root.querySelector("[data-test='workout-tss-value'], [data-testid='workout-tss-value'], .tss .value")?.textContent,
+    const completedTssUnit = normalizedText(
+      root.querySelector(".keyStats .tss .units, [data-test='workout-tss-unit'], [data-testid='workout-tss-unit'], .tss .units")?.textContent,
     );
-    const tssUnit = normalizedText(
-      root.querySelector("[data-test='workout-tss-unit'], [data-testid='workout-tss-unit'], .tss .units")?.textContent,
+    // Planned TSS: a workoutPlannedCompletedStats panel TSSStatsRow soraban,
+    // workoutStatsPlanned oszlop input.value-ja. Az egyseget ugyanazon sor
+    // workoutStatsUnitLabel label.tss elemebol vesszuk.
+    const plannedTssRow = root.querySelector(
+      ".workoutStatsRow.TSSStatsRow",
+    );
+    let plannedTssValue = "";
+    let plannedTssUnit = "";
+    if (plannedTssRow) {
+      const plannedInput = plannedTssRow.querySelector(
+        "#tssPlannedField, .workoutStatsPlanned input",
+      );
+      plannedTssValue = normalizedText(
+        plannedInput?.value || plannedInput?.getAttribute("value") || "",
+      );
+      plannedTssUnit = normalizedText(
+        plannedTssRow.querySelector(".workoutStatsUnitLabel label.tss, .workoutStatsUnitLabel label")?.textContent,
+      );
+    } else {
+      // Fallback: direkt #tssPlannedField, a label.tss kozelben.
+      const plannedInput = root.querySelector("#tssPlannedField");
+      if (plannedInput) {
+        plannedTssValue = normalizedText(
+          plannedInput.value || plannedInput.getAttribute("value") || "",
+        );
+        const row = plannedInput.closest(".workoutStatsRow");
+        plannedTssUnit = normalizedText(
+          row?.querySelector(".workoutStatsUnitLabel label.tss, .workoutStatsUnitLabel label")?.textContent,
+        );
+      }
+    }
+    if (!plannedTssUnit) {
+      plannedTssUnit = completedTssUnit;
+    }
+    // IF (Intensity Factor): planned + completed input mezok.
+    const plannedIfValue = normalizedText(
+      root.querySelector("#ifPlannedField")?.value ||
+        root.querySelector("#ifPlannedField")?.getAttribute("value") ||
+        "",
+    );
+    const completedIfValue = normalizedText(
+      root.querySelector("#ifCompletedField")?.value ||
+        root.querySelector("#ifCompletedField")?.getAttribute("value") ||
+        "",
     );
     const name = inferWorkoutNameFromDetail();
 
@@ -241,19 +530,33 @@
     }
 
     const workoutDay = getWorkoutDayTokenFromStart(workoutStart);
-    const rowKey = buildRowKey(workoutDay, workoutType, totalTime, tssValue, tssUnit) || `${workoutDay}_${tpWorkoutId}`;
+    const rowKey = buildRowKey(workoutDay, workoutType, completedTotalTime, completedTssValue, completedTssUnit) || `${workoutDay}_${tpWorkoutId}`;
+
+    // Best-effort: ha van chart, kinyerjuk az intervallumokat. Sosem fail-el,
+    // ures tomb is elfogadhato (a szerver oldalan `workoutStructure: []` lesz).
+    let workoutStructure = [];
+    try {
+      workoutStructure = await extractWorkoutStructure(8000);
+    } catch (err) {
+      log("workout structure extrakt hiba (folytatjuk)", err);
+    }
 
     return {
       rowKey,
       name,
       workoutStart,
       workoutType,
-      totalTime,
-      distance,
-      tssValue,
-      tssUnit,
+      completedTotalTime,
+      completedDistance,
+      completedTssValue,
+      completedTssUnit,
+      plannedTssValue,
+      plannedTssUnit,
+      plannedIfValue,
+      completedIfValue,
       description: extractWorkoutDescription(),
       comments: extractComments(),
+      workoutStructure,
       source: "trainingpeaks",
       raw: {
         route: currentRouteSignature(),
@@ -296,8 +599,8 @@
     return "";
   }
 
-  function buildRowKey(workoutDay, workoutType, totalTime, tssValue, tssUnit) {
-    return [workoutDay, workoutType, totalTime, `${tssValue || ""}${tssUnit || ""}`]
+  function buildRowKey(workoutDay, workoutType, completedTotalTime, completedTssValue, completedTssUnit) {
+    return [workoutDay, workoutType, completedTotalTime, `${completedTssValue || ""}${completedTssUnit || ""}`]
       .filter(Boolean)
       .join("_");
   }
@@ -441,44 +744,9 @@
       document,
     ];
 
-    const attrNames = [
-      "data-workout-id",
-      "data-workoutid",
-      "data-id",
-      "data-key",
-      "id",
-      "href",
-      "src",
-      "action",
-      "data-url",
-    ];
+    const attrNames = ["data-workout-id", "data-id", "data-key", "id", "href"];
     for (const candidate of candidates) {
-      if (!candidate) {
-        continue;
-      }
-
-      // 1) A candidate saját attribútumai (nem csak a leszármazottaké).
-      if (typeof candidate.getAttribute === "function") {
-        for (const attr of attrNames) {
-          const value = candidate.getAttribute(attr);
-          const id = extractWorkoutIdFromText(value);
-          if (id) {
-            return id;
-          }
-        }
-      }
-
-      // 2) Gyors textual fallback a candidate saját HTML-jére/szövegére.
-      const ownHtmlId = extractWorkoutIdFromText(candidate.outerHTML || "");
-      if (ownHtmlId) {
-        return ownHtmlId;
-      }
-      const ownTextId = extractWorkoutIdFromText(candidate.textContent || "");
-      if (ownTextId) {
-        return ownTextId;
-      }
-
-      if (typeof candidate.querySelectorAll !== "function") {
+      if (!candidate || typeof candidate.querySelectorAll !== "function") {
         continue;
       }
 
@@ -491,28 +759,6 @@
             return id;
           }
         }
-      }
-
-      // 3) Detail nézetben gyakori hidden/input mezők célzott keresése.
-      const specialNodes = candidate.querySelectorAll(
-        "input[name='workoutId'], input[name='workout_id'], input[id*='workoutId'], [data-workout-id], [data-workoutid]",
-      );
-      for (const node of specialNodes) {
-        const id =
-          extractWorkoutIdFromText(node.value) ||
-          extractWorkoutIdFromText(node.getAttribute("value")) ||
-          extractWorkoutIdFromText(node.getAttribute("data-workout-id")) ||
-          extractWorkoutIdFromText(node.getAttribute("data-workoutid")) ||
-          extractWorkoutIdFromText(node.id);
-        if (id) {
-          return id;
-        }
-      }
-
-      // 4) Utolsó fallback: a candidate teljes HTML-jében regex keresés.
-      const deepHtmlId = extractWorkoutIdFromText(candidate.innerHTML || "");
-      if (deepHtmlId) {
-        return deepHtmlId;
       }
     }
 
@@ -539,25 +785,8 @@
   }
 
   function getWorkoutQuickViewRoot() {
-    const candidates = [
-      SELECTORS.workoutQuickViewRoot,
-      "#workoutQuickView",
-      ".workOutQuickView",
-      ".workoutQuickView",
-      "[data-test='workout-quick-view']",
-      "[data-testid='workout-quick-view']",
-      "[data-test='workout-detail']",
-      "[data-testid='workout-detail']",
-    ];
-
-    for (const selector of candidates) {
-      const root = document.querySelector(selector);
-      if (root && isVisible(root)) {
-        return root;
-      }
-    }
-
-    return null;
+    const root = document.querySelector(SELECTORS.workoutQuickViewRoot);
+    return root && isVisible(root) ? root : null;
   }
 
   function textByCell(row, className) {
@@ -1157,61 +1386,13 @@
     const closeIcon = root?.querySelector(SELECTORS.workoutDetailCloseIcon);
     const dayName = root?.querySelector(SELECTORS.workoutDetailDayName);
     const detailShell = root?.querySelector(".dateAndTime");
-    const routeHasWorkout = /\/workouts\/\d+(?:[/?#]|$)/i.test(currentRouteSignature());
 
     return Boolean(
       root ||
       (closeIcon && isVisible(closeIcon)) ||
       (dayName && isVisible(dayName)) ||
-      (detailShell && isVisible(detailShell)) ||
-      routeHasWorkout,
+      (detailShell && isVisible(detailShell)),
     );
-  }
-
-  async function updateDetailGarminLink() {
-    const openGarminBtn = UI_STATE.openGarminBtn;
-    if (!openGarminBtn) return;
-
-    if (!isWorkoutDetailVisible()) {
-      openGarminBtn.style.display = "none";
-      return;
-    }
-
-    const tpWorkoutId =
-      getWorkoutIdFromRoute() ||
-      getWorkoutIdFromDomContext(getWorkoutQuickViewRoot()) ||
-      getWorkoutIdFromNetworkEntries(120000);
-
-    if (!tpWorkoutId) {
-      openGarminBtn.style.display = "none";
-      return;
-    }
-
-    try {
-      const links = await fetchWorkoutLinks({ tpWorkoutId });
-      const garminActivityId = String(links?.garminActivityId ?? "").trim();
-      if (!garminActivityId) {
-        openGarminBtn.style.display = "none";
-        return;
-      }
-
-      openGarminBtn.href = `https://connect.garmin.com/app/activity/${encodeURIComponent(garminActivityId)}`;
-      openGarminBtn.textContent = `Open Garmin Activity (${garminActivityId})`;
-      openGarminBtn.style.display = "inline-block";
-    } catch {
-      openGarminBtn.style.display = "none";
-    }
-  }
-
-  function startDetailStateWatcher() {
-    if (UI_STATE.detailStateTimer !== null) {
-      return;
-    }
-
-    UI_STATE.detailStateTimer = setInterval(() => {
-      refreshSyncButtonState();
-      updateDetailGarminLink();
-    }, 500);
   }
 
   function clickElementRobust(el) {
@@ -1239,7 +1420,6 @@
         new MouseEvent(eventName, {
           bubbles: true,
           cancelable: true,
-          view: window,
           clientX,
           clientY,
         }),
@@ -1495,12 +1675,10 @@
           name: title,
           workoutStart,
           workoutType: getWorkoutTypeFromRow(row),
-          totalTime: cellPartText(row, "totalTime", "value"),
-        distance: textByCell(row, "distance"),
-        tssValue: cellPartText(row, "tssActual", "value"),
-        tssUnit: cellPartText(row, "tssActual", "units"),
-        plannedTssValue: cellPartText(row, "tssPlanned", "value"),
-        plannedTssUnit: cellPartText(row, "tssPlanned", "units"),
+          completedTotalTime: cellPartText(row, "totalTime", "value"),
+        completedDistance: textByCell(row, "distance"),
+        completedTssValue: cellPartText(row, "tssActual", "value"),
+        completedTssUnit: cellPartText(row, "tssActual", "units"),
         description,
         comments,
         source: "trainingpeaks",
@@ -1586,11 +1764,11 @@
         workoutStart,
           ...(() => {
             const workoutType = getWorkoutTypeFromRow(row);
-            const totalTime = cellPartText(row, "totalTime", "value");
-            const tssValue = cellPartText(row, "tssActual", "value");
-            const tssUnit = cellPartText(row, "tssActual", "units");
-            const rowKey = buildRowKey(workoutStart, workoutType, totalTime, tssValue, tssUnit);
-            return { workoutType, totalTime, tssValue, tssUnit, rowKey, key: rowKey };
+            const completedTotalTime = cellPartText(row, "totalTime", "value");
+            const completedTssValue = cellPartText(row, "tssActual", "value");
+            const completedTssUnit = cellPartText(row, "tssActual", "units");
+            const rowKey = buildRowKey(workoutStart, workoutType, completedTotalTime, completedTssValue, completedTssUnit);
+            return { workoutType, completedTotalTime, completedTssValue, completedTssUnit, rowKey, key: rowKey };
           })(),
       });
     }
@@ -1602,154 +1780,8 @@
     return items.map((it) => it.key).sort().join("\n");
   }
 
-  function ensureTpDownloadHeader() {
-    const root = document.querySelector(SELECTORS.advancedResultsRoot);
-    if (!root) return;
-    const headerRow = root.querySelector("thead tr");
-    if (!headerRow || headerRow.querySelector(".tp-download-col-header")) return;
-
-    const th = document.createElement("th");
-    th.className = "tp-download-col-header";
-    th.textContent = "Letöltés";
-    th.style.minWidth = "110px";
-    th.style.textAlign = "center";
-    headerRow.appendChild(th);
-  }
-
-  function ensureTpDownloadCell(row) {
-    let cell = row.querySelector("td.tp-download-cell");
-    if (cell) return cell;
-
-    cell = document.createElement("td");
-    cell.className = "tp-download-cell";
-    cell.style.textAlign = "center";
-    cell.style.minWidth = "110px";
-    row.appendChild(cell);
-    return cell;
-  }
-
-  function createMiniActionButton(label, bgColor, onClick) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = label;
-    btn.style.border = "none";
-    btn.style.borderRadius = "6px";
-    btn.style.background = bgColor;
-    btn.style.color = "#fff";
-    btn.style.padding = "3px 8px";
-    btn.style.cursor = "pointer";
-    btn.style.fontSize = "12px";
-    btn.style.fontWeight = "600";
-    btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onClick();
-    });
-    return btn;
-  }
-
-  async function syncSingleListWorkout(item) {
-    const row = item?.row;
-    if (!row) return;
-
-    const routeBeforeOpen = currentRouteSignature();
-    row.scrollIntoView({ block: "center", behavior: "instant" });
-    row.click();
-
-    await waitForWorkoutDetailOpen(routeBeforeOpen, 12000);
-    await waitForWorkoutDetailDateReady(12000);
-    await waitForWorkoutDetailData(15000);
-
-    const workoutId = await resolveWorkoutId(row, 4000);
-    const workoutStart = resolveWorkoutStartDate(getWorkoutStartDateText(), item.workoutStart);
-    const payload = {
-      rowKey: item.rowKey,
-      name: item.name,
-      workoutStart,
-      workoutType: item.workoutType,
-      totalTime: item.totalTime,
-      distance: textByCell(row, "distance"),
-      tssValue: cellPartText(row, "tssActual", "value"),
-      tssUnit: cellPartText(row, "tssActual", "units"),
-      plannedTssValue: cellPartText(row, "tssPlanned", "value"),
-      plannedTssUnit: cellPartText(row, "tssPlanned", "units"),
-      description: extractWorkoutDescription(),
-      comments: extractComments(),
-      source: "trainingpeaks",
-      raw: {
-        route: currentRouteSignature(),
-        workoutId,
-      },
-    };
-
-    await reportWorkoutsToLocalApi([payload]);
-    await closeWorkoutDetail(routeBeforeOpen, 12000);
-  }
-
-  function renderResultRowDownloadActions() {
-    ensureTpDownloadHeader();
-    const items = collectResultListWorkouts(INCLUDE_FUTURE_ROWS);
-    for (const item of items) {
-      const key = String(item.key || "");
-      const row = item.row;
-      const cell = ensureTpDownloadCell(row);
-      cell.innerHTML = "";
-
-      const isPending = UI_STATE.pendingWorkoutKeys.has(key);
-      const syncing = UI_STATE.rowSyncingKeys.has(key);
-      const downloading = UI_STATE.rowDownloadingKeys.has(key);
-
-      if (isPending) {
-        const syncBtn = createMiniActionButton(syncing ? "Sync..." : "Sync", "#16a34a", async () => {
-          if (UI_STATE.rowSyncingKeys.has(key) || UI_STATE.rowDownloadingKeys.has(key)) return;
-          UI_STATE.rowSyncingKeys.add(key);
-          renderResultRowDownloadActions();
-          try {
-            await syncSingleListWorkout(item);
-            await refreshPendingFromServer(true);
-          } catch (err) {
-            alert(`Sync hiba: ${err instanceof Error ? err.message : String(err)}`);
-          } finally {
-            UI_STATE.rowSyncingKeys.delete(key);
-            renderResultRowDownloadActions();
-          }
-        });
-        if (syncing) {
-          syncBtn.disabled = true;
-          syncBtn.style.opacity = "0.75";
-        }
-        cell.appendChild(syncBtn);
-        continue;
-      }
-
-      const downloadBtn = createMiniActionButton(downloading ? "..." : "⬇️", "#0ea5e9", async () => {
-        if (UI_STATE.rowSyncingKeys.has(key) || UI_STATE.rowDownloadingKeys.has(key)) return;
-        UI_STATE.rowDownloadingKeys.add(key);
-        renderResultRowDownloadActions();
-        try {
-          const tpWorkoutId = await resolveWorkoutId(row, 5000);
-          if (!tpWorkoutId) {
-            throw new Error("Nem találtam TP workout ID-t a sorhoz");
-          }
-          await downloadWorkoutMarkdownById(tpWorkoutId);
-        } catch (err) {
-          alert(`Download hiba: ${err instanceof Error ? err.message : String(err)}`);
-        } finally {
-          UI_STATE.rowDownloadingKeys.delete(key);
-          renderResultRowDownloadActions();
-        }
-      });
-      if (downloading) {
-        downloadBtn.disabled = true;
-        downloadBtn.style.opacity = "0.75";
-      }
-      cell.appendChild(downloadBtn);
-    }
-  }
-
   function refreshSyncButtonState(loadedCountOverride) {
     const syncBtn = UI_STATE.syncBtn;
-    const detailSyncBtn = UI_STATE.detailSyncBtn;
     const downloadBtn = UI_STATE.downloadBtn;
     const statusEl = UI_STATE.statusEl;
     if (!syncBtn || !statusEl) {
@@ -1761,16 +1793,9 @@
       : collectResultListWorkouts(INCLUDE_FUTURE_ROWS).length;
     const pendingCount = UI_STATE.pendingWorkoutKeys.size;
     const detailVisible = isWorkoutDetailVisible();
-    const openGarminBtn = UI_STATE.openGarminBtn;
 
     if (downloadBtn) {
       downloadBtn.style.display = detailVisible ? "block" : "none";
-    }
-    if (detailSyncBtn) {
-      detailSyncBtn.style.display = detailVisible ? "block" : "none";
-    }
-    if (openGarminBtn) {
-      openGarminBtn.style.display = detailVisible ? "inline-block" : "none";
     }
 
     if (UI_STATE.runInProgress) {
@@ -1780,10 +1805,6 @@
       if (downloadBtn) {
         downloadBtn.disabled = true;
         downloadBtn.style.opacity = "0.7";
-      }
-      if (detailSyncBtn) {
-        detailSyncBtn.disabled = true;
-        detailSyncBtn.style.opacity = "0.7";
       }
       return;
     }
@@ -1795,10 +1816,6 @@
         downloadBtn.disabled = true;
         downloadBtn.style.opacity = "0.7";
         downloadBtn.textContent = "Download folyamatban...";
-      }
-      if (detailSyncBtn) {
-        detailSyncBtn.disabled = true;
-        detailSyncBtn.style.opacity = "0.7";
       }
       return;
     }
@@ -1812,12 +1829,7 @@
         downloadBtn.style.opacity = detailVisible ? "1" : "0.7";
         downloadBtn.textContent = "Download current workout";
       }
-      if (detailSyncBtn) {
-        detailSyncBtn.disabled = !detailVisible;
-        detailSyncBtn.style.opacity = detailVisible ? "1" : "0.7";
-      }
       statusEl.textContent = `Lista: ${loadedCount}, nem riportalt: ${pendingCount}`;
-      renderResultRowDownloadActions();
       return;
     }
 
@@ -1829,12 +1841,7 @@
       downloadBtn.style.opacity = detailVisible ? "1" : "0.7";
       downloadBtn.textContent = "Download current workout";
     }
-    if (detailSyncBtn) {
-      detailSyncBtn.disabled = !detailVisible;
-      detailSyncBtn.style.opacity = detailVisible ? "1" : "0.7";
-    }
     statusEl.textContent = `Lista: ${loadedCount}, minden riportalva`;
-    renderResultRowDownloadActions();
   }
 
   async function refreshPendingFromServer(force = false) {
@@ -1844,8 +1851,6 @@
 
     if (!listVisible) {
       UI_STATE.pendingWorkoutKeys = new Set();
-      UI_STATE.rowSyncingKeys.clear();
-      UI_STATE.rowDownloadingKeys.clear();
       UI_STATE.visibleSignature = "";
       UI_STATE.lastServerCheckSignature = "";
       refreshSyncButtonState(0);
@@ -1889,6 +1894,224 @@
       UI_STATE.refreshTimer = null;
       refreshPendingFromServer(force);
     }, 350);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Fuggetlen feature: download ikon a workout reszletes nezet (#workOutQuickView)
+  // .closeAndSettings.cf toolbarjaban. Kattintasra:
+  //   1) workout feldolgozas (collectCurrentWorkoutPayload + report_workouts),
+  //      ami eltarolja a JSON-t a szerveren (data/TrainingPeaks/...{id}.json).
+  //   2) A szerverrol lekeri a JSON fajlt es elinditja a kliens oldali letoltest.
+  // Teljesen fuggetlen az osszes tobbi UI-tol.
+  // ────────────────────────────────────────────────────────────────────────────
+
+  const WORKOUT_DETAIL_DL_ICON_MARKER = "data-tp-detail-download-icon";
+  let WORKOUT_DETAIL_DL_WATCHER_TIMER = null;
+
+  function findWorkoutDetailToolbar() {
+    const root =
+      getWorkoutQuickViewRoot() ||
+      document.querySelector("#workOutQuickView");
+    if (!root || !isVisible(root)) {
+      return null;
+    }
+    const toolbar = root.querySelector(".closeAndSettings.cf");
+    if (!toolbar || !isVisible(toolbar)) {
+      return null;
+    }
+    return toolbar;
+  }
+
+  function buildWorkoutDetailDownloadIcon() {
+    const wrapper = document.createElement("div");
+    wrapper.id = "tpDownloadIcon";
+    wrapper.setAttribute(WORKOUT_DETAIL_DL_ICON_MARKER, "1");
+    wrapper.setAttribute("role", "button");
+    wrapper.setAttribute("tabindex", "0");
+    wrapper.setAttribute("aria-label", "Workout feldolgozas + JSON letoltes");
+    wrapper.setAttribute("title", "Workout feldolgozas + JSON letoltes");
+    // A testver ikonok (settingsIcon, menuIcon, closeIcon, ...) ~24x24 px-es,
+    // background-image-szel hasznaljak. Nincs hozzaferesunk a TP CSS-hez,
+    // ezert inline SVG-vel rajzoljuk a download szimbolumot, hogy egyseges
+    // legyen a megjelenes meretileg.
+    // A testver ikonok (settingsIcon, menuIcon, ...) feltehetoleg float-osak
+    // (a szulo .cf clearfix). A biztonsag kedveert mindket lehetoseget lefedjuk:
+    // float-tal igazitunk, de inline-block-ot is megadunk, hogy ha nem float-os
+    // a layout, akkor is megjelenjen.
+    wrapper.style.cssText = [
+      "float: right",
+      "display: inline-block",
+      "box-sizing: border-box",
+      "width: 24px",
+      "height: 24px",
+      "margin: 6px 6px 0 6px",
+      "padding: 0",
+      "cursor: pointer",
+      "color: #555",
+      "opacity: 0.85",
+      "vertical-align: middle",
+      "text-align: center",
+      "line-height: 1",
+      "z-index: 10",
+    ].join("; ");
+
+    wrapper.innerHTML = [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"',
+      ' fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"',
+      ' stroke-linejoin="round" aria-hidden="true">',
+      '<path d="M12 3v12"/>',
+      '<path d="m6 11 6 6 6-6"/>',
+      '<path d="M5 21h14"/>',
+      "</svg>",
+    ].join("");
+
+    wrapper.addEventListener("mouseenter", () => {
+      wrapper.style.opacity = "1";
+    });
+    wrapper.addEventListener("mouseleave", () => {
+      wrapper.style.opacity = "0.85";
+    });
+
+    return wrapper;
+  }
+
+  async function processAndDownloadCurrentWorkoutJson() {
+    const statusEl = UI_STATE.statusEl;
+    const setStatus = (msg) => {
+      if (statusEl) statusEl.textContent = msg;
+      log(msg);
+    };
+
+    setStatus("Workout feldolgozas indul...");
+
+    let tpWorkoutId = "";
+    try {
+      const workout = await collectCurrentWorkoutPayload();
+      tpWorkoutId = String(workout?.raw?.workoutId || "").trim();
+      await reportWorkoutsToLocalApi([workout]);
+      setStatus(`Workout feldolgozva: TP ${tpWorkoutId || "(ismeretlen ID)"}`);
+    } catch (reportErr) {
+      log("Workout feldolgozas hiba (folytatjuk a letoltessel)", reportErr);
+      setStatus(
+        `Feldolgozas hiba (folytatjuk): ${
+          reportErr instanceof Error ? reportErr.message : String(reportErr)
+        }`,
+      );
+    }
+
+    if (!tpWorkoutId) {
+      tpWorkoutId =
+        getWorkoutIdFromRoute() ||
+        getWorkoutIdFromDomContext(getWorkoutQuickViewRoot()) ||
+        getWorkoutIdFromNetworkEntries(120000) ||
+        "";
+    }
+
+    if (!tpWorkoutId) {
+      throw new Error("Nem sikerult TP workout ID-t talalni a letoltehez");
+    }
+
+    const url = `${API_BASE}/trainingpeaks/get_workout_json?tpWorkoutId=${encodeURIComponent(tpWorkoutId)}`;
+    const json = await httpRequestText("GET", url);
+    triggerTextDownload(
+      `tp-workout-${tpWorkoutId}.json`,
+      json,
+      "application/json;charset=utf-8",
+    );
+    setStatus(`JSON letoltes kesz: TP ${tpWorkoutId}`);
+    return tpWorkoutId;
+  }
+
+  function ensureWorkoutDetailDownloadIcon() {
+    const toolbar = findWorkoutDetailToolbar();
+    if (!toolbar) {
+      return;
+    }
+    if (toolbar.querySelector(`[${WORKOUT_DETAIL_DL_ICON_MARKER}]`)) {
+      return;
+    }
+
+    const icon = buildWorkoutDetailDownloadIcon();
+    let inFlight = false;
+    const handleClick = async (ev) => {
+      if (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+      if (inFlight) {
+        return;
+      }
+      inFlight = true;
+      icon.style.opacity = "0.5";
+      icon.style.pointerEvents = "none";
+      try {
+        await processAndDownloadCurrentWorkoutJson();
+      } catch (err) {
+        log("Workout JSON letoltes hiba", err);
+        const msg = err instanceof Error ? err.message : String(err);
+        const statusEl = UI_STATE.statusEl;
+        if (statusEl) {
+          statusEl.textContent = `JSON letoltes hiba: ${msg}`;
+        } else {
+          alert(`JSON letoltes hiba: ${msg}`);
+        }
+      } finally {
+        inFlight = false;
+        icon.style.opacity = "0.85";
+        icon.style.pointerEvents = "";
+      }
+    };
+
+    icon.addEventListener("click", handleClick);
+    icon.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        handleClick(ev);
+      }
+    });
+
+    // A felhasznalo igenye: a settingsIcon ELE szurjuk be a download ikont.
+    const settingsIcon = toolbar.querySelector(".settingsIcon");
+    if (settingsIcon) {
+      toolbar.insertBefore(icon, settingsIcon);
+    } else {
+      toolbar.insertBefore(icon, toolbar.firstChild);
+    }
+
+    // A toolbar testverekent levo .dateAndTime szelesseget 30px-el csokkentjuk,
+    // hogy az uj download ikon elferjen mellette. Idempotens: a `data-tp-*`
+    // markerrel jelezzuk, hogy mar modositottuk.
+    try {
+      const root =
+        getWorkoutQuickViewRoot() ||
+        document.querySelector("#workOutQuickView");
+      const dateAndTime = root?.querySelector(".dateAndTime");
+      if (dateAndTime && !dateAndTime.hasAttribute("data-tp-width-shrunk")) {
+        const currentWidthPx = dateAndTime.getBoundingClientRect().width;
+        if (currentWidthPx > 0) {
+          const newWidth = Math.max(0, Math.round(currentWidthPx - 30));
+          dateAndTime.style.width = `${newWidth}px`;
+          dateAndTime.setAttribute("data-tp-width-shrunk", "1");
+        }
+      }
+    } catch (err) {
+      log("dateAndTime szelesseg modositas hiba", err);
+    }
+
+    log("Workout detail download ikon injektalva");
+  }
+
+  function startWorkoutDetailDownloadIconWatcher() {
+    if (WORKOUT_DETAIL_DL_WATCHER_TIMER !== null) {
+      return;
+    }
+    WORKOUT_DETAIL_DL_WATCHER_TIMER = setInterval(() => {
+      try {
+        ensureWorkoutDetailDownloadIcon();
+      } catch (err) {
+        log("Workout detail download ikon watcher hiba", err);
+      }
+    }, 500);
+    log("Workout detail download ikon watcher elindult");
   }
 
   function startResultListObserver() {
@@ -1962,12 +2185,10 @@
           name: title,
           workoutStart,
           workoutType: liveRow.workoutType,
-          totalTime: liveRow.totalTime,
-        distance: textByCell(row, "distance"),
-        tssValue: cellPartText(row, "tssActual", "value"),
-        tssUnit: cellPartText(row, "tssActual", "units"),
-        plannedTssValue: cellPartText(row, "tssPlanned", "value"),
-        plannedTssUnit: cellPartText(row, "tssPlanned", "units"),
+          completedTotalTime: liveRow.completedTotalTime,
+        completedDistance: textByCell(row, "distance"),
+        completedTssValue: cellPartText(row, "tssActual", "value"),
+        completedTssUnit: cellPartText(row, "tssActual", "units"),
         description,
         comments,
         source: "trainingpeaks",
@@ -2059,51 +2280,6 @@
     downloadBtn.style.width = "100%";
     downloadBtn.style.marginTop = "8px";
 
-    const detailSyncBtn = document.createElement("button");
-    detailSyncBtn.textContent = "Sync current workout";
-    detailSyncBtn.style.border = "none";
-    detailSyncBtn.style.borderRadius = "8px";
-    detailSyncBtn.style.background = "#22c55e";
-    detailSyncBtn.style.color = "white";
-    detailSyncBtn.style.padding = "8px 10px";
-    detailSyncBtn.style.cursor = "pointer";
-    detailSyncBtn.style.fontWeight = "600";
-    detailSyncBtn.style.display = "block";
-    detailSyncBtn.style.width = "100%";
-    detailSyncBtn.style.marginTop = "8px";
-
-    const openGarminBtn = document.createElement("a");
-    openGarminBtn.href = "#";
-    openGarminBtn.target = "_blank";
-    openGarminBtn.rel = "noreferrer";
-    openGarminBtn.textContent = "Open Garmin Activity";
-    openGarminBtn.style.display = "none";
-    openGarminBtn.style.marginTop = "8px";
-    openGarminBtn.style.color = "#93c5fd";
-    openGarminBtn.style.fontWeight = "600";
-
-    detailSyncBtn.addEventListener("click", async () => {
-      if (UI_STATE.runInProgress || UI_STATE.downloadInProgress) {
-        return;
-      }
-
-      UI_STATE.downloadInProgress = true;
-      refreshSyncButtonState();
-
-      try {
-        const tpWorkoutId = await syncCurrentWorkoutDetail();
-        status.textContent = `Sync kesz: TP ${tpWorkoutId || "-"}`;
-        await refreshPendingFromServer(true);
-      } catch (err) {
-        const errorText = err instanceof Error ? err.message : String(err);
-        status.textContent = `Sync hiba: ${errorText}`;
-        log("Detail sync hiba", err);
-      } finally {
-        UI_STATE.downloadInProgress = false;
-        refreshSyncButtonState();
-      }
-    });
-
     downloadBtn.addEventListener("click", async () => {
       if (UI_STATE.runInProgress || UI_STATE.downloadInProgress) {
         return;
@@ -2117,7 +2293,8 @@
         // Ha az adatgyűjtés nem sikerül (pl. hiányos DOM), akkor is próbálunk letölteni –
         // a szerveren lehet már meglévő rekord.
         try {
-          await syncCurrentWorkoutDetail();
+          const workout = await collectCurrentWorkoutPayload();
+          await reportWorkoutsToLocalApi([workout]);
         } catch (reportErr) {
           log("Workout riportalas nem sikerult (folytatjuk a letoltessel)", reportErr);
         }
@@ -2136,17 +2313,13 @@
     });
 
     UI_STATE.syncBtn = syncBtn;
-    UI_STATE.detailSyncBtn = detailSyncBtn;
     UI_STATE.downloadBtn = downloadBtn;
-    UI_STATE.openGarminBtn = openGarminBtn;
     UI_STATE.statusEl = status;
 
     panel.appendChild(title);
     panel.appendChild(status);
     panel.appendChild(syncBtn);
-    panel.appendChild(detailSyncBtn);
     panel.appendChild(downloadBtn);
-    panel.appendChild(openGarminBtn);
     document.body.appendChild(panel);
 
     refreshSyncButtonState();
@@ -2155,6 +2328,15 @@
   async function main() {
     try {
       log("Script indult");
+
+      // Fuggetlen feature: a workout detail toolbar download ikon watcher
+      // azonnal indul, meg az advanced search flow elott is, igy mukodik a
+      // calendar nezetbol kozvetlenul megnyitott edzeseken is.
+      try {
+        startWorkoutDetailDownloadIconWatcher();
+      } catch (err) {
+        log("Workout detail download ikon watcher korai indital hiba", err);
+      }
 
       const searchButton = await waitForElement(SELECTORS.searchButton);
       searchButton.click();
@@ -2192,7 +2374,6 @@
       logResultRows();
 
       ensureUi();
-      startDetailStateWatcher();
       startResultListObserver();
       await refreshPendingFromServer(true);
       log("TP sync panel kesz, listafigyeles aktiv");

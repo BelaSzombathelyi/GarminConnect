@@ -4,13 +4,15 @@
   "name": "Csopak->Alsóörs anyuval",
   "workoutStart": "2026-04-05T14:53:21",
   "workoutType": "Bike",
-  "totalTime": "0:19:10",
-  "distance": "4.85",
-  "tssValue": "10",
-  "tssUnit": "hrTSS",
+  "completedTotalTime": "0:19:10",
+  "completedDistance": "4.85",
+  "completedTssValue": "10",
+  "completedTssUnit": "hrTSS",
   "plannedTssValue": "",
   "plannedTssUnit": "",
+  "plannedIfValue": "",
+  "completedIfValue": "",
   "description": "",
   "comments": [],
-  "source": "trainingpeaks"
+  "workoutStructure": []
 }

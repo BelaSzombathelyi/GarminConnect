@@ -21,9 +21,33 @@ A cél, hogy a GarminConnect megoldáshoz hasonló, jól szervezett architektúr
 - URL paraméterekkel legyen vezérelhető az automata mód (pl. `auto_run=1`).
 - UI változás esetén maradjon működő fallback ág.
 
+## Funkciók
+
+### Advanced Search sync (alap flow)
+
+- Megnyitja a workout keresőt és az advanced search nézetet.
+- A találati listát összeveti a lokális API-val, és csak az új workoutokat riportálja.
+- Soronként Sync / ⬇️ Download gombot injektál a találati listába.
+- Floating panel (jobb alsó sarok) a globális Sync / Download / Sync current workout / Open Garmin Activity gombokkal.
+
+### Workout detail toolbar: Download (JSON) ikon (0.3.0)
+
+- Független poller (`startWorkoutDetailDownloadIconWatcher`), 500 ms-onként fut, nem függ semmilyen más UI állapottól.
+- Belépési pont: a `#workOutQuickView` modal `.closeAndSettings.cf` toolbarja (ahol a `settingsIcon`, `menuIcon`, `expandIcon`, `collapseIcon`, `closeIcon` is van).
+- A toolbar elejére egy új `<div id="tpDownloadIcon">` elemet injektál inline SVG download ikonnal (~24×24 px, hover effekttel). Idempotens (`data-tp-detail-download-icon` marker).
+- Kattintáskor:
+  1. **Workout feldolgozás** — `collectCurrentWorkoutPayload()` + `reportWorkoutsToLocalApi()` lefut, a szerver eltárolja a JSON fájlt (`data/TrainingPeaks/YYYY-MM/DD/{workoutId}.json`).
+  2. **JSON letöltés** — a script lekéri a `/api/trainingpeaks/get_workout_json?tpWorkoutId=...` endpointot és a kliens böngészőből letölti `tp-workout-{workoutId}.json` néven.
+- A státuszt a meglévő floating panel `statusEl`-jén jelzi vissza (ha a panel látható), egyébként alert-tel.
+- Új szerver endpoint: `GET /api/trainingpeaks/get_workout_json?tpWorkoutId=...` — visszaadja a tárolt JSON fájl tartalmát `application/json` content-type-pal és `Content-Disposition: attachment` header-rel.
+
+## Verziók
+
+- **0.3.0** — Új download ikon a workout detail (`#workOutQuickView .closeAndSettings`) toolbarjában: workout feldolgozást indít, majd letölti a tárolt JSON fájlt. Új szerver endpoint: `/api/trainingpeaks/get_workout_json`.
+- **0.2.0** — Advanced Search sync, soronkénti Sync / Download akciók, floating panel.
+
 ## Következő lépések
 
-1. A céloldalak és műveletek pontosítása (mit automatizáljon a script).
-2. Stabil selectorok kiválasztása a `references/` alapján.
-3. Alap script váz létrehozása és első működő flow implementálása.
-4. Hibakezelés, retry és fallback viselkedés finomhangolása.
+1. Esetleges UI finomhangolás (ikon pozíció / méret testreszabás a TP eredeti CSS-ével).
+2. JSON letöltés mellett opcionálisan markdown letöltés gomb is itt megjelenhetne (megosztott kód a meglévő `downloadCurrentWorkoutMarkdown`-nal).
+3. Hibakezelés finomhangolása offline / nem futó dev szerver esetén.

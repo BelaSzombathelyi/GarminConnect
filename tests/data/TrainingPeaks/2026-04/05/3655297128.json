@@ -4,12 +4,14 @@
   "name": "70 perc kötetlen",
   "workoutStart": "2026-04-05T15:18:24",
   "workoutType": "Run",
-  "totalTime": "1:08:53",
-  "distance": "14.2",
-  "tssValue": "99",
-  "tssUnit": "rTSS",
+  "completedTotalTime": "1:08:53",
+  "completedDistance": "14.2",
+  "completedTssValue": "99",
+  "completedTssUnit": "rTSS",
   "plannedTssValue": "99",
   "plannedTssUnit": "rTSS",
+  "plannedIfValue": "",
+  "completedIfValue": "",
   "description": "Egyenletes, könnyed futás érzésre RPE 1-3",
   "comments": [
     {
@@ -18,5 +20,5 @@
       "user": "Szombathelyi Bela"
     }
   ],
-  "source": "trainingpeaks"
+  "workoutStructure": []
 }

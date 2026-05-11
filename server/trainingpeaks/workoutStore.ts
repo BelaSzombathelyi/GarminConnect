@@ -15,16 +15,17 @@ export interface TrainingPeaksWorkoutInput {
     workout_start?: string
     date?: string
     workoutType?: string
-    totalTime?: string
-    distance?: string
-    /** @deprecated Küldj tssValue + tssUnit mezőket helyette */
-    tss?: string
-    tssValue?: string
-    tssUnit?: string
+    completedTotalTime?: string
+    completedDistance?: string
+    completedTssValue?: string
+    completedTssUnit?: string
     plannedTssValue?: string
     plannedTssUnit?: string
+    plannedIfValue?: string
+    completedIfValue?: string
     description?: string
     comments?: (string | TrainingPeaksComment)[]
+    workoutStructure?: unknown
     raw?: Record<string, unknown>
 }
 
@@ -33,10 +34,10 @@ interface NormalizedWorkout {
     name: string
     workoutStart: string
     workoutType: string
-    totalTime: string
-    distance: string
-    tssValue: string
-    tssUnit: string
+    completedTotalTime: string
+    completedDistance: string
+    completedTssValue: string
+    completedTssUnit: string
     workoutId: string
     filePath: string
 }
@@ -45,19 +46,14 @@ function nowIso(): string {
     return new Date().toISOString()
 }
 
-function parseTss(item: TrainingPeaksWorkoutInput): { tssValue: string; tssUnit: string } {
-    if (item.tssValue !== undefined || item.tssUnit !== undefined) {
-        return {
-            tssValue: String(item.tssValue ?? '').trim(),
-            tssUnit: String(item.tssUnit ?? '').trim(),
-        }
+function parseCompletedTss(item: TrainingPeaksWorkoutInput): {
+    completedTssValue: string
+    completedTssUnit: string
+} {
+    return {
+        completedTssValue: String(item.completedTssValue ?? '').trim(),
+        completedTssUnit: String(item.completedTssUnit ?? '').trim(),
     }
-    const combined = String(item.tss ?? '').trim()
-    const match = combined.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]*)/)
-    if (match) {
-        return { tssValue: match[1], tssUnit: match[2] }
-    }
-    return { tssValue: combined, tssUnit: '' }
 }
 
 function parsePlannedTss(item: TrainingPeaksWorkoutInput): { plannedTssValue: string; plannedTssUnit: string } {
@@ -183,7 +179,7 @@ function normalizeWorkout(item: TrainingPeaksWorkoutInput): NormalizedWorkout | 
 
     if (!rowKey || !name || !workoutStart || !workoutId) return null
 
-    const { tssValue, tssUnit } = parseTss(item)
+    const { completedTssValue, completedTssUnit } = parseCompletedTss(item)
 
     const workoutDayFromRowKey = rowKeyToWorkoutDay(rowKey)
     const normalizedWorkoutStart =
@@ -197,10 +193,10 @@ function normalizeWorkout(item: TrainingPeaksWorkoutInput): NormalizedWorkout | 
         name,
         workoutStart: normalizedWorkoutStart,
         workoutType: String(item.workoutType ?? '').trim(),
-        totalTime: String(item.totalTime ?? '').trim(),
-        distance: String(item.distance ?? '').trim(),
-        tssValue,
-        tssUnit,
+        completedTotalTime: String(item.completedTotalTime ?? '').trim(),
+        completedDistance: String(item.completedDistance ?? '').trim(),
+        completedTssValue,
+        completedTssUnit,
         workoutId,
         filePath,
     }
@@ -222,15 +218,17 @@ function buildFullJson(item: TrainingPeaksWorkoutInput, normalized: NormalizedWo
         name: normalized.name,
         workoutStart: normalized.workoutStart,
         workoutType: normalized.workoutType,
-        totalTime: normalized.totalTime,
-        distance: normalized.distance,
-        tssValue: normalized.tssValue,
-        tssUnit: normalized.tssUnit,
+        completedTotalTime: normalized.completedTotalTime,
+        completedDistance: normalized.completedDistance,
+        completedTssValue: normalized.completedTssValue,
+        completedTssUnit: normalized.completedTssUnit,
         plannedTssValue,
         plannedTssUnit,
+        plannedIfValue: String(item.plannedIfValue ?? '').trim(),
+        completedIfValue: String(item.completedIfValue ?? '').trim(),
         description: String(item.description ?? '').trim(),
         comments: normalizeComments(item.comments),
-        source: 'trainingpeaks',
+        workoutStructure: Array.isArray(item.workoutStructure) ? item.workoutStructure : [],
     }
 }
 
@@ -246,10 +244,10 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
             name TEXT NOT NULL,
             workout_start TEXT NOT NULL,
             workout_type TEXT NOT NULL DEFAULT '',
-            total_time TEXT NOT NULL DEFAULT '',
-            distance TEXT NOT NULL DEFAULT '',
-            tss_value TEXT NOT NULL DEFAULT '',
-            tss_unit TEXT NOT NULL DEFAULT '',
+            completed_total_time TEXT NOT NULL DEFAULT '',
+            completed_distance TEXT NOT NULL DEFAULT '',
+            completed_tss_value TEXT NOT NULL DEFAULT '',
+            completed_tss_unit TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -317,14 +315,16 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
     const insertStmt = db.prepare(`
         INSERT INTO trainingpeaks_workouts
             (row_key, workout_id, name, workout_start, workout_type,
-             total_time, distance, tss_value, tss_unit, created_at, updated_at)
+             completed_total_time, completed_distance, completed_tss_value, completed_tss_unit,
+             created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     const updateStmt = db.prepare(`
         UPDATE trainingpeaks_workouts
         SET workout_id = ?, name = ?, workout_start = ?, workout_type = ?,
-            total_time = ?, distance = ?, tss_value = ?, tss_unit = ?, updated_at = ?
+            completed_total_time = ?, completed_distance = ?,
+            completed_tss_value = ?, completed_tss_unit = ?, updated_at = ?
         WHERE row_key = ?
     `)
 
@@ -376,8 +376,8 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
                         insertStmt.run(
                             normalized.rowKey, normalized.workoutId, normalized.name,
                             normalized.workoutStart, normalized.workoutType,
-                            normalized.totalTime, normalized.distance,
-                            normalized.tssValue, normalized.tssUnit,
+                            normalized.completedTotalTime, normalized.completedDistance,
+                            normalized.completedTssValue, normalized.completedTssUnit,
                             timestamp, timestamp,
                         )
                         console.info('[trainingpeaks] uj workout erkezett', {
@@ -393,8 +393,8 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
                     updateStmt.run(
                         normalized.workoutId, normalized.name,
                         normalized.workoutStart, normalized.workoutType,
-                        normalized.totalTime, normalized.distance,
-                        normalized.tssValue, normalized.tssUnit,
+                        normalized.completedTotalTime, normalized.completedDistance,
+                        normalized.completedTssValue, normalized.completedTssUnit,
                         timestamp,
                         normalized.rowKey,
                     )

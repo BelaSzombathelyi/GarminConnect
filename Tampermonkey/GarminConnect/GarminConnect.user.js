@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Garmin Connect ONE Sync
 // @namespace    https://connect.garmin.com/
-// @version      3.3
+// @version      3.7
 // @description  Garmin Connect: activities lista riport + új aktivitások szinkronizálása rejtett iframe-eken keresztül (új tabok megnyitása nélkül; az iframe-ben a fogaskerék menüből indul a natív letöltés, a parent pedig pollozza a lokális szervert).
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
@@ -24,9 +24,9 @@
     const API_BASE_DEFAULT = 'http://127.0.0.1:5173/api';
     const IFRAME_SYNC_PARAM = 'iframe_sync';
     const IFRAME_TIMEOUT_MS = 90000;
-    // Egyelőre vizuális debuggáshoz 1-en hagyjuk — látszik a sync, nincs többszörös
-    // párhuzamos letöltés, ami a Chrome-ot zavarhatja.
-    const IFRAME_MAX_CONCURRENT = 1;
+    // 3 szálon szinkronizálunk — a Chrome a többszörös letöltést kezeli
+    // (az iframe `allow=downloads` + per-aktivitás saját iframe miatt).
+    const IFRAME_MAX_CONCURRENT = 3;
     // Mennyit várjunk a fogaskerék kattintás után, hogy a menü kirajzolódjon,
     // és a menüpontok megjelenjenek az iframe DOM-jában.
     const IFRAME_MENU_OPEN_DELAY_MS = 100;
@@ -672,6 +672,7 @@
         observer: null,
         refreshTimer: null,
         rowSyncingIds: new Set(),
+        rowWaitingIds: new Set(),
         rowDownloadIds: new Set(),
     };
 
@@ -758,6 +759,7 @@
         UI_STATE.serverNewIds.clear();
         UI_STATE.visibleActivityIds.clear();
         UI_STATE.rowSyncingIds.clear();
+        UI_STATE.rowWaitingIds.clear();
         UI_STATE.rowDownloadIds.clear();
         UI_STATE.lastVisibleSignature = '';
         UI_STATE.lastReportedSignature = '';
@@ -889,22 +891,21 @@
 
             const iframe = document.createElement('iframe');
             iframe.dataset.gcIframeSync = id;
-            // Látható modal-szerű overlay, hogy debug közben szemmel lássuk
-            // mi történik az iframe-ben. A Tampermonkey alapból betölti az
-            // iframe-ekbe is a userscriptet (nincs @noframes), így ott lefut a
+            // Rejtett iframe — a Tampermonkey alapból betölti az iframe-ekbe is
+            // a userscriptet (nincs @noframes), így ott lefut a
             // runActivityDetailIframe (fogaskerék → Export File kattintás).
+            // Nem `display: none`-t használunk, mert a Chrome egyes esetekben
+            // azt user-gesture szempontból „nem renderelt" frame-nek tekinti és
+            // blokkolhatja a letöltést — ezért inkább off-screen + 1x1 px.
             Object.assign(iframe.style, {
                 position: 'fixed',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '50vw',
-                height: '50vh',
-                zIndex: '2147483646',
-                border: '2px solid #16a34a',
-                borderRadius: '8px',
-                boxShadow: '0 12px 36px rgba(0,0,0,0.45)',
-                background: '#fff',
+                left: '-10000px',
+                top: '-10000px',
+                width: '1px',
+                height: '1px',
+                opacity: '0',
+                pointerEvents: 'none',
+                border: '0',
             });
             iframe.setAttribute('title', `GC sync ${id}`);
             // A Chrome iframe-ből gyakran blokkolja a programatikus download-ot,
@@ -986,13 +987,24 @@
         const inFlight = new Set();
 
         const runOne = async (activityId) => {
+            // Jelöljük a sort folyamatban lévőnek, hogy a soron belül is
+            // látsszon a spinner. Vegyük ki a waiting halmazból (most
+            // aktív, nem már csak várakozik).
+            UI_STATE.rowWaitingIds.delete(activityId);
+            UI_STATE.rowSyncingIds.add(activityId);
+            renderRowDownloadActions();
             try {
                 await syncActivityViaIframe(activityId);
+                // Sikeres sync esetén töröljük a serverNewIds-ból, hogy a sor
+                // azonnal kék „Download" (markdown) gombra váltson.
+                UI_STATE.serverNewIds.delete(activityId);
                 completed += 1;
             } catch (err) {
                 failed += 1;
                 console.warn('[GC] iframe sync hiba:', activityId, err instanceof Error ? err.message : err);
             } finally {
+                UI_STATE.rowSyncingIds.delete(activityId);
+                renderRowDownloadActions();
                 if (statusEl) {
                     statusEl.textContent =
                         `Sync ${completed + failed}/${total} (fut: ${inFlight.size}, hiba: ${failed})`;
@@ -1022,6 +1034,33 @@
         return !UI_STATE.serverNewIds.has(String(activityId));
     }
 
+    function ensureSpinnerStyles() {
+        if (document.getElementById('gc-spinner-style')) return;
+        const style = document.createElement('style');
+        style.id = 'gc-spinner-style';
+        style.textContent = `
+            @keyframes gc-spin { to { transform: rotate(360deg); } }
+            .gc-spinner {
+                display: inline-block;
+                width: 12px;
+                height: 12px;
+                border: 2px solid rgba(255, 255, 255, 0.35);
+                border-top-color: #ffffff;
+                border-radius: 50%;
+                animation: gc-spin 0.8s linear infinite;
+                vertical-align: middle;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function makeSpinner() {
+        const sp = document.createElement('span');
+        sp.className = 'gc-spinner';
+        sp.setAttribute('aria-label', 'folyamatban');
+        return sp;
+    }
+
     function createActionButton(label, background, onClick) {
         const btn = document.createElement('button');
         btn.textContent = label;
@@ -1044,6 +1083,7 @@
     }
 
     function renderRowDownloadActions() {
+        ensureSpinnerStyles();
         const rows = getActivityRows();
         if (rows.length > 0) {
             ensureDownloadColumnHeader(rows[0].parentElement?.previousElementSibling || rows[0]);
@@ -1054,17 +1094,47 @@
 
             const activityId = String(item.activityId);
             const cell = ensureDownloadCell(row);
-            cell.innerHTML = '';
 
             const syncing = UI_STATE.rowSyncingIds.has(activityId);
+            const waiting = UI_STATE.rowWaitingIds.has(activityId);
             const downloading = UI_STATE.rowDownloadIds.has(activityId);
             const downloaded = isActivityDownloaded(activityId);
+            // Állapot-aláírás — ha nem változott, NEM rendereljük újra a
+            // cellát (mert akkor a spinner CSS animációja minden hívásnál
+            // 0-ról indulna és vibrálna).
+            const stateKey = `${activityId}|${syncing ? 'S' : ''}${waiting ? 'W' : ''}${downloading ? 'D' : ''}${downloaded ? 'd' : 'n'}`;
+            if (cell.dataset.gcState === stateKey) continue;
+            cell.dataset.gcState = stateKey;
+            cell.innerHTML = '';
+
+            // Színek: új = zöld, várakozik a sorra = világos narancs,
+            // épp szinkronizál = sötét narancs, kész MD letöltés = kék.
+            let bgColor;
+            let label;
+            if (syncing) {
+                bgColor = '#ea580c'; // sötét narancs
+                label = '';
+            } else if (waiting) {
+                bgColor = '#f59e0b'; // világos narancs / amber
+                label = 'Várakozik';
+            } else if (downloading) {
+                bgColor = '#0ea5e9'; // kék (MD letöltés folyamatban)
+                label = '';
+            } else if (downloaded) {
+                bgColor = '#0ea5e9'; // kék
+                label = 'Download';
+            } else {
+                bgColor = '#16a34a'; // zöld
+                label = 'Download';
+            }
 
             const downloadBtn = createActionButton(
-                syncing || downloading ? '...' : 'Download',
-                downloaded ? '#0ea5e9' : '#16a34a',
+                label,
+                bgColor,
                 async () => {
-                    if (UI_STATE.rowDownloadIds.has(activityId) || UI_STATE.rowSyncingIds.has(activityId)) return;
+                    if (UI_STATE.rowDownloadIds.has(activityId)
+                        || UI_STATE.rowSyncingIds.has(activityId)
+                        || UI_STATE.rowWaitingIds.has(activityId)) return;
 
                     if (!downloaded) {
                         UI_STATE.rowSyncingIds.add(activityId);
@@ -1099,7 +1169,16 @@
             );
             if (downloading || syncing) {
                 downloadBtn.disabled = true;
-                downloadBtn.style.opacity = '0.75';
+                downloadBtn.style.opacity = '0.85';
+                downloadBtn.style.minWidth = '74px';
+                downloadBtn.style.display = 'inline-flex';
+                downloadBtn.style.alignItems = 'center';
+                downloadBtn.style.justifyContent = 'center';
+                downloadBtn.appendChild(makeSpinner());
+            } else if (waiting) {
+                downloadBtn.disabled = true;
+                downloadBtn.style.opacity = '0.85';
+                downloadBtn.style.minWidth = '74px';
             }
             cell.appendChild(downloadBtn);
         }
@@ -1232,16 +1311,27 @@
                 if (downloadIds.length === 0) {
                     status.textContent = 'Nincs új aktivitás.';
                 } else {
-                    UI_STATE.serverNewIds.clear();
+                    // NE töröljük a serverNewIds-t — a sorok színe a sync alatt
+                    // is „új" (zöld/várakozik), és csak akkor váltson kékre,
+                    // ha az adott aktivitás sync-je sikeresen befejeződött
+                    // (a runOne maga törli onnan).
+                    // Inkább töltsük fel a waiting Set-et az összes ID-val.
+                    UI_STATE.rowWaitingIds = new Set(downloadIds);
+                    renderRowDownloadActions();
                     status.textContent = `${downloadIds.length} aktivitás szinkronizálása rejtett iframe-ekkel...`;
                     const activities = downloadIds.map((id) => ({ activityId: id }));
-                    const result = await syncActivitiesViaIframesWithConcurrency(
-                        activities,
-                        status,
-                        IFRAME_MAX_CONCURRENT,
-                    );
-                    status.textContent =
-                        `Sync kész: ${result.completed}/${result.total} (hiba: ${result.failed})`;
+                    try {
+                        const result = await syncActivitiesViaIframesWithConcurrency(
+                            activities,
+                            status,
+                            IFRAME_MAX_CONCURRENT,
+                        );
+                        status.textContent =
+                            `Sync kész: ${result.completed}/${result.total} (hiba: ${result.failed})`;
+                    } finally {
+                        UI_STATE.rowWaitingIds.clear();
+                        renderRowDownloadActions();
+                    }
                 }
             } catch (err) {
                 console.error('[Activities Sync] Hiba:', err);
