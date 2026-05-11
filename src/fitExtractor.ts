@@ -929,7 +929,7 @@ export function extractLaps(data: FitUploadResponse): string {
         'Max kadencia',
         'Lépéshossz (mm)',
         'Vert. osz. (mm)',
-        'Talajérintés (ms)',
+        'GCT (ms)',
         'Vert. arány (%)',
         'Átl. légzés (l/p)',
         'Max. légzés (l/p)',
