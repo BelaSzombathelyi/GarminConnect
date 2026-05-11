@@ -169,6 +169,11 @@ export function createActivityStore(dbFilePath: string) {
             return row ?? null
         },
 
+        getStatus(activityId: string | number): ActivityStatusValue | null {
+            const row = getStatusByIdStmt.get(String(activityId)) as { status: ActivityStatusValue } | undefined
+            return row?.status ?? null
+        },
+
         filterDownloadable(activityIds: string[]): string[] {
             return activityIds.filter((id) => {
                 const row = getStatusByIdStmt.get(id) as { status: string } | undefined

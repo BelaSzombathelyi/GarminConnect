@@ -307,6 +307,31 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
         res.end(JSON.stringify({ ok: true, activities: items }))
     })
 
+    server.middlewares.use('/api/activity_status', (req, res) => {
+        if (handleOptions(req, res)) return
+        setCorsHeaders(res)
+
+        if (req.method !== 'GET') {
+            res.statusCode = 405
+            res.end('Method Not Allowed')
+            return
+        }
+
+        const reqUrl = new URL(req.url || '', 'http://localhost')
+        const activityId = String(reqUrl.searchParams.get('activityId') || '').trim()
+        if (!activityId) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({ ok: false, error: 'activityId kötelező' }))
+            return
+        }
+
+        const status = activityStore.getStatus(activityId)
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.statusCode = 200
+        res.end(JSON.stringify({ ok: true, activityId, status: status ?? 'UNKNOWN' }))
+    })
+
     server.middlewares.use('/api/mark_processed', async (req, res) => {
         if (handleOptions(req, res)) return
         setCorsHeaders(res)

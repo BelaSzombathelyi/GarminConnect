@@ -42,75 +42,73 @@ A Tampermonkey szkript fejlesztésekor ezek a fájlok helyi referenciaként hasz
 
 ---
 
-## GarminConnect.user.js – Szkript működése
+## GarminConnect.user.js – Egyesített userscript
 
-A szkript a `https://connect.garmin.com/app/activity/*` URL-mintára illeszkedik, pl.:
+A korábbi **két különálló userscript** (`GarminConnect.user.js` az activity detail oldalra és `GarminConnect.activities.user.js` az activities listára) össze lett vonva egyetlen userscriptbe. A `@match` minták:
+
 ```
-https://connect.garmin.com/app/activity/22222900920
+https://connect.garmin.com/app/activities
+https://connect.garmin.com/app/activities?*
+https://connect.garmin.com/app/activity/*
 ```
 
-### Lépések, amiket a szkript végrehajt
+A szkript az URL alapján szétválasztja a kódágakat. Az iframe-ben futó példány a `?iframe_sync=1` query paraméter (vagy a `window.top !== window.self` ellenőrzés) alapján headless módba kapcsol.
 
-1. **Oldal betöltésének megvárása** – mivel a Garmin Connect egy React SPA, a szkript megvárja, amíg a fogaskerék (`⚙`) gomb (`[class*="Menu_menuBtn"]`) megjelenik a DOM-ban.
+> Ha korábban telepítve volt a `GarminConnect.activities.user.js`, **távolítsd el a Tampermonkey-ban**, hogy ne fusson kétszer.
 
-2. **Aktivitás ID kinyerése** – az URL-ből (`/app/activity/{id}`) regex-szel kinyeri az aktivitás azonosítóját.
+### Három futási mód
 
-3. **FIT fájl letöltése** – `GM_xmlhttpRequest`-tel közvetlenül lekéri a FIT binárist a Garmin API-ról:
-   ```
-   GET https://connect.garmin.com/download-service/files/activity/{activityId}
-   ```
-   A `GM_xmlhttpRequest` nem kötve van a böngésző CORS-szabályaihoz, és a garmin.com session cookie-kat automatikusan elküldi.
+1. **Activities lista oldal** (`/app/activities*`, top frame)
+   - DOM-ból kiolvassa az aktivitásokat → `POST /api/report_activities`
+   - Jobb alsó sarokban panel: `Sync` + `Export` gombok, soronkénti `Download` gomb
+   - A `Sync` gomb a szerver által új-ként jelzett ID-kat **látható modal iframe-eken keresztül** szinkronizálja (egyszerre `IFRAME_MAX_CONCURRENT = 1` — debug-barát, nincs többszálú letöltés ami a Chrome-ot zavarná)
+   - **Nem nyit új tabot/ablakot** — minden iframe-ben fut, `postMessage`-zel jelez vissza
 
-4. **FIT adat továbbítása** – a letöltött bináris adatot `GM_xmlhttpRequest` POST kéréssel elküldi a helyi Vite szerverre:
-   ```
-   POST http://localhost:5173/api/fit-upload
-   Content-Type: application/octet-stream
-   X-Activity-Id: {activityId}
-   ```
+2. **Activity detail oldal iframe-ben** (`/app/activity/{id}?iframe_sync=1` vagy `window.top !== window.self`)
+   - Nincs Quick Actions UI
+   - Megvárja a fogaskerék gomb megjelenését, **kattint rá**, vár ~100 ms-t, hogy a menü kirajzolódjon
+   - Megkeresi az „Export File” menüpontot a megnyitott menüben és **valódi MouseEvent sequence-t** (`mousedown` → `mouseup` → `click`) küld rá → ez elindítja a Garmin natív böngésző-letöltését
+   - Minden lépésnél diagnosztikai log megy ki `postMessage({ type: 'gc-iframe-log', activityId, level, message })` formában → a parent ablak konzolján `[GC iframe {id}] ...` prefix-szel látszik
+   - `postMessage({ type: 'gc-iframe-clicked', activityId }, '*')` üzenettel jelez a parent felé, hogy a kattintás megtörtént
+   - A letöltött ZIP-et a server-oldali `downloadWatcher` figyeli a Downloads mappában, archiválja és feldolgozza (status `NEW` → `RECEIVED` → `PROCESSED`)
+   - Hiba esetén `postMessage({ type: 'gc-iframe-error', activityId, error }, '*')` megy ki
 
-### Tampermonkey fejléc (`@grant` / `@connect`)
+3. **Activity detail oldal standalone** (top frame)
+   - Megjelenít egy *Garmin Quick Actions* panelt (`Sync current workout`, `Download MD`, opcionális TP link)
+   - Ha `?auto_download=1` szerepel az URL-ben, megpróbálja a fogaskerék menüből az „Export File” pontot, fallback-ként az API blob letöltést
+   - `?close_after_download=1` esetén lezárja vagy visszanavigálja a tabot (legacy, kézi flow-hoz)
 
-A szkriptnek két extra Tampermonkey engedélyre van szüksége:
-```js
-// @grant   GM_xmlhttpRequest
-// @connect localhost
-```
-- `GM_xmlhttpRequest` – CORS-mentes HTTP kérések indítására
-- `@connect localhost` – engedélyezi, hogy a szkript `localhost`-ra küldjön kérést
+### Iframe sync protokoll
 
-### Verziókezelés
+| Lépés | Parent (`/app/activities`) | Iframe (`/app/activity/{id}?iframe_sync=1`) |
+|------|----------------------------|---------------------------------------------|
+| 1 | Létrehoz **látható, középre pozícionált** `<iframe>`-et (`50vw × 50vh`, zöld kerettel, `zIndex 2147483646`, `allow="downloads"`). `IFRAME_MAX_CONCURRENT = 1` | — |
+| 2 | `window.addEventListener('message', ...)` | A userscript automatikusan elindul az iframe-ben is |
+| 3 | Mirroring: a `gc-iframe-log` üzeneteket `[GC iframe {id}] ...` prefixszel a parent konzolra is kiírja | Megvárja a fogaskerék gombot, kattint rá, vár 100 ms-t |
+| 4 | — | Megkeresi az „Export File” menüpontot, és **valódi MouseEvent sequence-t** (`mousedown`/`mouseup`/`click`) dispatch-el rá → natív letöltés indul |
+| 5 | — | `postMessage({ type: 'gc-iframe-clicked', activityId }, '*')` |
+| 6 | Elkezdi pollozni `GET /api/activity_status?activityId=...` (1 s intervallum, max 60 s). Az iframe-et **csak `IFRAME_KEEP_ALIVE_AFTER_CLICK_MS = 3000` ms múlva** távolítja el — különben a Chrome blokkolja az iframe-ből indított letöltést | A natív letöltés tovább fut, az iframe már leszedhető |
+| 7 | A `downloadWatcher` átteszi a ZIP-et az archive-ba és lefuttatja a FIT feldolgozást → status `PROCESSED` | — |
+| 8 | A poll `RECEIVED`/`PROCESSED` státusznál resolve-ol (vagy `ERROR` → reject) | — |
 
-> **Fontos:** a szkript minden módosításakor kötelező a `@version` értékét emelni a fejlécben:
-> ```js
-> // @version  0.4
-> ```
-> A Tampermonkey csak akkor frissíti automatikusan a telepített szkriptet, ha a verziószám magasabb, mint az előző. Verzió emelés nélkül a módosítás nem érvényesül a böngészőben.
+Status értékek (`/api/activity_status`):
 
----
+- `NEW` — riportolva, de még nincs ZIP
+- `RECEIVED` — `downloadWatcher` elkapta a ZIP-et
+- `PROCESSED` — FIT feldolgozva, MD elkészült
+- `ERROR` — feldolgozás közben hiba
+- `UNKNOWN` — nincs ilyen ID a store-ban
 
-## GarminConnect.activities.user.js – Activities lista szinkron
+> **Risk 1:** ha a Garmin valaha `X-Frame-Options: DENY`-t (vagy `frame-ancestors 'none'`) küldene a detail oldalra, az iframe nem töltődik be. Jelenleg same-origin keretezés működik.
+>
+> **Risk 2:** a Chrome iframe-ből származó programatikus letöltést könnyen blokkolja. Ennek kivédésére a script:
+> - `allow="downloads"` attribútumot tesz az iframe-re,
+> - valódi `MouseEvent` sequence-t dispatch-el (nem csak `.click()`-et),
+> - és a klikk után **3 másodpercig életben hagyja** az iframe-et a DOM-ban.
+>
+> Ha mégis blokkolódna, a Chrome cím-sorának bal oldalán megjelenik egy „Downloads blocked" pajzs ikon — ott manuálisan engedélyezhető a `connect.garmin.com` automatikus letöltése (*Site settings → Automatic downloads → Allow*).
 
-Ez egy külön userscript, ami az activities lista oldalon fut:
-
-- `@match https://connect.garmin.com/app/activities*`
-- DOM-ból kiolvassa az aktivitás adatokat (`activityId`, `name`, `date`, `type`)
-- elküldi a helyi API-ra:
-   - `POST /api/report_activities`
-- lekéri a NEW aktivitásokat:
-   - `GET /api/get_new_activities?limit=25`
-- egyszerre megnyitja a detail oldalakat:
-   - `https://connect.garmin.com/app/activity/{id}?auto_download=1&close_after_download=1`
-
-### UI
-
-A script az oldal jobb alsó sarkába betesz egy kis panelt:
-
-- státusz sor
-- gomb: `Újak letöltése`
-
-Az oldal megnyitásakor egyszer automatikusan lefut a riport küldés.
-
-### Szükséges fejléc
+### Tampermonkey engedélyek
 
 ```js
 // @grant   GM_xmlhttpRequest
@@ -118,4 +116,6 @@ Az oldal megnyitásakor egyszer automatikusan lefut a riport küldés.
 // @connect 127.0.0.1
 ```
 
-Ezek nélkül a script nem tud a local API-val kommunikálni.
+### Verziókezelés
+
+> **Fontos:** minden módosításnál emelni kell a `@version` értékét, különben a Tampermonkey nem frissít automatikusan.
