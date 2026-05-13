@@ -87,12 +87,14 @@
         return httpRequestJson(method, url, data);
     }
 
-    function httpRequestArrayBuffer(method, url) {
+    function httpRequestArrayBuffer(method, url, data) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method,
                 url,
                 responseType: 'arraybuffer',
+                data: data ? JSON.stringify(data) : undefined,
+                headers: data ? { 'Content-Type': 'application/json' } : undefined,
                 onload: (response) => {
                     if (response.status < 200 || response.status >= 300) {
                         reject(new Error(`HTTP ${response.status} ${url}`));
@@ -106,11 +108,13 @@
         });
     }
 
-    function httpRequestText(method, url) {
+    function httpRequestText(method, url, data) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method,
                 url,
+                data: data ? JSON.stringify(data) : undefined,
+                headers: data ? { 'Content-Type': 'application/json' } : undefined,
                 onload: (response) => {
                     if (response.status < 200 || response.status >= 300) {
                         reject(new Error(`HTTP ${response.status} ${url}: ${response.responseText}`));
@@ -205,27 +209,15 @@
         return { activityId: id, zipBlob };
     }
 
-    async function fetchActivityMarkdown(activityId) {
-        // GM_xmlhttpRequest a Garmin CSP miatt (a localhost nincs az engedélyezett
-        // connect-src-ben). A content-type ellenőrzést megőrizzük: ha a szerver
-        // hibát adna vissza, a httpRequestText akkor is text-et hoz, és itt
-        // próbáljuk azonosítani.
-        const url = `${getApiBase()}/reprocess_workout_by_garmin_id?garminActivityId=${encodeURIComponent(activityId)}`;
-        const text = await httpRequestText('GET', url);
-        if (!text || !text.trim()) throw new Error(`Üres markdown válasz activityId=${activityId}`);
-        if (!text.includes('## Edzés összefoglaló')) {
-            console.warn(`[GC] Reprocess markdown gyanús (${activityId}), hiányzik az összefoglaló.`);
-        }
-        return text;
-    }
+    async function downloadResultsMarkdown(activityIds) {
+        const selectedIds = Array.isArray(activityIds)
+            ? Array.from(new Set(activityIds.map((id) => String(id || '').trim()).filter((id) => /^\d+$/.test(id))))
+            : [];
+        if (selectedIds.length === 0) throw new Error('Nincs kijelölt aktivitás.');
 
-    async function downloadActivityMarkdown(activityId) {
-        const text = await fetchActivityMarkdown(activityId);
-        triggerDownloadFromText(`garmin-${activityId}.md`, text);
-    }
-
-    async function downloadResultsMarkdown() {
-        const res = await httpRequestArrayBuffer('GET', `${getApiBase()}/download_results_markdown`);
+        const res = await httpRequestArrayBuffer('POST', `${getApiBase()}/download_workout_markdown`, {
+            garminActivityIds: selectedIds,
+        });
         const blob = new Blob([res.data], { type: res.contentType || 'text/markdown' });
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1342,12 +1334,26 @@
             }
         });
 
+
+    function collectSelectedActivityIds() {
+        const ids = [];
+        for (const row of getActivityRows()) {
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            if (!checkbox || !checkbox.checked) continue;
+            const item = extractActivityFromRow(row);
+            if (!item) continue;
+            ids.push(String(item.activityId));
+        }
+        return Array.from(new Set(ids));
+    }
+
         pdfBtn.addEventListener('click', async () => {
             pdfBtn.disabled = true;
             pdfBtn.style.opacity = '0.7';
             status.textContent = 'Exportálás...';
             try {
-                await downloadResultsMarkdown();
+                const selectedIds = collectSelectedActivityIds();
+                await downloadResultsMarkdown(selectedIds);
                 status.textContent = 'Exportálva.';
             } catch (err) {
                 status.textContent = `Hiba: ${err instanceof Error ? err.message : String(err)}`;

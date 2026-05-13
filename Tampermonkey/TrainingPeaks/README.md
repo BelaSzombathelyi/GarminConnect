@@ -51,3 +51,6 @@ A cél, hogy a GarminConnect megoldáshoz hasonló, jól szervezett architektúr
 1. Esetleges UI finomhangolás (ikon pozíció / méret testreszabás a TP eredeti CSS-ével).
 2. JSON letöltés mellett opcionálisan markdown letöltés gomb is itt megjelenhetne (megosztott kód a meglévő `downloadCurrentWorkoutMarkdown`-nal).
 3. Hibakezelés finomhangolása offline / nem futó dev szerver esetén.
+
+
+- A workout detail Download gomb a `POST /api/download_workout_markdown` endpointot hívja, és a feldolgozott Markdown fájlt tölti le.
