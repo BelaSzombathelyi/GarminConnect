@@ -141,7 +141,7 @@
       throw new Error("Nem sikerult TP workout ID-t talalni az aktualis nezetben");
     }
 
-    const endpoint = `${API_BASE}/reprocess_workout_by_tp_id`;
+    const endpoint = `${API_BASE}/download_workout_markdown`;
     const markdown = await httpRequestText("POST", endpoint, { tpWorkoutId });
     triggerTextDownload(`tp-workout-${tpWorkoutId}.md`, markdown);
     return tpWorkoutId;

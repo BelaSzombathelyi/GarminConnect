@@ -60,7 +60,7 @@ A szkript az URL alapján szétválasztja a kódágakat. Az iframe-ben futó pé
 
 1. **Activities lista oldal** (`/app/activities*`, top frame)
    - DOM-ból kiolvassa az aktivitásokat → `POST /api/report_activities`
-   - Jobb alsó sarokban panel: `Sync` + `Export` gombok, soronkénti `Download` gomb
+   - Jobb alsó sarokban panel: `Sync` + `Export` gombok, soronkénti `Download` gomb (Export csak kijelölt sorokból készít összefűzött MD-t)
    - A `Sync` gomb a szerver által új-ként jelzett ID-kat **rejtett (off-screen 1×1 px) iframe-eken keresztül** szinkronizálja (`IFRAME_MAX_CONCURRENT = 1`, hogy a Chrome ne blokkolja a párhuzamos letöltéseket)
    - **Nem nyit új tabot/ablakot** — minden iframe-ben fut, `postMessage`-zel jelez vissza
 
