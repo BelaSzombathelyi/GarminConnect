@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Garmin Connect ONE Sync
 // @namespace    https://connect.garmin.com/
-// @version      3.7
-// @description  Garmin Connect: activities lista riport + új aktivitások szinkronizálása rejtett iframe-eken keresztül (új tabok megnyitása nélkül; az iframe-ben a fogaskerék menüből indul a natív letöltés, a parent pedig pollozza a lokális szervert).
+// @version      3.9.2
+// @description  Garmin Connect: activities lista riport + új aktivitások szinkronizálása rejtett iframe-eken keresztül. Iframe módban a térkép azonnal eltávolításra kerül (gyorsabb betöltés), a fogaskerék menüből Export indul, és a Splits/Időközök tábla ACTIVE sorai egy JSON-be kerülnek (data/Garmin/YYYY-MM/DD/{activityId}.json).
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
 // @match        https://connect.garmin.com/app/activities?*
@@ -307,9 +307,230 @@
         return null;
     }
 
+    // Iframe módban a térkép-szakasz nagyon lassítja a betöltést (Leaflet/Mapbox
+    // tile-ok, ~MB-os erőforrások). Mivel itt csak az Export menü kell, ezeket
+    // a node-okat azonnal kidobjuk amint megjelennek a DOM-ban.
+    const MAP_SELECTORS = [
+        '[class*="ActivityMap_"]',
+        '[class*="ActivityMapWithFullScreen_"]',
+        '[class*="MapWithBlock_"]',
+        '[class*="LeafletMap_"]',
+        '.leaflet-container',
+        '#activityMap',
+    ];
+
+    function removeMapElementsOnce() {
+        let removed = 0;
+        for (const sel of MAP_SELECTORS) {
+            const list = document.querySelectorAll(sel);
+            for (const el of list) {
+                try { el.remove(); removed += 1; } catch {}
+            }
+        }
+        return removed;
+    }
+
+    function startMapKiller(activityId) {
+        let total = removeMapElementsOnce();
+        if (total > 0) gcIframeLog(activityId, 'log', `🗺️ térkép azonnal eltávolítva (${total} elem)`);
+
+        const observer = new MutationObserver(() => {
+            const n = removeMapElementsOnce();
+            if (n > 0) {
+                total += n;
+                gcIframeLog(activityId, 'log', `🗺️ térkép utólag eltávolítva (+${n}, össz: ${total})`);
+            }
+        });
+        try {
+            observer.observe(document.documentElement || document.body, {
+                childList: true,
+                subtree: true,
+            });
+        } catch (err) {
+            gcIframeLog(activityId, 'warn', 'MapKiller observer hiba:', err instanceof Error ? err.message : String(err));
+        }
+        return observer;
+    }
+
+    function dispatchClick(el) {
+        if (!el) return;
+        try {
+            el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window, button: 0 }));
+            el.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true, cancelable: true, view: window, button: 0 }));
+            el.dispatchEvent(new MouseEvent('click',     { bubbles: true, cancelable: true, view: window, button: 0 }));
+        } catch {
+            try { el.click(); } catch {}
+        }
+    }
+
+    function activateSplitsTab() {
+        const tab = document.querySelector('#tabSplitsId');
+        if (!tab) return false;
+        dispatchClick(tab);
+        return true;
+    }
+
+    function findIntervalsFilterDropdownButton() {
+        // A „Lépés típusa" szűrő egy <button aria-haspopup="listbox"> az
+        // ActivityIntervals_intervalsFilter__... konténerben.
+        const container = document.querySelector('[class*="ActivityIntervals_intervalsFilter"]');
+        if (!container) return null;
+        return container.querySelector('button[aria-haspopup="listbox"]');
+    }
+
+    function findIntervalsActiveOption() {
+        // A listbox-ban a <li data-value="ACTIVE">, vagy a benne lévő
+        // <div data-value="ACTIVE">. Bármelyikre kattintva is működik.
+        const li = document.querySelector('li[data-value="ACTIVE"]');
+        if (li) return li;
+        const div = document.querySelector('div[data-value="ACTIVE"]');
+        if (div) return div;
+        return null;
+    }
+
+    async function selectIntervalsActiveFilter(activityId) {
+        // Megnyitjuk a dropdown-t.
+        const dropdownBtn = findIntervalsFilterDropdownButton();
+        if (!dropdownBtn) {
+            gcIframeLog(activityId, 'warn', 'Intervals filter dropdown nem található');
+            return false;
+        }
+        dispatchClick(dropdownBtn);
+
+        // Várjuk az ACTIVE option-t.
+        let activeOpt = null;
+        try {
+            activeOpt = await waitForElementInIframe(() => findIntervalsActiveOption(), 3000);
+        } catch {
+            gcIframeLog(activityId, 'warn', 'ACTIVE option nem jelent meg időben');
+            return false;
+        }
+
+        dispatchClick(activeOpt);
+        // Adjunk egy kis időt a tábla újrarenderelésére.
+        await new Promise((r) => setTimeout(r, 200));
+        return true;
+    }
+
+    function scrapeIntervalsTable() {
+        const tabPane = document.querySelector('#tab-splits');
+        if (!tabPane) return null;
+        const table = tabPane.querySelector('table');
+        if (!table) return null;
+
+        const headers = [];
+        for (const th of table.querySelectorAll('thead th')) {
+            headers.push((th.textContent || '').replace(/\s+/g, ' ').trim());
+        }
+
+        const rows = [];
+        for (const tr of table.querySelectorAll('tbody tr')) {
+            // Csak a látható (nem .IntervalsTable_hidden__... osztályú) sorok kellenek.
+            const cls = String(tr.className || '');
+            if (/IntervalsTable_hidden__/.test(cls)) continue;
+            if (!/IntervalsTable_tableRow__/.test(cls)) continue;
+
+            const cells = [];
+            for (const td of tr.querySelectorAll('td')) {
+                cells.push((td.textContent || '').replace(/\s+/g, ' ').trim());
+            }
+            rows.push(cells);
+        }
+
+        if (rows.length === 0) return null;
+
+        // Oszlop-orientált átrendezés: minden oszlopra { column, values }.
+        // Üres oszlopokat (üres fejléc VAGY minden cella üres) eldobunk —
+        // a Garmin UI gyakran ad ikon-only / pl. „kijelölt sor" jelölő
+        // oszlopokat, amik downstream-en nem hasznosak.
+        const colCount = Math.max(headers.length, ...rows.map((r) => r.length));
+        const intervalColumns = [];
+        for (let c = 0; c < colCount; c++) {
+            const column = (headers[c] || '').trim();
+            const values = rows.map((r) => (r[c] || '').trim());
+            const anyValue = values.some((v) => v !== '');
+            if (!column || !anyValue) continue;
+            intervalColumns.push({ column, values });
+        }
+
+        if (intervalColumns.length === 0) return null;
+        return intervalColumns;
+    }
+
+    async function captureActivityDetailJson(activityId) {
+        // Az `intervalColumns` mezőt csak akkor vesszük fel, ha van scrape-elhető
+        // tábla; üres / null esetén ne kerüljön bele a JSON-be.
+        const result = { activityId };
+
+        if (!activateSplitsTab()) {
+            gcIframeLog(activityId, 'warn', 'Splits tab (#tabSplitsId) nem található — JSON kihagyva');
+            return result;
+        }
+        // Várjuk meg, hogy a #tab-splits aktívvá / kitöltötté váljon.
+        try {
+            await waitForElementInIframe(() => {
+                const pane = document.querySelector('#tab-splits');
+                if (!pane) return null;
+                return pane.querySelector('table tbody tr') ? pane : null;
+            }, 5000);
+        } catch {
+            gcIframeLog(activityId, 'warn', 'Splits tábla nem töltődött be időben');
+            return result;
+        }
+
+        const filterOk = await selectIntervalsActiveFilter(activityId);
+        if (!filterOk) {
+            gcIframeLog(activityId, 'warn', 'ACTIVE filter nem volt beállítható, mégis scrape-elünk az aktuális szűréssel');
+        }
+
+        const intervalColumns = scrapeIntervalsTable();
+        if (intervalColumns && intervalColumns.length > 0) {
+            result.intervalColumns = intervalColumns;
+            const rowCount = intervalColumns[0]?.values?.length ?? 0;
+            gcIframeLog(activityId, 'log', `📊 Intervals: ${rowCount} sor, ${intervalColumns.length} oszlop`);
+        } else {
+            gcIframeLog(activityId, 'warn', 'Intervals tábla üres / nem scrape-elhető');
+        }
+
+        return result;
+    }
+
+    function postActivityJsonToServer(activityId, payload) {
+        return new Promise((resolve) => {
+            try {
+                const apiBase = sessionStorage.getItem('gc_api_base') || API_BASE_DEFAULT;
+                GM_xmlhttpRequest({
+                    method: 'POST',
+                    url: `${apiBase}/garmin/upload_activity_json`,
+                    headers: { 'Content-Type': 'application/json' },
+                    data: JSON.stringify({ activityId, payload }),
+                    onload: (response) => {
+                        if (response.status >= 200 && response.status < 300) {
+                            gcIframeLog(activityId, 'log', '✓ JSON feltöltve a szerverre');
+                        } else {
+                            gcIframeLog(activityId, 'warn', `JSON upload HTTP ${response.status}: ${(response.responseText || '').slice(0, 200)}`);
+                        }
+                        resolve();
+                    },
+                    onerror: () => {
+                        gcIframeLog(activityId, 'warn', 'JSON upload hálózati hiba');
+                        resolve();
+                    },
+                });
+            } catch (err) {
+                gcIframeLog(activityId, 'warn', 'JSON upload kivétel:', err instanceof Error ? err.message : String(err));
+                resolve();
+            }
+        });
+    }
+
     async function runActivityDetailIframe() {
         const activityId = getActivityIdFromUrl();
         gcIframeLog(activityId, 'log', 'Menü-alapú sync indul, URL:', window.location.href);
+
+        // Térkép-killer azonnal indul (még a fogaskerék előtt is) — gyorsabb a
+        // teljes oldal renderelése, kevesebb hálózati erőforrás.
+        startMapKiller(activityId);
 
         try {
             if (!activityId) throw new Error('Nincs activity ID az URL-ben');
@@ -342,17 +563,35 @@
             //    egyes React handler-eknek ez kell, hogy „user-aktivált"
             //    kontextusban induljon a letöltés.
             gcIframeLog(activityId, 'log', '4/4 Export kattintás...');
-            try {
-                exportItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window, button: 0 }));
-                exportItem.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true, cancelable: true, view: window, button: 0 }));
-                exportItem.dispatchEvent(new MouseEvent('click',     { bubbles: true, cancelable: true, view: window, button: 0 }));
-            } catch (clickErr) {
-                gcIframeLog(activityId, 'warn', 'MouseEvent dispatch failed, fallback .click():', clickErr instanceof Error ? clickErr.message : String(clickErr));
-                exportItem.click();
-            }
+            dispatchClick(exportItem);
             gcIframeLog(activityId, 'log', '✓ Export kattintva, letöltés indulhat');
 
-            // 5) Egy kis grace period, majd jelezzük a parent-nek, hogy a klikk
+            // 5) Még az iframe lebontás előtt scrape-eljük a Splits/Időközök
+            //    tábla ACTIVE sorait + bármi mást, ami JSON-be megy. Ez
+            //    best-effort: ha bármi hiba van, nem buktatja el a sync-et.
+            try {
+                // A JSON-t mindig leküldjük a szervernek, akkor is ha üres
+                // (csak `{ activityId }`) — ez jelzi, hogy a rekord 'teljes',
+                // azaz a userscript végigfutott az aktivitáson és nincs
+                // hiányzó scrape-elt adat. Ha hiányozna a JSON fájl a
+                // szerveren, a list UI újra zöld-ként mutatná.
+                const detail = await captureActivityDetailJson(activityId);
+                if (detail) {
+                    await postActivityJsonToServer(activityId, detail);
+                }
+            } catch (extractErr) {
+                gcIframeLog(activityId, 'warn', 'Activity JSON scrape hiba, minimális JSON-t küldünk:', extractErr instanceof Error ? extractErr.message : String(extractErr));
+                // Fallback: legalább a minimális `{ activityId }` payload-ot
+                // küldjük le, hogy a szerveren létrejöjjön a JSON fájl és a
+                // list UI ne ragadjon zölden.
+                try {
+                    await postActivityJsonToServer(activityId, { activityId });
+                } catch (postErr) {
+                    gcIframeLog(activityId, 'warn', 'Fallback JSON upload is hibára futott:', postErr instanceof Error ? postErr.message : String(postErr));
+                }
+            }
+
+            // 6) Egy kis grace period, majd jelezzük a parent-nek, hogy a klikk
             //    megtörtént és kezdheti a status pollozást.
             await new Promise((r) => setTimeout(r, IFRAME_POST_CLICK_DELAY_MS));
             postIframeMessage(activityId, { type: 'gc-iframe-clicked' });
@@ -1136,24 +1375,36 @@
                         || UI_STATE.rowSyncingIds.has(activityId)
                         || UI_STATE.rowWaitingIds.has(activityId)) return;
 
-                    if (!downloaded) {
-                        UI_STATE.rowSyncingIds.add(activityId);
-                        renderRowDownloadActions();
+                    // Egységes flow mindkét állapotra (zöld = még nem szinkronizált,
+                    // kék = már szinkronizált): a sor Download gombja
+                    //   1) szükség esetén lefuttatja a teljes iframe-sync-et
+                    //      (ZIP letöltés + Garmin JSON scrape + processzálás)
+                    //   2) lekéri a kész MD-t a szervertől (reprocess endpoint)
+                    //   3) elindítja a böngészős letöltést a kapott MD-vel.
+                    //
+                    // A kék gombnál is végrehajtjuk az újra-sync-et, hogy a
+                    // user explicit szándékkal frissíthesse a teljes
+                    // pipeline-t (új scrape, friss MD, stb.).
+                    UI_STATE.rowSyncingIds.add(activityId);
+                    renderRowDownloadActions();
+                    try {
+                        await syncActivityViaIframe(activityId);
+                        const latest = syncVisibleActivityState();
                         try {
-                            await syncActivityViaIframe(activityId);
-                            const latest = syncVisibleActivityState();
                             const res = await reportActivities(latest.activities);
                             markActivitiesAsReported(latest.activities);
                             applyReportResult(res);
                             UI_STATE.lastReportedSignature = latest.signature;
-                        } catch (err) {
-                            alert(`Sync hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
-                        } finally {
-                            UI_STATE.rowSyncingIds.delete(activityId);
-                            scheduleUiRefresh();
+                        } catch (reportErr) {
+                            console.warn('[GC] report_activities hiba sync után:', reportErr instanceof Error ? reportErr.message : reportErr);
                         }
+                    } catch (err) {
+                        alert(`Sync hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
+                        UI_STATE.rowSyncingIds.delete(activityId);
+                        renderRowDownloadActions();
                         return;
                     }
+                    UI_STATE.rowSyncingIds.delete(activityId);
 
                     UI_STATE.rowDownloadIds.add(activityId);
                     renderRowDownloadActions();
@@ -1163,7 +1414,7 @@
                         alert(`Reprocess + MD hiba (${activityId}): ${err instanceof Error ? err.message : String(err)}`);
                     } finally {
                         UI_STATE.rowDownloadIds.delete(activityId);
-                        renderRowDownloadActions();
+                        scheduleUiRefresh();
                     }
                 },
             );

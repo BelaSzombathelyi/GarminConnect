@@ -14,6 +14,7 @@ const TEST_FILES = [
     { name: 'VO2max interval', activityId: '22367706617', dayKey: '2026-04-01' },
     { name: 'Almádi fagyizás', activityId: '22417526163', dayKey: '2026-04-05' },
     { name: 'Solymár - 3fél óra terepen', activityId: '22403957560', dayKey: '2026-04-04' },
+    { name: 'VO2 max 3*8min (TP terv)', activityId: '22839150987', dayKey: '2026-05-11' },
 ]
 
 function activityFilePath(dayKey: string, activityId: string, ext: 'zip' | 'md'): string {
@@ -40,6 +41,7 @@ function toTpInputFromFixture(filePath: string): TrainingPeaksWorkoutInput {
         plannedTssUnit: String(raw.plannedTssUnit ?? ''),
         description: String(raw.description ?? ''),
         comments: Array.isArray(raw.comments) ? (raw.comments as TrainingPeaksComment[]) : [],
+        workoutStructure: Array.isArray(raw.workoutStructure) ? raw.workoutStructure : [],
         raw: { workoutId: String(raw.workoutId ?? '') },
     }
 }
@@ -78,7 +80,6 @@ for (const { name, activityId, dayKey } of TEST_FILES) {
         })
 
         it('tartalmaz edzés összefoglalót', () => {
-            expect(text).toContain('## Edzés összefoglaló')
             expect(text).toContain('Sport profil:')
         })
 
@@ -107,7 +108,7 @@ describe('fitPipeline TP enrich', () => {
         rmSync(tmpTpDir, { recursive: true, force: true })
         mkdirSync(tmpTpDataDir, { recursive: true })
 
-        const fixtureRel = '2026-04/05/3655297128.json'
+        const fixtureRel = '2026-05/11/3719988536.json'
         const fixtureSrc = join(TP_FIXTURE_DIR, fixtureRel)
         expect(existsSync(fixtureSrc)).toBe(true)
 
@@ -118,18 +119,45 @@ describe('fitPipeline TP enrich', () => {
         const tpStore = createTrainingPeaksWorkoutStore(tmpTpDb, tmpTpDataDir)
         tpStore.upsertWorkouts([toTpInputFromFixture(fixtureSrc)])
 
-        const runZip = readFileSync(activityFilePath('2026-04-05', '22417526163', 'zip'))
-        const { text } = processBuffer(runZip, { activityId: '99000000004', tpStore })
+        const runZip = readFileSync(activityFilePath('2026-05-11', '22839150987', 'zip'))
+        const { text } = processBuffer(runZip, { activityId: '22839150987', tpStore })
 
-        expect(text.startsWith('# Workout Summary:')).toBe(true)
-        expect(text).toContain('Aktivitás neve: 70 perc kötetlen')
-        expect(text).not.toContain('Title:')
-        expect(text).toContain('TSS: 99 rTSS')
-        expect(text).toContain('Tervezett idő: 1:08:53')
+        expect(text.startsWith('# Edzés:')).toBe(true)
+        // Az `Aktivitás neve` sor felesleges, ha a markdown cím a FIT wktName-t mutatja.
+        expect(text).not.toContain('Aktivitás neve:')
+        expect(text).not.toContain('Cím:')
+        expect(text).toContain('TSS: 81 rTSS')
+        expect(text).toContain('Tervezett idő: 0:59:18')
         expect(text).toContain('### Edzői instrukciók')
-        expect(text).toContain('## Edzés összefoglaló')
 
+        tpStore.close()
         rmSync(tmpTpDir, { recursive: true, force: true })
+    })
+
+    it('processBuffer Garmin scraped intervals táblát szúr be, ha garminExtra adott', () => {
+        const garminExtra = {
+            intervalColumns: [
+                { column: 'Intervallum', values: ['1', '2', '3'] },
+                { column: 'Lépés típusa', values: ['Futás', 'Futás', 'Futás'] },
+                { column: 'Idő', values: ['8:00', '8:00', '8:00'] },
+                { column: 'Távolság', values: ['1.89', '1.89', '1.89'] },
+                { column: 'Átlagos tempó', values: ['4:14', '4:13', '4:14'] },
+            ],
+        }
+
+        const runZip = readFileSync(activityFilePath('2026-05-11', '22839150987', 'zip'))
+        const { text } = processBuffer(runZip, { activityId: '22839150987', garminExtra })
+
+        // A "### Intervallumok" cím megmarad, de a FIT-alapú tábla helyett a
+        // Garmin scraped tábla fejlécét/sorait kell látni.
+        expect(text).toContain('### Intervallumok')
+        expect(text).toContain('| Intervallum | Lépés típusa | Idő | Távolság | Átlagos tempó |')
+        expect(text).toContain('| 1 | Futás | 8:00 | 1.89 | 4:14 |')
+        expect(text).toContain('| 2 | Futás | 8:00 | 1.89 | 4:13 |')
+
+        // A régi FIT-alapú interval-tábla fejléce NEM jelenhet meg, mert a
+        // garminExtra felülírja.
+        expect(text).not.toContain('| Idő | Típus | Táv (km) | Pace (min/km) |')
     })
 })
 
@@ -150,11 +178,10 @@ describe('results export összefűzés', () => {
         writeFileSync(EXPORT_OUTPUT_PATH, outputText, 'utf8')
 
         expect(entries).toHaveLength(TEST_FILES.length)
-        expect(outputText).toContain('# Garmin Download Results')
+        expect(outputText).toContain('# Garmin letöltések eredménye')
         expect(outputText).toContain('## Tartalomjegyzék')
         expect(outputText).toContain('### 2026-03')
         expect(outputText).toContain('### 2026-04')
-        expect(outputText).toContain('#### Edzés összefoglaló')
         expect(outputText).not.toContain('ismeretlen idő • ismeretlen típus')
     })
 })

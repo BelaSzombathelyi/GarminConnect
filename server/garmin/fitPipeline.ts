@@ -13,6 +13,13 @@ export interface ProcessResult {
 export interface ProcessBufferOptions {
     activityId?: string | null
     tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>
+    /**
+     * A Garmin oldalról scrape-elt extra adatok (pl. Splits/Időközök ACTIVE
+     * sorai), amit a userscript küld fel és a szerver elment
+     * `data/Garmin/YYYY-MM/DD/{activityId}.json` formában. Ha jelen van, a
+     * `buildTextOutput` egy dedikált szekciót fűz hozzá az MD-hez.
+     */
+    garminExtra?: Record<string, unknown> | null
 }
 
 function toLocalIso(d: Date): string {
@@ -75,7 +82,7 @@ export function processBuffer(buffer: Buffer, optionsOrActivityId: ProcessBuffer
         }
     }
 
-    const finalText = buildTextOutput(data, false, tpFileContent)
+    const finalText = buildTextOutput(data, false, tpFileContent, options.garminExtra ?? null)
 
     return { text: finalText, activityId, startTimeIso, errors: errors.map(String) }
 }

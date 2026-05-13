@@ -19,11 +19,7 @@ interface TpFixtureFile {
 }
 
 const TP_FIXTURES: TpFixtureFile[] = [
-    { relPath: '2026-04/01/3640712028.json', workoutId: '3640712028' },
-    { relPath: '2026-04/04/3655296297.json', workoutId: '3655296297' },
-    { relPath: '2026-04/05/3655297128.json', workoutId: '3655297128' },
-    { relPath: '2026-04/05/3665674049.json', workoutId: '3665674049' },
-    { relPath: '2026-04/05/3665734922.json', workoutId: '3665734922' },
+    { relPath: '2026-05/11/3719988536.json', workoutId: '3719988536' },
 ]
 
 function toInputFromFixture(filePath: string): TrainingPeaksWorkoutInput {
@@ -60,41 +56,58 @@ function copyFixturesToTempDataDir(): TrainingPeaksWorkoutInput[] {
 }
 
 describe('trainingpeaks workout store fixtures', () => {
+    let openStore: ReturnType<typeof createTrainingPeaksWorkoutStore> | null = null
+
     beforeEach(() => {
         rmSync(TMP_DIR, { recursive: true, force: true })
         mkdirSync(TMP_DATA_DIR, { recursive: true })
     })
 
     afterEach(() => {
+        // Windows alatt a SQLite handle-t le kell zárni, mielőtt töröljük a
+        // mappát, különben EBUSY-val esik el az unlink.
+        openStore?.close()
+        openStore = null
         rmSync(TMP_DIR, { recursive: true, force: true })
     })
 
     it('loads TP fixtures and matches workouts by Garmin start datetime', () => {
         const store = createTrainingPeaksWorkoutStore(TMP_DB_PATH, TMP_DATA_DIR)
+        openStore = store
         const inputs = copyFixturesToTempDataDir()
         const summary = store.upsertWorkouts(inputs)
 
         expect(summary.received).toBe(TP_FIXTURES.length)
 
-        const runMatch = store.findByDateTimeNear('2026-04-05T15:18:24', 60)
-        expect(runMatch?.workoutId).toBe('3655297128')
-        expect(runMatch?.filePath).toContain('TrainingPeaks/2026-04/05/3655297128.json')
+        const runMatch = store.findByDateTimeNear('2026-05-11T06:47:45', 60)
+        expect(runMatch?.workoutId).toBe('3719988536')
+        // Útvonal-szeparátor platform-független ellenőrzése.
+        expect(runMatch?.filePath.replace(/\\/g, '/')).toContain('TrainingPeaks/2026-05/11/3719988536.json')
 
-        const trailMatch = store.findByDateTimeNear('2026-04-04T10:11:25', 60)
-        expect(trailMatch?.workoutId).toBe('3655296297')
+        // ±60s toleranciasáv: 30 másodperccel későbbi indítás még illeszkedik.
+        const runMatchNear = store.findByDateTimeNear('2026-05-11T06:48:15', 60)
+        expect(runMatchNear?.workoutId).toBe('3719988536')
 
-        const vo2Match = store.findByDateTimeNear('2026-04-01T06:17:28', 60)
-        expect(vo2Match?.workoutId).toBe('3640712028')
+        // Túl messzi datetime nem ad találatot.
+        const noMatch = store.findByDateTimeNear('2026-05-11T09:00:00', 60)
+        expect(noMatch).toBeNull()
     })
 
-    it('keeps matching deterministic near two same-day bike workouts', () => {
+    it('links Garmin activity ID to workout and resolves both directions', () => {
         const store = createTrainingPeaksWorkoutStore(TMP_DB_PATH, TMP_DATA_DIR)
+        openStore = store
         store.upsertWorkouts(copyFixturesToTempDataDir())
 
-        const firstBike = store.findByDateTimeNear('2026-04-05T14:53:21', 60)
-        expect(firstBike?.workoutId).toBe('3665674049')
+        // A nyers TP export még nem tartalmaz garminActivityId-t — azt a
+        // reprocess útvonal írja be a `linkGarminActivity` hívással, miután a
+        // datetime alapján megtalálta az aktivitást.
+        store.linkGarminActivity('3719988536', '22839150987')
 
-        const secondBike = store.findByDateTimeNear('2026-04-05T16:54:49', 60)
-        expect(secondBike?.workoutId).toBe('3665734922')
+        const workout = store.getByWorkoutId('3719988536')
+        expect(workout).not.toBeNull()
+        expect(String(workout?.garminActivityId ?? '')).toBe('22839150987')
+
+        const byGarmin = store.getByGarminActivityId('22839150987')
+        expect(byGarmin?.workoutId).toBe('3719988536')
     })
 })

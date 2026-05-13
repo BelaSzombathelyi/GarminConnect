@@ -15,15 +15,19 @@ export function buildTextOutput(
     data: FitUploadResponse,
     mergeShortWalks = false,
     trainingPeaksData?: Record<string, unknown> | null,
+    garminExtra?: Record<string, unknown> | null,
 ): string {
     const sections: string[] = [];
     const summary = extractSummary(data, trainingPeaksData);
     if (summary) sections.push(summary);
 
     if (trainingPeaksData) {
-        sections.push(...buildTpMetaLines(trainingPeaksData));
-        sections.push(...buildTpDescriptionLines(trainingPeaksData));
-        sections.push(...buildTpCommentsLines(trainingPeaksData));
+        const tpMeta = buildTpMetaLines(trainingPeaksData, getFitWorkoutName(data));
+        if (tpMeta) sections.push(tpMeta);
+        const tpDesc = buildTpDescriptionLines(trainingPeaksData);
+        if (tpDesc) sections.push(tpDesc);
+        const tpComments = buildTpCommentsLines(trainingPeaksData);
+        if (tpComments) sections.push(tpComments);
     }
     
     if (SHOW_USER_PROFILE) {
@@ -31,17 +35,68 @@ export function buildTextOutput(
         if (profile) sections.push(profile);
     }
     sections.push(
-        extractSession(data),
-        extractSplits(data, mergeShortWalks),
+        extractSession(data, trainingPeaksData),
+        extractSplits(data, mergeShortWalks, garminExtra ?? null),
         extractLaps(data),
         extractTrailClimbInfo(data),
     );
     return sections.filter(Boolean).join('\n\n');
 }
 
-function buildTpMetaLines(tp: Record<string, unknown>): string[] {
+function buildScrapedIntervalsTable(extra: Record<string, unknown> | null | undefined): string[] | null {
+    if (!extra) return null;
+
+    // Oszlop-orientált formátum a Garmin scraper-től:
+    //   intervalColumns: [{ column: string, values: string[] }, ...]
+    // A userscript már szűrt formában (üres oszlopok nélkül) küldi.
+    const intervalColumns = extra.intervalColumns;
+    if (!Array.isArray(intervalColumns) || intervalColumns.length === 0) return null;
+
+    const cols = intervalColumns
+        .map((c) => {
+            const obj = c as { column?: unknown; values?: unknown };
+            const column = String(obj?.column ?? '').trim();
+            const values = Array.isArray(obj?.values)
+                ? (obj.values as unknown[]).map((v) => String(v ?? '').trim())
+                : [];
+            return { column, values };
+        })
+        .filter((c) => c.column && c.values.some((v) => v !== ''));
+
+    if (cols.length === 0) return null;
+    const rowCount = Math.max(...cols.map((c) => c.values.length));
+    if (rowCount === 0) return null;
+
+    const escape = (s: string) => s.replace(/\|/g, '\\|');
+    const lines: string[] = [];
+    lines.push(`| ${cols.map((c) => escape(c.column)).join(' | ')} |`);
+    lines.push(`| ${cols.map(() => '---').join(' | ')} |`);
+    for (let r = 0; r < rowCount; r++) {
+        const cells = cols.map((c) => escape(c.values[r] ?? ''));
+        lines.push(`| ${cells.join(' | ')} |`);
+    }
+    return lines;
+}
+
+function getFitWorkoutName(data: FitUploadResponse): string {
+    const workoutMesgs = data.messages['workoutMesgs'] as Record<string, unknown>[] | undefined;
+    const workout = workoutMesgs?.[0];
+    if (!workout) return '';
+    const wktNameArr = Array.isArray(workout['wktName'])
+        ? (workout['wktName'] as unknown[]).filter((s) => typeof s === 'string' && (s as string).trim())
+        : null;
+    if (wktNameArr && wktNameArr.length > 0) return (wktNameArr as string[]).join(' ').trim();
+    if (typeof workout['wktName'] === 'string') return (workout['wktName'] as string).trim();
+    return '';
+}
+
+function buildTpMetaLines(tp: Record<string, unknown>, fitWorkoutName = ''): string {
     const rows: [string, string][] = []
-    if (tp.name) rows.push(['Aktivitás neve', String(tp.name)])
+    // Az "Aktivitás neve" sort csak akkor jelenítjük meg, ha a FIT-ben nincs
+    // wktName (mert a markdown cím a wktName-t mutatja, és felesleges
+    // duplikáció lenne).
+    const tpName = String(tp.name ?? '').trim()
+    if (tpName && !fitWorkoutName) rows.push(['Aktivitás neve', tpName])
 
     const tssValue = String(tp.completedTssValue ?? '').trim()
     const tssUnit = String(tp.completedTssUnit ?? '').trim()
@@ -50,46 +105,39 @@ function buildTpMetaLines(tp: Record<string, unknown>): string[] {
     if (tp.workoutType) rows.push(['Edzés típus', String(tp.workoutType)])
     if (tp.completedTotalTime) rows.push(['Tervezett idő', String(tp.completedTotalTime)])
 
-    return rows.map(([key, value]) => `${key}: ${value}`)
+    if (rows.length === 0) return ''
+    return rows.map(([key, value]) => `${key}: ${value}`).join('\n')
 }
 
-function buildTpDescriptionLines(tp: Record<string, unknown>): string[] {
+function buildTpDescriptionLines(tp: Record<string, unknown>): string {
     const description = String(tp.description ?? '').trim()
-    if (!description) {
-        return []
-    }
-
-    return [
-        '',
-        '### Edzői instrukciók',
-        '',
-        description,
-    ]
+    if (!description) return ''
+    return ['### Edzői instrukciók', '', description].join('\n')
 }
 
 function buildTpCommentLines(comment: TpComment): string[] {
-    const lines = ['']
+    const lines: string[] = []
     const meta = [comment.date, comment.user].filter(Boolean).join(' — ')
     if (meta) lines.push(`**${meta}**`)
-    lines.push('')
-    lines.push(comment.text)
+    if (comment.text) {
+        if (meta) lines.push('')
+        lines.push(comment.text)
+    }
     return lines
 }
 
-function buildTpCommentsLines(tp: Record<string, unknown>): string[] {
+function buildTpCommentsLines(tp: Record<string, unknown>): string {
     const comments = Array.isArray(tp.comments)
         ? (tp.comments as TpComment[])
         : []
 
-    if (comments.length === 0) {
-        return []
-    }
+    if (comments.length === 0) return ''
 
-    return [
-        '',
-        '### Kommentek',
-        ...comments.flatMap((comment) => buildTpCommentLines(comment)),
-    ]
+    const blocks = comments
+        .map((c) => buildTpCommentLines(c).join('\n'))
+        .filter(Boolean)
+    if (blocks.length === 0) return ''
+    return ['### Kommentek', '', blocks.join('\n\n')].join('\n')
 }
 
 function teShortLabel(val: number): string {
@@ -137,31 +185,19 @@ function extractSummary(data: FitUploadResponse, trainingPeaksData?: Record<stri
         : '';
     const workoutMesgs = data.messages['workoutMesgs'] as Record<string, unknown>[] | undefined;
     const workout = workoutMesgs?.[0];
-    const wktNameArr = workout && Array.isArray(workout['wktName'])
-        ? (workout['wktName'] as unknown[]).filter(s => typeof s === 'string' && (s as string).trim())
-        : null;
-    const wktName = wktNameArr && wktNameArr.length > 0
-        ? (wktNameArr as string[]).join(' ')
-        : (workout && typeof workout['wktName'] === 'string' ? workout['wktName'] as string : '');
+    const wktName = workout ? getFitWorkoutName(data) : '';
 
     const headerParts = [startDateStr, durationLabel, wktName].filter(Boolean);
-    const headerLine = "# Workout Summary: " + (headerParts.length > 0 ? headerParts.join(' | ') : 'Summary');
-    const tpActivityName = String(trainingPeaksData?.name ?? '').trim();
-    const shouldShowTitle = !tpActivityName;
+    const headerLine = "# Edzés: " + (headerParts.length > 0 ? headerParts.join(' | ') : '–');
 
     return [
         headerLine,
         '',
-        ...(shouldShowTitle ? [`Title: ${typeLabel}`] : []),
-        `Time: ${durationLabel}`,
-        `Distance: ${distanceLabel}`,
-        ...(shouldHideAscent ? [] : [`Elevation: ${ascent}`]),
-        '',
-        `Heart rate: avg ${avgHeart} bpm`,
-        `RPE: ${rpeLabel}`,
-        '',
-        `Aerobic: ${aerobicLabel}`,
-        `Anaerobic: ${anaerobicLabel}`,
+        `Időtartam: ${durationLabel}`,
+        `Távolság: ${distanceLabel}`,
+        ...(shouldHideAscent ? [] : [`Szintemelkedés: ${ascent}`]),
+        `Aerob hatás: ${aerobicLabel}`,
+        `Anaerob hatás: ${anaerobicLabel}`,
     ].join('\n');
 }
 
@@ -195,6 +231,20 @@ function mpsToMinPerKm(speed: unknown): string {
     if (typeof speed !== 'number' || speed <= 0) return '–';
     // Az FIT SDK az avgSpeed-et 0.01 m/s-es egységekben adja meg
     const mps = speed / 100;
+    const secPerKm = 1000 / mps;
+    const totalSec = Math.round(secPerKm);
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+/**
+ * Tiszta m/s → min/km pace formátum (mm:ss). A workoutStepMesgs
+ * `customTargetSpeedLow/High` mezője nyers m/s egységben érkezik (pl. 2.869),
+ * ellentétben az avgSpeed-del, ami 0.01 m/s skálát használ.
+ */
+function mpsToPaceMinKm(mps: unknown): string {
+    if (typeof mps !== 'number' || mps <= 0) return '–';
     const secPerKm = 1000 / mps;
     const totalSec = Math.round(secPerKm);
     const mins = Math.floor(totalSec / 60);
@@ -577,7 +627,7 @@ function extractPauseEvents(data: FitUploadResponse): string {
 // Public extract functions
 // ---------------------------------------------------------------------------
 
-export function extractSession(data: FitUploadResponse): string {
+export function extractSession(data: FitUploadResponse, trainingPeaksData?: Record<string, unknown> | null): string {
     const session = (data.messages['sessionMesgs'] as Record<string, unknown>[])?.[0];
     if (!session) return '';
 
@@ -607,7 +657,7 @@ export function extractSession(data: FitUploadResponse): string {
     const avgHeart = typeof session['avgHeartRate'] === 'number' ? String(session['avgHeartRate']) : '–';
     const maxHeart = typeof session['maxHeartRate'] === 'number' ? String(session['maxHeartRate']) : '–';
     if (avgHeart !== '–' || maxHeart !== '–') {
-        rows.push(['Heart rate', `avg ${avgHeart}, max ${maxHeart} bpm`]);
+        rows.push(['Pulzus', `átl. ${avgHeart}, max. ${maxHeart} bpm`]);
     }
 
     // Cadence (single compact line)
@@ -618,7 +668,7 @@ export function extractSession(data: FitUploadResponse): string {
         ? cadence(session['maxRunningCadence'])
         : (typeof session['maxCadence'] === 'number' ? cadence(session['maxCadence']) : '–');
     if (avgCadenceVal !== '–' || maxCadenceVal !== '–') {
-        rows.push(['Cadence', `avg ${avgCadenceVal}, max ${maxCadenceVal} spm`]);
+        rows.push(['Pedálütem', `átl. ${avgCadenceVal}, max. ${maxCadenceVal} spérc`]);
     }
     // Respiration (single compact line)
     const avgResp = typeof session['enhancedAvgRespirationRate'] === 'number'
@@ -631,15 +681,15 @@ export function extractSession(data: FitUploadResponse): string {
         ? (session['enhancedMinRespirationRate'] as number).toFixed(1)
         : '–';
     if (avgResp !== '–' || maxResp !== '–' || minResp !== '–') {
-        rows.push(['Respiration', `avg ${avgResp}, max ${maxResp}, min ${minResp} breaths/min`]);
+        rows.push(['Légzés', `átl. ${avgResp}, max. ${maxResp}, min. ${minResp} légvétel/perc`]);
     }
 
     // Running dynamics
-    if (typeof session['avgStepLength'] === 'number') rows.push(['Avg. step length', `${stepLengthMm(session['avgStepLength'])} mm`]);
-    if (typeof session['avgStanceTime'] === 'number') rows.push(['Avg. ground contact time', `${(session['avgStanceTime'] as number).toFixed(0)} ms`]);
-    if (typeof session['avgStanceTimePercent'] === 'number') rows.push(['Ground contact time %', `${(session['avgStanceTimePercent'] as number).toFixed(1)} %`]);
-    if (typeof session['avgStanceTimeBalance'] === 'number') rows.push(['Ground contact balance', `${(session['avgStanceTimeBalance'] as number).toFixed(1)} %`]);
-    if (typeof session['avgVerticalRatio'] === 'number') rows.push(['Vertical ratio', `${(session['avgVerticalRatio'] as number).toFixed(1)} %`]);
+    if (typeof session['avgStepLength'] === 'number') rows.push(['Átl. lépéshossz', `${stepLengthMm(session['avgStepLength'])} mm`]);
+    if (typeof session['avgStanceTime'] === 'number') rows.push(['Átl. talajérintési idő', `${(session['avgStanceTime'] as number).toFixed(0)} ms`]);
+    if (typeof session['avgStanceTimePercent'] === 'number') rows.push(['Talajérintési idő %', `${(session['avgStanceTimePercent'] as number).toFixed(1)} %`]);
+    if (typeof session['avgStanceTimeBalance'] === 'number') rows.push(['Talajérintési egyensúly', `${(session['avgStanceTimeBalance'] as number).toFixed(1)} %`]);
+    if (typeof session['avgVerticalRatio'] === 'number') rows.push(['Függőleges arány', `${(session['avgVerticalRatio'] as number).toFixed(1)} %`]);
 
     // Önértékelés
     if (typeof session['workoutFeel'] === 'number') {
@@ -658,7 +708,7 @@ export function extractSession(data: FitUploadResponse): string {
     rows.push(['Aerob edzéshatás', `${aerobicTE !== null ? aerobicTE.toFixed(1) + ' / 5.0 – ' + teLabel(aerobicTE) : '–'}`]);
     rows.push(['Anaerob edzéshatás', `${anaerobicTE !== null ? anaerobicTE.toFixed(1) + ' / 5.0 – ' + teLabel(anaerobicTE) : '–'}`]);
     if (typeof session['trainingStressScore'] === 'number') {
-        rows.push(['Training Stress Score', `${(session['trainingStressScore'] / 10).toFixed(1)}`]);
+        rows.push(['Edzésterhelés pontszám', `${(session['trainingStressScore'] / 10).toFixed(1)}`]);
     }
     if (typeof session['intensityFactor'] === 'number') {
         rows.push(['Intenzitás faktor', `${(session['intensityFactor'] / 1000).toFixed(2)}`]);
@@ -675,70 +725,260 @@ export function extractSession(data: FitUploadResponse): string {
         for (const [key, label] of Object.entries(rwdTypes)) {
             const entry = summaries.find(s => String(s['splitType']) === key);
             if (entry && typeof entry['totalTimerTime'] === 'number') {
-                rows.push([label, formatSeconds(entry['totalTimerTime'] as number)]);
+                const secs = entry['totalTimerTime'] as number;
+                if (secs > 0) rows.push([label, formatSeconds(secs)]);
             }
         }
     }
 
     // Edzés neve és leírása (workoutMesgs)
-    const workoutMesgs = data.messages['workoutMesgs'] as Record<string, unknown>[] | undefined;
-    const workout = workoutMesgs?.[0];
-    if (workout) {
-        const wktNameArr = Array.isArray(workout['wktName'])
-            ? (workout['wktName'] as unknown[]).filter(s => typeof s === 'string' && (s as string).trim())
-            : null;
-        const wktName = wktNameArr && wktNameArr.length > 0
-            ? String(wktNameArr[0])
-            : (typeof workout['wktName'] === 'string' ? workout['wktName'] : '');
-        if (wktName) rows.push(['Edzés neve', wktName]);
-        if (typeof workout['numValidSteps'] === 'number') rows.push(['workout steps', String(workout['numValidSteps'])]);
-    }
+    const wktName = getFitWorkoutName(data);
+    if (wktName) rows.push(['Edzés neve', wktName]);
 
-    const lines: string[] = ['## Edzés összefoglaló', '', buildKeyValueLines(rows)];
+    const lines: string[] = [buildKeyValueLines(rows)];
 
-    // Edzéslépések (workoutStepMesgs)
+    // Edzéslépések — előnyben részesítjük a TrainingPeaks `workoutStructure`-t,
+    // mert ott egzakt cél tempók vannak (pl. "8 min @ 04:15 min/km"), míg a
+    // FIT-ben csak tartomány (low–high m/s). Ha a TP terv nem érhető el vagy
+    // üres, akkor visszaesünk a FIT alapú renderelésre.
     const visibleSteps = getVisibleWorkoutSteps(data);
     if (visibleSteps.length > 0) {
-        lines.push('');
-        lines.push('### Edzéslépések');
-        for (let i = 0; i < visibleSteps.length; i++) {
-            const step = visibleSteps[i];
-            const notesArr = Array.isArray(step['notes']) ? step['notes'] as unknown[] : null;
-            const noteText = notesArr && typeof notesArr[0] === 'string' && notesArr[0].trim() ? notesArr[0].trim() : '';
-
-            const intensity = typeof step['intensity'] === 'string' ? step['intensity'] : '';
-            const durationType = typeof step['durationType'] === 'string' ? step['durationType'] : '';
-            const durationTime = typeof step['durationTime'] === 'number' ? step['durationTime'] as number : null;
-            const targetType = typeof step['targetType'] === 'string' ? step['targetType'] : '';
-            const hrZone = typeof step['targetHrZone'] === 'number' ? step['targetHrZone'] as number : 0;
-            const hrLow = typeof step['customTargetHeartRateLow'] === 'number' ? step['customTargetHeartRateLow'] as number : null;
-            const hrHigh = typeof step['customTargetHeartRateHigh'] === 'number' ? step['customTargetHeartRateHigh'] as number : null;
-
-            const durationStr = durationType === 'time' && durationTime !== null
-                ? formatSeconds(durationTime)
-                : durationType || '–';
-
-            let targetStr = '';
-            if (targetType === 'heartRate') {
-                if (hrZone > 0) targetStr = `HR Z${hrZone}`;
-                else if (hrLow !== null && hrHigh !== null) targetStr = `${hrLow}–${hrHigh} bpm`;
-            } else if (targetType && targetType.toLowerCase() !== 'open') {
-                targetStr = targetType;
-            }
-
-            const parts = [`${i + 1}.`];
-            if (noteText) parts.push(noteText);
-            if (intensity) parts.push(`[${intensity}]`);
-            parts.push(durationStr);
-            if (targetStr) parts.push(targetStr);
-            lines.push('  ' + parts.join('  '));
+        const tpLines = buildTpWorkoutStepsLines(trainingPeaksData, visibleSteps);
+        if (tpLines && tpLines.length > 0) {
+            lines.push('');
+            lines.push(...tpLines);
+        } else {
+            lines.push(...buildFitWorkoutStepsLines(visibleSteps));
         }
     }
 
     return lines.join('\n');
 }
 
-export function extractSplits(data: FitUploadResponse, mergeShortWalks = false): string {
+function buildFitWorkoutStepsLines(visibleSteps: Record<string, unknown>[]): string[] {
+    const lines: string[] = [];
+    lines.push('');
+    lines.push('### Edzéslépések');
+
+    // Repeat-blokkok felderítése: a FIT-ben a repeat marker a referált lépések
+    // UTÁN szerepel (durationValue = 0-bázisú kezdő index, az index pedig a
+    // marker pozíciója előtti utolsó lépés). Ezeket beágyazott bullet listává
+    // alakítjuk: a `- Ismétlés: N×` parent bullet a blokk első belső lépésének
+    // helyén jelenik meg, alatta a belső lépések indentálva.
+    const repeatBlockStartAt = new Map<number, { count: number; innerIdx: number[] }>();
+    const consumedAsInner = new Set<number>();
+    const isRepeatMarker = new Set<number>();
+    for (let i = 0; i < visibleSteps.length; i++) {
+        const dt = String(visibleSteps[i]['durationType'] ?? '');
+        if (!dt.startsWith('repeatUntil')) continue;
+        isRepeatMarker.add(i);
+        const fromIdx0 = typeof visibleSteps[i]['durationValue'] === 'number'
+            ? (visibleSteps[i]['durationValue'] as number)
+            : null;
+        const repeatCount = typeof visibleSteps[i]['repeatSteps'] === 'number'
+            ? (visibleSteps[i]['repeatSteps'] as number)
+            : null;
+        if (fromIdx0 === null || fromIdx0 < 0 || fromIdx0 >= i) continue;
+        const inner: number[] = [];
+        for (let k = fromIdx0; k < i; k++) {
+            if (consumedAsInner.has(k)) continue; // beágyazott repeat egyelőre nincs kezelve
+            inner.push(k);
+            consumedAsInner.add(k);
+        }
+        if (inner.length > 0) {
+            repeatBlockStartAt.set(inner[0], { count: repeatCount ?? 0, innerIdx: inner });
+        }
+    }
+
+    const renderStep = (step: Record<string, unknown>, indent: string): string => {
+        const notesArr = Array.isArray(step['notes']) ? step['notes'] as unknown[] : null;
+        const noteText = notesArr && typeof notesArr[0] === 'string' && notesArr[0].trim()
+            ? notesArr[0].trim()
+            : (typeof step['notes'] === 'string' ? (step['notes'] as string).trim() : '');
+
+        const intensity = typeof step['intensity'] === 'string' ? step['intensity'] : '';
+        const durationType = typeof step['durationType'] === 'string' ? step['durationType'] : '';
+        const durationTime = typeof step['durationTime'] === 'number' ? step['durationTime'] as number : null;
+        const targetType = typeof step['targetType'] === 'string' ? step['targetType'] : '';
+        const hrZone = typeof step['targetHrZone'] === 'number' ? step['targetHrZone'] as number : 0;
+        const hrLow = typeof step['customTargetHeartRateLow'] === 'number' ? step['customTargetHeartRateLow'] as number : null;
+        const hrHigh = typeof step['customTargetHeartRateHigh'] === 'number' ? step['customTargetHeartRateHigh'] as number : null;
+        const speedLow = typeof step['customTargetSpeedLow'] === 'number' ? step['customTargetSpeedLow'] as number : null;
+        const speedHigh = typeof step['customTargetSpeedHigh'] === 'number' ? step['customTargetSpeedHigh'] as number : null;
+
+        const durationStr = durationType === 'time' && durationTime !== null
+            ? formatSeconds(durationTime)
+            : durationType || '–';
+
+        let targetStr = '';
+        if (targetType === 'heartRate') {
+            if (hrZone > 0) targetStr = `HR Z${hrZone}`;
+            else if (hrLow !== null && hrHigh !== null) targetStr = `${hrLow}–${hrHigh} bpm`;
+        } else if (targetType === 'speed') {
+            if (speedLow !== null && speedHigh !== null && speedLow > 0 && speedHigh > 0) {
+                const paceFast = mpsToPaceMinKm(speedHigh);
+                const paceSlow = mpsToPaceMinKm(speedLow);
+                targetStr = paceFast === paceSlow ? `pace ${paceFast} /km` : `pace ${paceFast}–${paceSlow} /km`;
+            } else {
+                targetStr = 'pace (nyitott)';
+            }
+        } else if (targetType && targetType.toLowerCase() !== 'open') {
+            targetStr = targetType;
+        }
+
+        const parts: string[] = [];
+        if (intensity) parts.push(`[${intensity}]`);
+        parts.push(durationStr);
+        if (targetStr) parts.push(targetStr);
+        if (noteText) parts.push(noteText);
+        return `${indent}- ${parts.join('  ')}`;
+    };
+
+    for (let i = 0; i < visibleSteps.length; i++) {
+        if (isRepeatMarker.has(i)) continue; // a markert kihagyjuk, az első belső lépésnél jelenik meg
+        const block = repeatBlockStartAt.get(i);
+        if (block) {
+            const countStr = block.count > 0 ? `${block.count}×` : 'ismétlés';
+            lines.push(`- Ismétlés: ${countStr}`);
+            for (const innerIdx of block.innerIdx) {
+                lines.push(renderStep(visibleSteps[innerIdx], '  '));
+            }
+            continue;
+        }
+        if (consumedAsInner.has(i)) continue; // biztonsági háló (nem szabadna előfordulnia)
+        lines.push(renderStep(visibleSteps[i], ''));
+    }
+    return lines;
+}
+
+/**
+ * Egy TP step durationIntensity sztringjének értelmezése.
+ * Pl. "5 min @ 05:31 min/km", "8 min @ 04:15 min/km", "10 min", "1 km @ 04:15 min/km"
+ */
+function parseTpDurationIntensity(raw: unknown): { durationSec: number | null; paceStr: string | null; raw: string } {
+    const s = String(raw ?? '').trim();
+    if (!s) return { durationSec: null, paceStr: null, raw: '' };
+
+    let durationSec: number | null = null;
+    const minMatch = s.match(/(\d+(?:[.,]\d+)?)\s*min(?![/])/i);
+    if (minMatch) {
+        durationSec = Math.round(parseFloat(minMatch[1].replace(',', '.')) * 60);
+    } else {
+        const secMatch = s.match(/(\d+)\s*s(?:ec)?\b/i);
+        if (secMatch) durationSec = parseInt(secMatch[1], 10);
+    }
+
+    const paceMatch = s.match(/@\s*(\d{1,2}:\d{2})\s*min\/km/i);
+    const paceStr = paceMatch ? paceMatch[1] : null;
+
+    return { durationSec, paceStr, raw: s };
+}
+
+/**
+ * TP `workoutStructure` alapú edzéslépés-renderelés. Ha a TP terv nem érhető el
+ * vagy üres, `null`-t ad vissza, hogy a hívó a FIT-alapú fallback-re válthasson.
+ *
+ * A FIT visible lépéseket (`visibleSteps`) sorban végigjárjuk és a TP top-level
+ * elemekhez rendeljük, hogy összevethessük az időtartamokat — így ha a futó az
+ * eszközön módosította valamelyik lépést (pl. bemelegítést 5 → 10 percre
+ * növelte), külön jelöljük "(TP: 5:00 — módosítva)" formában.
+ */
+function buildTpWorkoutStepsLines(
+    tp: Record<string, unknown> | null | undefined,
+    visibleFitSteps: Record<string, unknown>[],
+): string[] | null {
+    if (!tp) return null;
+    const structure = tp.workoutStructure;
+    if (!Array.isArray(structure) || structure.length === 0) return null;
+
+    // FIT non-repeat lépések ID-jét gyűjtsük: ezek a "prototípus" lépések,
+    // amelyek a TP plain és repeat-block inner steps-eihez illeszkednek.
+    const fitNonRepeat = visibleFitSteps.filter((s) => {
+        const dt = String(s['durationType'] ?? '');
+        return !dt.startsWith('repeatUntil');
+    });
+
+    let fitCursor = 0;
+    const consumeFit = (): Record<string, unknown> | null => {
+        if (fitCursor < fitNonRepeat.length) {
+            return fitNonRepeat[fitCursor++];
+        }
+        return null;
+    };
+
+    const formatStepLine = (
+        tpStep: { description?: unknown; durationIntensity?: unknown },
+        fitStep: Record<string, unknown> | null,
+        indent: string,
+    ): string => {
+        const desc = String(tpStep?.description ?? '').trim();
+        const di = parseTpDurationIntensity(tpStep?.durationIntensity);
+        const intensity = fitStep && typeof fitStep['intensity'] === 'string'
+            ? (fitStep['intensity'] as string)
+            : '';
+        const fitDur = fitStep && typeof fitStep['durationTime'] === 'number'
+            ? (fitStep['durationTime'] as number)
+            : null;
+
+        const tpDurStr = di.durationSec !== null ? formatSeconds(di.durationSec) : '';
+        const fitDurStr = fitDur !== null ? formatSeconds(fitDur) : '';
+        // Eltérés: ha a FIT időtartam ±5s-nél jobban különbözik a TP-től,
+        // jelöljük (módosítva). Ha a TP nem ad meg időtartamot, csak a FIT-et
+        // jelenítjük meg.
+        let durationDisplay = '';
+        let deviationNote = '';
+        if (di.durationSec !== null && fitDur !== null) {
+            if (Math.abs(fitDur - di.durationSec) > 5) {
+                durationDisplay = fitDurStr;
+                deviationNote = `*(TP: ${tpDurStr} — Garmin-ban módosítva)*`;
+            } else {
+                durationDisplay = tpDurStr;
+            }
+        } else if (di.durationSec !== null) {
+            durationDisplay = tpDurStr;
+        } else if (fitDur !== null) {
+            durationDisplay = fitDurStr;
+        }
+
+        const parts: string[] = [];
+        if (intensity) parts.push(`[${intensity}]`);
+        if (durationDisplay) parts.push(durationDisplay);
+        if (di.paceStr) parts.push(`@ ${di.paceStr} /km`);
+        if (desc) parts.push(desc);
+        if (deviationNote) parts.push(deviationNote);
+        return `${indent}- ${parts.join('  ')}`;
+    };
+
+    const out: string[] = [];
+    out.push('### Edzéslépések (TP terv)');
+
+    for (let i = 0; i < structure.length; i++) {
+        const item = structure[i] as Record<string, unknown>;
+        const repeats = typeof item.repeats === 'number' ? (item.repeats as number) : null;
+        const innerSteps = Array.isArray(item.steps) ? (item.steps as Record<string, unknown>[]) : null;
+
+        if (repeats !== null && repeats > 1 && innerSteps && innerSteps.length > 0) {
+            out.push(`- Ismétlés: ${repeats}×`);
+            for (let j = 0; j < innerSteps.length; j++) {
+                // A FIT-ben a repeat blokk inner step-jei egyszer szerepelnek
+                // (prototípus), nem `repeats`-szer; ezért csak egyszer consume-olunk.
+                const fitStep = consumeFit();
+                out.push(formatStepLine(innerSteps[j], fitStep, '  '));
+            }
+        } else {
+            const fitStep = consumeFit();
+            out.push(formatStepLine(item, fitStep, ''));
+        }
+    }
+
+    return out;
+}
+
+export function extractSplits(
+    data: FitUploadResponse,
+    mergeShortWalks = false,
+    garminExtra?: Record<string, unknown> | null,
+): string {
     const splits = data.messages['splitMesgs'] as Record<string, unknown>[] | undefined;
     const summaries = data.messages['splitSummaryMesgs'] as Record<string, unknown>[] | undefined;
 
@@ -850,46 +1090,48 @@ export function extractSplits(data: FitUploadResponse, mergeShortWalks = false):
         !isSimpleSingleIntervalCase;
 
     const visibleWorkoutSteps = getVisibleWorkoutSteps(data);
-    const shouldHideIntervals = filtered.length === 2 && visibleWorkoutSteps.length === 1;
+    // Az Intervallumok és Intervallum összefoglalók szekciókat csak akkor
+    // jelenítjük meg, ha van legalább 2 látható Edzéslépés ÉS a második nem
+    // levezetés (cooldown). Egyébként a tábla önmagában nem ad érdemi
+    // információt a strukturálatlan / triviális (warmup+cooldown) edzéseknél.
+    const secondStep = visibleWorkoutSteps[1];
+    const secondIsCooldown = !!secondStep && String(secondStep['intensity'] ?? '').toLowerCase() === 'cooldown';
+    const shouldShowIntervalSections = visibleWorkoutSteps.length >= 2 && !secondIsCooldown;
+
+    const scrapedTable = buildScrapedIntervalsTable(garminExtra);
 
     const lines: string[] = [];
-    if (!shouldHideIntervals) {
-        lines.push(
-            headerTitle,
-            '',
-            ...(shouldShowSplitHint
-                ? [
-                    '_Megjegyzés: ha az első szakasz rövidebb a tervezettnél, ez jellemzően abból adódik, hogy futás közben a kör gombbal jelölés/szakaszbontás történt, ezért az első rész több szakaszra tagolódott._',
-                    '',
-                ]
-                : []),
-            `| ${header.join(' | ')} |`,
-            `| ---: | :--- | ---: | ---: | ---: | ---: |`,
-            ...rows.map(r => `| ${r.join(' | ')} |`),
-        );
+    if (shouldShowIntervalSections) {
+        if (scrapedTable) {
+            // A Garmin webes Splits/Időközök táblát (ACTIVE szűréssel
+            // scrape-elve) használjuk a FIT-ből összerakott interval-tábla
+            // HELYETT — sokkal több oszlop, és pontosan azt mutatja, amit a
+            // felhasználó is lát a webes oldalon.
+            lines.push(
+                headerTitle,
+                '',
+                ...scrapedTable,
+            );
+        } else {
+            lines.push(
+                headerTitle,
+                '',
+                ...(shouldShowSplitHint
+                    ? [
+                        '_Megjegyzés: ha az első szakasz rövidebb a tervezettnél, ez jellemzően abból adódik, hogy futás közben a kör gombbal jelölés/szakaszbontás történt, ezért az első rész több szakaszra tagolódott._',
+                        '',
+                    ]
+                    : []),
+                `| ${header.join(' | ')} |`,
+                `| ---: | :--- | ---: | ---: | ---: | ---: |`,
+                ...rows.map(r => `| ${r.join(' | ')} |`),
+            );
+        }
     }
 
-    const shouldShowIntervalSummary = visibleWorkoutSteps.length > 1;
-    if (shouldShowIntervalSummary && summaries && summaries.length > 0) {
-        if (lines.length > 0) lines.push('');
-        lines.push('### Intervallum összefoglalók');
-        lines.push('');
-        const summaryHeader = ['Típus', 'Darab', 'Össz táv (km)', 'Össz idő'];
-        const summaryRows: string[][] = [];
-        for (const s of summaries) {
-            const type = String(s['splitType'] ?? '');
-            if (!INTERVAL_TYPES.has(type)) continue;
-            const label = SPLIT_TYPE_HU[type] ?? type;
-            const count = typeof s['numSplits'] === 'number' ? String(s['numSplits']) : '–';
-            const dist = km(s['totalDistance']);
-            const timeSecs = splitTimeSeconds(s);
-            const time = typeof timeSecs === 'number' ? formatSeconds(timeSecs) : '–';
-            summaryRows.push([label, count, dist, time]);
-        }
-        lines.push(`| ${summaryHeader.join(' | ')} |`);
-        lines.push(`| :--- | ---: | ---: | ---: |`);
-        summaryRows.forEach(r => lines.push(`| ${r.join(' | ')} |`));
-    }
+    // Az "Intervallum összefoglalók" szekciót szándékosan nem jelenítjük meg —
+    // a `summaries` adat továbbra is rendelkezésre áll, ha később mégis kéne.
+    void summaries;
 
     const pauseText = extractPauseEvents(data);
     if (pauseText) {

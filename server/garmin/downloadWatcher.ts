@@ -147,7 +147,26 @@ export function startDownloadWatcher({ downloadsDir, archiveDir, onZipReady, res
             const archivedPath = join(archiveTargetDir, archivedFileName)
             const moved = await moveFile(sourcePath, archivedPath)
             if (!moved) {
-                logger.warn('[downloads] Forrás ZIP már nem létezik (dupla watcher event), kihagyva:', fileName)
+                // Forrás ZIP eltűnt (dupla watcher event vagy korábbi futás már bemozgatta).
+                // Ha az archív cél már létezik, ÚJRA feldolgozzuk → felülírjuk az outputot.
+                let archiveExists = false
+                try {
+                    const st = await stat(archivedPath)
+                    archiveExists = st.isFile() && st.size > 0
+                } catch {
+                    archiveExists = false
+                }
+                if (archiveExists) {
+                    logger.log('[downloads] Dupla watcher event, archív ZIP-ből újrafeldolgozás:', archivedFileName)
+                    await onZipReady({
+                        fileName,
+                        archivedFileName,
+                        archivedPath,
+                        activityId,
+                    })
+                } else {
+                    logger.warn('[downloads] Forrás ZIP már nem létezik és archívben sincs, kihagyva:', fileName)
+                }
                 return
             }
 

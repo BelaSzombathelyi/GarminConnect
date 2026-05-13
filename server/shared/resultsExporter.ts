@@ -218,7 +218,7 @@ export async function buildResultsMarkdown(entries: ResultTextEntry[]): Promise<
     const lines: string[] = []
 
     // Header
-    lines.push('# Garmin Download Results')
+    lines.push('# Garmin letöltések eredménye')
     lines.push('')
 
     if (entries.length === 0) {

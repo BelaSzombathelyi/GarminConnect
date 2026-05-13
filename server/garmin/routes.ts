@@ -2,6 +2,7 @@ import { Decoder, Stream } from '@garmin/fitsdk'
 import AdmZip from 'adm-zip'
 import { basename, dirname, join } from 'node:path'
 import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import type { ViteDevServer } from 'vite'
 import { ActivityStatus, createActivityStore, type ActivityInput } from './activityStore'
 import { startDownloadWatcher } from './downloadWatcher'
@@ -89,6 +90,34 @@ function parseActivityDateToIso(rawDate: string): string | null {
     }
 
     return null
+}
+
+async function loadGarminExtraJsonForReprocess(dir: string, activityId: string): Promise<Record<string, unknown> | null> {
+    const jsonPath = join(dir, `${activityId}.json`)
+    try {
+        const raw = await readFile(jsonPath, 'utf-8')
+        const parsed = JSON.parse(raw)
+        return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
+    } catch {
+        return null
+    }
+}
+
+/**
+ * Visszaadja, hogy egy adott aktivitáshoz tartozó `data/Garmin/YYYY-MM/DD/{id}.json`
+ * fájl HIÁNYZIK-e a lemezen. Ha az aktivitás dátuma nem ismert, missing-nek
+ * tekintjük (mert így biztosabb, hogy a userscript újra szinkronizálja).
+ */
+function isGarminJsonMissing(
+    archiveDir: string,
+    activityStore: ReturnType<typeof createActivityStore>,
+    activityId: string,
+): boolean {
+    const activity = activityStore.getById(activityId)
+    const isoDate = parseActivityDateToIso(activity?.date ?? '')
+    if (!isoDate) return true
+    const jsonPath = join(archiveDir, isoDate.slice(0, 7), isoDate.slice(8, 10), `${activityId}.json`)
+    return !existsSync(jsonPath)
 }
 
 async function cleanupIncompleteActivities(
@@ -270,13 +299,25 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
             const stats = activityStore.upsertActivities(activities)
             const downloadableIds = activityStore.filterDownloadable(submittedIds)
 
+            // Ha egy aktivitás már PROCESSED állapotban van a DB-ben, de a
+            // scraped Garmin JSON fájl HIÁNYZIK a `data/Garmin/YYYY-MM/DD/{id}.json`
+            // útvonalon, akkor a lista UI szempontjából újra zöld-ként
+            // (újra szinkronizálandóként) kell kezelnünk — különben a
+            // felhasználó nem tudná újra letölteni a JSON-t a fogaskerék
+            // alapú sync-kel.
+            const missingJsonIds = submittedIds.filter((id) => {
+                if (downloadableIds.includes(id)) return false
+                return isGarminJsonMissing(archiveDir, activityStore, id)
+            })
+            const combinedNewIds = Array.from(new Set([...downloadableIds, ...missingJsonIds]))
+
             res.setHeader('Content-Type', 'application/json; charset=utf-8')
             res.statusCode = 200
             res.end(JSON.stringify({
                 ok: true,
                 ...stats,
-                newCount: downloadableIds.length,
-                newActivityIds: downloadableIds,
+                newCount: combinedNewIds.length,
+                newActivityIds: combinedNewIds,
             }))
         } catch (err) {
             res.statusCode = 400
@@ -455,6 +496,70 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
         }
     })
 
+    server.middlewares.use('/api/garmin/upload_activity_json', async (req, res) => {
+        if (handleOptions(req, res)) return
+        setCorsHeaders(res)
+
+        if (req.method !== 'POST') {
+            res.statusCode = 405
+            res.end('Method Not Allowed')
+            return
+        }
+
+        try {
+            const body = await readJsonBody(req)
+            const activityId = String(body.activityId ?? '').trim()
+            const payload = body.payload ?? null
+
+            if (!activityId) {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'activityId kötelező' }))
+                return
+            }
+            if (!payload || typeof payload !== 'object') {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'payload kötelező (objektum)' }))
+                return
+            }
+
+            const activity = activityStore.getById(activityId)
+            const isoDate = parseActivityDateToIso(activity?.date ?? '') ?? localTodayIso()
+            const relativeDir = `${isoDate.slice(0, 7)}/${isoDate.slice(8, 10)}`
+            const targetDir = join(archiveDir, relativeDir)
+            const targetJsonPath = join(targetDir, `${activityId}.json`)
+
+            await mkdir(targetDir, { recursive: true })
+
+            const enriched = {
+                activityId,
+                capturedAt: new Date().toISOString(),
+                activity: activity ?? null,
+                ...payload,
+            }
+            await writeFile(targetJsonPath, JSON.stringify(enriched, null, 2), 'utf-8')
+
+            console.log(`[garmin-json] mentve: ${targetJsonPath}`)
+
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.statusCode = 200
+            res.end(JSON.stringify({
+                ok: true,
+                activityId,
+                relativeDir,
+                jsonPath: targetJsonPath,
+            }))
+        } catch (err) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+            }))
+        }
+    })
+
     server.middlewares.use('/api/fit-upload', async (req, res) => {
         console.log('[GarminConnect] FIT feltöltés API hívva.')
 
@@ -564,7 +669,8 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
 
                     try {
                         const buffer = await readFile(fullPath);
-                        const { text, startTimeIso, errors: decodeErrors } = processBuffer(buffer, { activityId, tpStore });
+                        const garminExtra = await loadGarminExtraJsonForReprocess(dirname(fullPath), activityId);
+                        const { text, startTimeIso, errors: decodeErrors } = processBuffer(buffer, { activityId, tpStore, garminExtra });
 
                         if (decodeErrors.length > 0) {
                             console.warn(`[reprocess] Dekódolási hibák (${activityId}):`, decodeErrors);

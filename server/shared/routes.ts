@@ -101,7 +101,8 @@ export async function reprocessWorkoutByGarminId(
     }
 
     const buffer = await readFile(zipPath)
-    const { text, startTimeIso, errors } = processBuffer(buffer, { activityId: garminActivityId, tpStore })
+    const garminExtra = await loadGarminExtraJson(dirname(zipPath), garminActivityId)
+    const { text, startTimeIso, errors } = processBuffer(buffer, { activityId: garminActivityId, tpStore, garminExtra })
 
     if (errors.length > 0) {
         console.warn(`[reprocess-by-id] Dekódolási hibák (${garminActivityId}):`, errors)
@@ -111,6 +112,21 @@ export async function reprocessWorkoutByGarminId(
     await writeFile(mdPath, text, 'utf-8')
 
     return { zipPath, mdPath, startTimeIso }
+}
+
+/**
+ * A userscript által iframe módban scrape-elt extra adatok
+ * (`{activityId}.json`). Best-effort: ha nincs / nem parse-olható, null-t ad.
+ */
+async function loadGarminExtraJson(dir: string, activityId: string): Promise<Record<string, unknown> | null> {
+    const jsonPath = join(dir, `${activityId}.json`)
+    try {
+        const raw = await readFile(jsonPath, 'utf-8')
+        const parsed = JSON.parse(raw)
+        return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null
+    } catch {
+        return null
+    }
 }
 
 function getQueryParam(req: any, key: string): string {

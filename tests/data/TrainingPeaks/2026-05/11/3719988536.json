@@ -1,0 +1,42 @@
+{
+  "rowKey": "11/5/2026_Run_0:59:18_81rTSS",
+  "workoutId": "3719988536",
+  "name": "VO2 max - SUM 24p 3*8 min, 04:15 iram",
+  "workoutStart": "2026-05-11T06:47:45",
+  "workoutType": "Run",
+  "completedTotalTime": "0:59:18",
+  "completedDistance": "12.0 km",
+  "completedTssValue": "81",
+  "completedTssUnit": "rTSS",
+  "plannedTssValue": "73",
+  "plannedTssUnit": "rTSS",
+  "plannedIfValue": "",
+  "completedIfValue": "",
+  "description": "nem kell 4:15-nél gyorsabban",
+  "comments": [
+    {
+      "text": "### Technikai megjegyzés Megint bele editáltam az edzés leíróba, hogy legyen 10 perc a gyors(ak) előtt, mert kb 8-9 perc mire kiérek a szigetre. A cím kicsit csaló mert SUM 20p != 8*3=24 perc-el. ### Napló Picit eleve fáradt voltam, a tegnapit gyorsabban mentem. Ennek ellenére nem lett olyan rossz, jóléreztem magam. Az elején volt 45g, majd a 3. gyors után 20g CH. A 2. gyors végefelé már lihegtem, a 3.-ban már a felétől. A 2-3. végén volt egy kis séta is. A 3. végén már kapkodtam a levegőt rendesen.",
+      "date": "2026-05-11",
+      "user": "Szombathelyi Bela"
+    }
+  ],
+  "workoutStructure": [
+    {
+      "description": "Ebbe a részbe mehet egy kis futósikola, szökdelés stb.",
+      "durationIntensity": "5 min @ 05:31 min/km"
+    },
+    {
+      "repeats": 3,
+      "steps": [
+        {
+          "description": "Hard",
+          "durationIntensity": "8 min @ 04:15 min/km"
+        },
+        {
+          "description": "Easy",
+          "durationIntensity": "8 min @ 05:40 min/km"
+        }
+      ]
+    }
+  ]
+}

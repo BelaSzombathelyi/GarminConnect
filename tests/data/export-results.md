@@ -1,7 +1,10 @@
-# Garmin Download Results
+# Garmin letöltések eredménye
 
 ## Tartalomjegyzék
 
+### 2026-05
+- **2026-05-11**
+  - [06:47:45 • Futás](#activity-2026-05-11-99000000006)
 ### 2026-04
 - **2026-04-05**
   - [15:18:24 • Futás](#activity-2026-04-05-99000000004)
@@ -17,39 +20,100 @@
 
 ---
 
-## 2026-04-05
+## 2026-05-11
 
-<a id="activity-2026-04-05-99000000004"></a>
-### Workout Summary: 2026. 04. 05. 15:18 | 1:33 | 70 perc kötetlen *5 min, 04:05
+<a id="activity-2026-05-11-99000000006"></a>
+### Edzés: 2026. 05. 11. 06:47 | 0:59 | VO2 max - SUM 20p 3*8 min, 04:15
 
-Time: 1:33
-Distance: 14.19 km
+Időtartam: 0:59
+Távolság: 11.99 km
+Aerob hatás: 3.8 (kozepes)
+Anaerob hatás: nincs
 
-Heart rate: avg 146 bpm
-RPE: 5/10
-
-Aerobic: 4.0 (magas)
-Anaerobic: alacsony
-
-Aktivitás neve: 70 perc kötetlen
-
-TSS: 99 rTSS
-
+TSS: 81 rTSS
 Edzés típus: Run
-
-Tervezett idő: 1:08:53
+Tervezett idő: 0:59:18
 
 ##### Edzői instrukciók
 
-Egyenletes, könnyed futás érzésre RPE 1-3
+nem kell 4:15-nél gyorsabban
 
 ##### Kommentek
 
-**2026-04-05 — Szombathelyi Bela**
+**2026-05-11 — Szombathelyi Bela**
 
-Ettem egy közepes ebédet, majd nem sokkal utána mentünk anyukámmal bringával egy részen, aztán utána én futva, majd fél időnél fagyiztunk egyet Almádiban. Odafelé picit nyomtam a gázt, ahogy jól esett. Vissza felé, már nem akartam túlságosan erősen futni, így esett most jól. Egy zselé volt, a só most kiamaradt, 1l víz.
+##### Technikai megjegyzés Megint bele editáltam az edzés leíróba, hogy legyen 10 perc a gyors(ak) előtt, mert kb 8-9 perc mire kiérek a szigetre. A cím kicsit csaló mert SUM 20p != 8*3=24 perc-el. ### Napló Picit eleve fáradt voltam, a tegnapit gyorsabban mentem. Ennek ellenére nem lett olyan rossz, jóléreztem magam. Az elején volt 45g, majd a 3. gyors után 20g CH. A 2. gyors végefelé már lihegtem, a 3.-ban már a felétől. A 2-3. végén volt egy kis séta is. A 3. végén már kapkodtam a levegőt rendesen.
 
-#### Edzés összefoglaló
+Sport profil: Futás
+Kezdés: 2026. 05. 11. 6:47:45
+Befejezés: 2026. 05. 11. 7:47:03
+Össz. emelkedés: 28 m
+Össz. süllyedés: 15 m
+Kalória: 861 kcal
+Metabolikus kalória: 86 kcal
+Pulzus: átl. 142, max. 164 bpm
+Pedálütem: átl. 170, max. 186 spérc
+Légzés: átl. 36.0, max. 46.9, min. 19.2 légvétel/perc
+Átl. lépéshossz: 1186.00 mm
+Átl. talajérintési idő: 232 ms
+Talajérintési idő %: 33.0 %
+Talajérintési egyensúly: 49.7 %
+Függőleges arány: 8.9 %
+Önértékelés/Közérzet: Gyenge
+Önértékelés/RPE: 9/10 - Majdnem maxon vagyok. EX-AN
+Aerob edzéshatás: 3.8 / 5.0 – Fejlődés
+Anaerob edzéshatás: 0.0 / 5.0 – Nincs hatás
+Edzésterhelés (peak): 162.3
+Futás idő: 58:21
+Séta idő: 0:57
+Edzés neve: VO2 max - SUM 20p 3*8 min, 04:15
+
+##### Edzéslépések (TP terv)
+- [warmup]  10:00  @ 05:31 /km  Ebbe a részbe mehet egy kis futósikola, szökdelés stb.  *(TP: 5:00 — Garmin-ban módosítva)*
+- Ismétlés: 3×
+  - [active]  8:00  @ 04:15 /km  Hard
+  - [rest]  8:00  @ 05:40 /km  Easy
+
+##### Intervallumok - **3 blokk**
+
+| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
+| ---: | :--- | ---: | ---: | ---: | ---: |
+| 10:00 | Bemelegítés | 1.843 | 5:25 | 12 | 10 |
+| 8:00 + 8:00 | Intervallum | 1.89 / 1.492 | 4:14 | 1 | 0 |
+| 8:00 + 8:00 | Intervallum | 1.894 / 1.437 | 4:13 | 2 | 0 |
+| 8:00 + 8:00 | Intervallum | 1.887 / 1.359 | 4:14 | 1 | 1 |
+| 1:18 | Levezető | 0.188 | 6:57 | 9 | 0 |
+
+#### Körök
+nem feltétlenül egységes km-ek
+
+| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | GCT (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 1 | 5:34 | 12 | 0 | 166 | 172 | 1107.50 | 91.1 | 272 | 8.2 | 31.9 | 40.2 |
+| 2 | 0.843 | 5:16 | 0 | 10 | 168 | 174 | 1084.50 | 98.1 | 259 | 8.8 | 32.8 | 40.0 |
+| 3 | 1 | 4:15 | 1 | 0 | 174 | 182 | 1331.90 | 109.7 | 219 | 8.0 | 36.8 | 43.3 |
+| 4 | 0.89 | 4:13 | 0 | 0 | 174 | 180 | 1366.00 | 114.8 | 216 | 8.2 | 37.2 | 40.2 |
+| 5 | 1 | 5:19 | 1 | 1 | 170 | 174 | 1102.80 | 105.1 | 246 | 9.3 | 36.1 | 41.0 |
+| 6 | 0.492 | 5:27 | 0 | 0 | 170 | 174 | 1074.20 | 103.1 | 251 | 9.4 | 36.6 | 40.5 |
+| 7 | 1 | 4:14 | 1 | 0 | 174 | 186 | 1341.80 | 113.9 | 204 | 8.3 | 40.8 | 46.5 |
+| 8 | 0.894 | 4:13 | 1 | 0 | 174 | 180 | 1364.40 | 116.3 | 199 | 8.3 | 38.2 | 46.9 |
+| 9 | 1 | 5:35 | 0 | 1 | 166 | 174 | 1079.30 | 109.3 | 259 | 10.0 | 35.2 | 44.7 |
+| 10 | 0.437 | 5:32 | 0 | 1 | 168 | 172 | 1048.20 | 108.4 | 248 | 10.1 | 33.9 | 35.7 |
+| 11 | 1 | 4:16 | 1 | 1 | 174 | 182 | 1333.60 | 115.0 | 189 | 8.4 | 37.0 | 42.4 |
+| 12 | 0.887 | 4:13 | 0 | 0 | 174 | 178 | 1368.90 | 117.1 | 182 | 8.3 | 38.4 | 42.1 |
+| 13 | 1 | 6:00 | 0 | 0 | 160 | 172 | 1042.60 | 102.0 | 247 | 9.7 | 34.9 | 38.3 |
+| 14 | 0.359 | 5:34 | 1 | 0 | 172 | 176 | 1062.20 | 105.0 | 227 | 9.7 | 36.0 | 38.6 |
+| 15 | 0.188 | 6:57 | 9 | 0 | 168 | 172 | 970.90 | 95.2 | 241 | 9.6 | 35.0 | 36.5 |
+
+## 2026-04-05
+
+<a id="activity-2026-04-05-99000000004"></a>
+### Edzés: 2026. 04. 05. 15:18 | 1:33 | 70 perc kötetlen *5 min, 04:05
+
+Időtartam: 1:33
+Távolság: 14.19 km
+Aerob hatás: 4.0 (magas)
+Anaerob hatás: alacsony
 
 Sport profil: Futás
 Kezdés: 2026. 04. 05. 15:18:24
@@ -58,14 +122,14 @@ Befejezés: 2026. 04. 05. 16:51:34
 Össz. süllyedés: 14 m
 Kalória: 1019 kcal
 Metabolikus kalória: 100 kcal
-Heart rate: avg 146, max 164 bpm
-Cadence: avg 170, max 182 spm
-Respiration: avg 37.2, max 50.0, min 19.0 breaths/min
-Avg. step length: 1210.70 mm
-Avg. ground contact time: 256 ms
-Ground contact time %: 36.4 %
-Ground contact balance: 47.9 %
-Vertical ratio: 7.9 %
+Pulzus: átl. 146, max. 164 bpm
+Pedálütem: átl. 170, max. 182 spérc
+Légzés: átl. 37.2, max. 50.0, min. 19.0 légvétel/perc
+Átl. lépéshossz: 1210.70 mm
+Átl. talajérintési idő: 256 ms
+Talajérintési idő %: 36.4 %
+Talajérintési egyensúly: 47.9 %
+Függőleges arány: 7.9 %
 Önértékelés/Közérzet: Nagyon erős
 Önértékelés/RPE: 5/10 - Nehezedő tempó, még tudok pár mondatot mondani. E1/2-E2
 Aerob edzéshatás: 4.0 / 5.0 – Magas fejlődés
@@ -74,11 +138,10 @@ Edzésterhelés (peak): 192.2
 Futás idő: 68:03
 Séta idő: 0:49
 Állás idő: 0:01
-Edzés neve: 70 perc kötetlen
-workout steps: 2
+Edzés neve: 70 perc kötetlen *5 min, 04:05
 
 ##### Edzéslépések
-  1.  RPE 1-3  [active]  70:00
+- [active]  70:00  RPE 1-3
 
 ##### Pause Events (Timer Button)
 
@@ -89,7 +152,7 @@ workout steps: 2
 #### Körök
 nem feltétlenül egységes km-ek
 
-| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | Talajérintés (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
+| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | GCT (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 1 | 4:44 | 1 | 1 | 170 | 176 | 1230.00 | 95.2 | 265 | 7.4 | 29.9 | 34.0 |
 | 2 | 1 | 4:22 | 1 | 0 | 174 | 182 | 1309.50 | 94.8 | 246 | 7.0 | 32.9 | 41.6 |
@@ -114,37 +177,13 @@ nem feltétlenül egységes km-ek
 ## 2026-04-04
 
 <a id="activity-2026-04-04-99000000005"></a>
-### Workout Summary: 2026. 04. 04. 10:11 | 3:23 | 3,5 óra terepen 4*5 min, 04:05
+### Edzés: 2026. 04. 04. 10:11 | 3:23 | 3,5 óra terepen 4*5 min, 04:05
 
-Time: 3:23
-Distance: 30.163 km
-Elevation: +1265 m
-
-Heart rate: avg 143 bpm
-RPE: 6/10
-
-Aerobic: 4.9 (magas)
-Anaerobic: alacsony
-
-Aktivitás neve: 3,5 óra terepen
-
-TSS: 220 rTSS
-
-Edzés típus: Run
-
-Tervezett idő: 3:18:21
-
-##### Edzői instrukciók
-
-Szokásos szisztéma. Emelkedőkön vissza 150-es pulzusig. Lejtőket fusd meg de ne maxon. Szint 1 ezres legyen benne minimum.
-
-##### Kommentek
-
-**2026-04-04 — Szombathelyi Bela**
-
-Terepfutó cipő csere -> ugyan olyanra. A régi 11 hónapot és 1000km-ert élt meg. Ugyan az az útvonal volt mint múlt héten csak a start nem Óbuda hanem Solymár lett. Vittem botot, felfeléken használtam is. 4 zselé, 3 dekás marcipán szelet, 2 l víz. Lefeléket jobban meg futottam mint múlt héten. Persze van ezen az útvonalon 3-4 kisebb szakasz ahol nem lehet fékezni szinte lefelé mert túl meredek, ott a múltkor is gyors voltam. Talán picit alul frissítettem, és utána meg túl ettem magam, de aztán estére minden jó volt.
-
-#### Edzés összefoglaló
+Időtartam: 3:23
+Távolság: 30.163 km
+Szintemelkedés: +1265 m
+Aerob hatás: 4.9 (magas)
+Anaerob hatás: alacsony
 
 Sport profil: Terepfutás
 Kezdés: 2026. 04. 04. 10:11:25
@@ -153,14 +192,14 @@ Befejezés: 2026. 04. 04. 13:34:38
 Össz. süllyedés: 1275 m
 Kalória: 2448 kcal
 Metabolikus kalória: 288 kcal
-Heart rate: avg 143, max 160 bpm
-Cadence: avg 152, max 248 spm
-Respiration: avg 35.6, max 46.0, min 13.2 breaths/min
-Avg. step length: 979.70 mm
-Avg. ground contact time: 298 ms
-Ground contact time %: 38.7 %
-Ground contact balance: 49.6 %
-Vertical ratio: 9.1 %
+Pulzus: átl. 143, max. 160 bpm
+Pedálütem: átl. 152, max. 248 spérc
+Légzés: átl. 35.6, max. 46.0, min. 13.2 légvétel/perc
+Átl. lépéshossz: 979.70 mm
+Átl. talajérintési idő: 298 ms
+Talajérintési idő %: 38.7 %
+Talajérintési egyensúly: 49.6 %
+Függőleges arány: 9.1 %
 Önértékelés/Közérzet: Normál
 Önértékelés/RPE: 6/10 - Nehezedő tempó, még tudok pár mondatot mondani. E1/2-E2
 Aerob edzéshatás: 4.9 / 5.0 – Magas fejlődés
@@ -169,11 +208,10 @@ Edzésterhelés (peak): 273.1
 Futás idő: 145:23
 Séta idő: 52:46
 Állás idő: 0:13
-Edzés neve: 3,5 óra terepen
-workout steps: 2
+Edzés neve: 3,5 óra terepen 4*5 min, 04:05
 
 ##### Edzéslépések
-  1.  Active  [active]  210:00  114–150 bpm
+- [active]  210:00  114–150 bpm  Active
 
 ##### Pause Events (Timer Button)
 
@@ -182,7 +220,7 @@ Mikro megállások: 10 db (2 percnél rövidebb), összidő: 4:52.
 #### Körök
 nem feltétlenül egységes km-ek
 
-| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | Talajérintés (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
+| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | GCT (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 1 | 5:47 | 10 | 1 | 164 | 172 | 1044.60 | 94.1 | 280 | 8.8 | 31.6 | 35.6 |
 | 2 | 1 | 7:34 | 68 | 15 | 168 | 190 | 803.90 | 70.1 | 308 | 8.6 | 35.3 | 40.8 |
@@ -263,32 +301,12 @@ nem feltétlenül egységes km-ek
 ## 2026-04-01
 
 <a id="activity-2026-04-01-99000000003"></a>
-### Workout Summary: 2026. 04. 01. 06:17 | 1:06 | VO2 max - SUM 20p 4*5 min, 04:05
+### Edzés: 2026. 04. 01. 06:17 | 1:06 | VO2 max - SUM 20p 4*5 min, 04:05
 
-Time: 1:06
-Distance: 13.097 km
-
-Heart rate: avg 141 bpm
-RPE: 9/10
-
-Aerobic: 3.9 (kozepes)
-Anaerobic: alacsony
-
-Aktivitás neve: VO2 max - SUM 20p 4*5 min, 04:05 iram
-
-TSS: 86 rTSS
-
-Edzés típus: Run
-
-Tervezett idő: 1:06:15
-
-##### Kommentek
-
-**2026-04-01 — Szombathelyi Bela**
-
-Ezt a tempót nem érzem biztonságosnak. 1-2 percig oké, de 20 percre olyan érzés mit amikor elkezd pörögni a villany óra csak itt a CH raktáron. Biztosan bele tudnék menni jobban is, de az már nem biztonságos érzés. Azért így sem lett olyan rossz 😉
-
-#### Edzés összefoglaló
+Időtartam: 1:06
+Távolság: 13.097 km
+Aerob hatás: 3.9 (kozepes)
+Anaerob hatás: alacsony
 
 Sport profil: Futás
 Kezdés: 2026. 04. 01. 6:17:28
@@ -297,14 +315,14 @@ Befejezés: 2026. 04. 01. 7:24:20
 Össz. süllyedés: 29 m
 Kalória: 938 kcal
 Metabolikus kalória: 96 kcal
-Heart rate: avg 141, max 166 bpm
-Cadence: avg 170, max 182 spm
-Respiration: avg 36.7, max 48.2, min 22.2 breaths/min
-Avg. step length: 1159.40 mm
-Avg. ground contact time: 226 ms
-Ground contact time %: 32.1 %
-Ground contact balance: 53.0 %
-Vertical ratio: 9.1 %
+Pulzus: átl. 141, max. 166 bpm
+Pedálütem: átl. 170, max. 182 spérc
+Légzés: átl. 36.7, max. 48.2, min. 22.2 légvétel/perc
+Átl. lépéshossz: 1159.40 mm
+Átl. talajérintési idő: 226 ms
+Talajérintési idő %: 32.1 %
+Talajérintési egyensúly: 53.0 %
+Függőleges arány: 9.1 %
 Önértékelés/Közérzet: Normál
 Önértékelés/RPE: 9/10 - Majdnem maxon vagyok. EX-AN
 Aerob edzéshatás: 3.9 / 5.0 – Fejlődés
@@ -314,17 +332,16 @@ Futás idő: 66:15
 Séta idő: 0:00
 Állás idő: 0:00
 Edzés neve: VO2 max - SUM 20p 4*5 min, 04:05
-workout steps: 9
 
 ##### Edzéslépések
-  1.  Warm up  [warmup]  5:00  speed
-  2.  Hard  [active]  0:35  speed
-  3.  Easy  [rest]  2:00  speed
-  4.  repeatUntilStepsCmplt
-  5.  Hard  [active]  5:00  speed
-  6.  Easy  [rest]  5:00  speed
-  7.  repeatUntilStepsCmplt
-  8.  Recovery  [rest]  5:00  speed
+- [warmup]  5:00  pace 5:24–5:58 /km  Warm up
+- Ismétlés: 2×
+  - [active]  0:35  pace 4:08–4:34 /km  Hard
+  - [rest]  2:00  pace 5:24–5:58 /km  Easy
+- Ismétlés: 4×
+  - [active]  5:00  pace 3:54–4:18 /km  Hard
+  - [rest]  5:00  pace 5:11–5:44 /km  Easy
+- [rest]  5:00  pace 5:37–6:13 /km  Recovery
 
 ##### Intervallumok - **6 blokk**
 
@@ -340,15 +357,6 @@ workout steps: 9
 | 5:00 | Pihenő interval | 0.899 | 5:34 | 1 | 0 |
 | 11:16 | Levezető | 1.948 | 5:47 | 13 | 10 |
 
-##### Intervallum összefoglalók
-
-| Típus | Darab | Össz táv (km) | Össz idő |
-| :--- | ---: | ---: | ---: |
-| Pihenő interval | 7 | 5.202 | 29:00 |
-| Aktív interval | 6 | 5.111 | 21:10 |
-| Levezető | 1 | 1.948 | 11:16 |
-| Bemelegítés | 1 | 0.836 | 4:49 |
-
 ##### Pause Events (Timer Button)
 
 Mikro megállások: 2 db (2 percnél rövidebb), összidő: 0:38.
@@ -356,7 +364,7 @@ Mikro megállások: 2 db (2 percnél rövidebb), összidő: 0:38.
 #### Körök
 nem feltétlenül egységes km-ek
 
-| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | Talajérintés (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
+| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | GCT (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 0.836 | 5:46 | 12 | 0 | 164 | 170 | 1105.20 | 97.1 | 271 | 8.7 | 22.2 | 22.2 |
 | 2 | 0.137 | 4:16 | 1 | 0 | 176 | 178 | 1216.50 | 99.2 | 222 | 8.1 | – | – |
@@ -382,19 +390,12 @@ nem feltétlenül egységes km-ek
 ## 2026-03-22
 
 <a id="activity-2026-03-22-99000000001"></a>
-### Workout Summary: 2026. 03. 22. 09:00 | 1:30
+### Edzés: 2026. 03. 22. 09:00 | 1:30
 
-Title: futás
-Time: 1:30
-Distance: 21.351 km
-
-Heart rate: avg 161 bpm
-RPE: 10/10
-
-Aerobic: 5.0 (magas)
-Anaerobic: kozepes
-
-#### Edzés összefoglaló
+Időtartam: 1:30
+Távolság: 21.351 km
+Aerob hatás: 5.0 (magas)
+Anaerob hatás: kozepes
 
 Sport profil: Futás
 Kezdés: 2026. 03. 22. 9:00:26
@@ -403,33 +404,25 @@ Befejezés: 2026. 03. 22. 10:30:26
 Össz. süllyedés: 60 m
 Kalória: 1445 kcal
 Metabolikus kalória: 129 kcal
-Heart rate: avg 161, max 181 bpm
-Cadence: avg 170, max 182 spm
-Respiration: avg 40.0, max 45.4, min 34.8 breaths/min
-Avg. step length: 1393.80 mm
-Avg. ground contact time: 213 ms
-Ground contact time %: 30.2 %
-Ground contact balance: 48.6 %
-Vertical ratio: 7.8 %
+Pulzus: átl. 161, max. 181 bpm
+Pedálütem: átl. 170, max. 182 spérc
+Légzés: átl. 40.0, max. 45.4, min. 34.8 légvétel/perc
+Átl. lépéshossz: 1393.80 mm
+Átl. talajérintési idő: 213 ms
+Talajérintési idő %: 30.2 %
+Talajérintési egyensúly: 48.6 %
+Függőleges arány: 7.8 %
 Önértékelés/Közérzet: Nagyon gyenge
 Önértékelés/RPE: 10/10 - Maximális, most hagyj békén. AN-SW
 Aerob edzéshatás: 5.0 / 5.0 – Megterhelés
 Anaerob edzéshatás: 2.2 / 5.0 – Fenntartás
 Edzésterhelés (peak): 436.9
 Futás idő: 90:00
-Séta idő: 0:00
-Állás idő: 0:00
-
-##### Intervallumok
-
-| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
-| ---: | :--- | ---: | ---: | ---: | ---: |
-| 90:00 | Aktív interval | 21.351 | 4:13 | 62 | 60 |
 
 #### Körök
 nem feltétlenül egységes km-ek
 
-| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | Talajérintés (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
+| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | GCT (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 1 | 4:23 | 12 | 8 | 170 | 182 | 1318.30 | 105.1 | 234 | 8.0 | 38.6 | 42.0 |
 | 2 | 1 | 4:08 | 0 | 5 | 174 | 180 | 1393.30 | 113.6 | 224 | 7.9 | 38.8 | 42.4 |
@@ -457,19 +450,12 @@ nem feltétlenül egységes km-ek
 ## 2026-03-01
 
 <a id="activity-2026-03-01-99000000002"></a>
-### Workout Summary: 2026. 03. 01. 08:30 | 6:51
+### Edzés: 2026. 03. 01. 08:30 | 6:51
 
-Title: futás (hosszu)
-Time: 6:51
-Distance: 51.519 km
-
-Heart rate: avg 116 bpm
-RPE: 9/10
-
-Aerobic: 3.8 (kozepes)
-Anaerobic: nincs
-
-#### Edzés összefoglaló
+Időtartam: 6:51
+Távolság: 51.519 km
+Aerob hatás: 3.8 (kozepes)
+Anaerob hatás: nincs
 
 Sport profil: Futás
 Kezdés: 2026. 03. 01. 8:30:28
@@ -478,14 +464,14 @@ Befejezés: 2026. 03. 01. 15:22:09
 Össz. süllyedés: 214 m
 Kalória: 3594 kcal
 Metabolikus kalória: 591 kcal
-Heart rate: avg 116, max 134 bpm
-Cadence: avg 162, max 218 spm
-Respiration: avg 28.5, max 41.6, min 14.3 breaths/min
-Avg. step length: 770.30 mm
-Avg. ground contact time: 306 ms
-Ground contact time %: 42.5 %
-Ground contact balance: 52.2 %
-Vertical ratio: 8.7 %
+Pulzus: átl. 116, max. 134 bpm
+Pedálütem: átl. 162, max. 218 spérc
+Légzés: átl. 28.5, max. 41.6, min. 14.3 légvétel/perc
+Átl. lépéshossz: 770.30 mm
+Átl. talajérintési idő: 306 ms
+Talajérintési idő %: 42.5 %
+Talajérintési egyensúly: 52.2 %
+Függőleges arány: 8.7 %
 Önértékelés/Közérzet: Normál
 Önértékelés/RPE: 9/10 - Majdnem maxon vagyok. EX-AN
 Aerob edzéshatás: 3.8 / 5.0 – Fejlődés
@@ -495,33 +481,10 @@ Futás idő: 384:56
 Séta idő: 21:47
 Állás idő: 4:58
 
-##### Intervallumok - **16 blokk**
-
-| Idő | Típus | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) |
-| ---: | :--- | ---: | ---: | ---: | ---: |
-| 17:07 | Aktív interval | 2.347 | 7:18 | 18 | 0 |
-| 23:31 + 0:13 | Intervallum | 3.305 / 0.006 | 7:07 | 4 | 26 |
-| 14:53 + 0:44 | Intervallum | 2.068 / 0.007 | 7:12 | 6 | 2 |
-| 25:55 + 0:16 | Intervallum | 3.42 / 0.003 | 7:35 | 4 | 9 |
-| 26:57 + 0:55 | Intervallum | 3.59 / 0.017 | 7:30 | 4 | 4 |
-| 11:10 + 0:57 | Intervallum | 1.508 / 0.025 | 7:24 | 1 | 0 |
-| 13:43 | Aktív interval | 1.89 | 7:16 | 3 | 0 |
-| 29:42 + 0:29 | Intervallum | 3.94 / 0.006 | 7:32 | 35 | 34 |
-| 24:07 + 0:43 | Intervallum | 3.176 / 0.019 | 7:36 | 3 | 3 |
-| 5:24 + 0:04 | Intervallum | 0.707 / 0.002 | 7:38 | 0 | 4 |
-| 5:56 + 0:26 | Intervallum | 0.764 / 0.01 | 7:46 | 0 | 1 |
-| 1:18 | Pihenő interval | 0.065 | 20:03 | 0 | 0 |
-| 28:05 + 0:48 | Intervallum | 3.669 / 0.006 | 7:39 | 8 | 16 |
-| 1:44 | Aktív interval | 0.234 | 7:24 | 0 | 3 |
-| 3:57 | Aktív interval | 0.512 | 7:43 | 2 | 1 |
-| 11:14 | Aktív interval | 1.449 | 7:45 | 0 | 2 |
-| 32:27 | Aktív interval | 4.476 | 7:15 | 0 | 5 |
-| 0:00 | Levezető | 0.003 | 1:30 | 0 | 0 |
-
 #### Körök
 nem feltétlenül egységes km-ek
 
-| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | Talajérintés (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
+| # | Táv (km) | Pace (min/km) | Emelkedés (m) | Süllyedés (m) | Kadencia (lép/p) | Max kadencia | Lépéshossz (mm) | Vert. osz. (mm) | GCT (ms) | Vert. arány (%) | Átl. légzés (l/p) | Max. légzés (l/p) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 1 | 6:55 | 0 | 0 | 176 | 182 | 827.00 | 66.2 | 276 | 7.8 | 32.2 | 35.4 |
 | 2 | 1 | 7:29 | 10 | 0 | 170 | 178 | 779.50 | 65.5 | 299 | 8.3 | 31.5 | 36.9 |

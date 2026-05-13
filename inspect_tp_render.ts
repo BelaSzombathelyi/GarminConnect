@@ -1,0 +1,20 @@
+import { processBuffer } from './server/garmin/fitPipeline.ts';
+import { createTrainingPeaksWorkoutStore } from './server/trainingpeaks/workoutStore.ts';
+import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const zipPath = 'data/Garmin/2026-05/11/22839150987.zip';
+const tpPath = 'data/TrainingPeaks/2026-05/11/3719988536.json';
+const buf = readFileSync(zipPath);
+const dbPath = join(tmpdir(), 'tp-' + Date.now() + '.db');
+const tpStore = createWorkoutStore(dbPath);
+const tp = JSON.parse(readFileSync(tpPath, 'utf-8'));
+tpStore.upsertWorkout(tp);
+const res = await processBuffer(buf, { tpStore, activityId: '22839150987' });
+const md = res.markdown;
+const startIdx = md.indexOf('### Edzéslépések');
+const endIdx = md.indexOf('## ', startIdx + 5);
+console.log('\n=== TP-BASED STEPS ===');
+console.log(md.substring(startIdx, endIdx > 0 ? endIdx : md.length));
+tpStore.close();

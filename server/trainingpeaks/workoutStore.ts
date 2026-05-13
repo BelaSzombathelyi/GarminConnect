@@ -631,6 +631,14 @@ export function createTrainingPeaksWorkoutStore(dbFilePath: string, dataDir: str
                 fileContent,
             }
         },
+
+        /**
+         * Lezárja a SQLite kapcsolatot. Főleg tesztekben kell — Windows alatt
+         * a vitest afterEach unlink elszáll EBUSY-val, ha a fájl handle nyitva van.
+         */
+        close() {
+            try { db.close() } catch { /* idempotens */ }
+        },
     }
 }
 
