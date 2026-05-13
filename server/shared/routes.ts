@@ -134,6 +134,15 @@ function getQueryParam(req: any, key: string): string {
     return String(reqUrl.searchParams.get(key) ?? '').trim()
 }
 
+
+function parseActivityIdsFromUnknown(value: unknown): string[] {
+    if (!Array.isArray(value)) return []
+    const ids = value
+        .map((item) => String(item ?? '').trim())
+        .filter((id) => /^\d+$/.test(id))
+    return Array.from(new Set(ids))
+}
+
 export function registerSharedRoutes(server: ViteDevServer, options: RegisterSharedRoutesOptions): void {
     const { archiveDir, tpStore } = options
 
@@ -193,109 +202,73 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
         }
     })
 
-    server.middlewares.use('/api/reprocess_workout_by_garmin_id', async (req, res) => {
+    server.middlewares.use('/api/download_workout_markdown', async (req, res) => {
         if (handleOptions(req, res)) return
         setCorsHeaders(res)
 
-        if (req.method !== 'GET' && req.method !== 'POST') {
+        if (req.method !== 'POST') {
             res.statusCode = 405
             res.end('Method Not Allowed')
             return
         }
 
         try {
-            const body = req.method === 'POST' ? await readJsonBody(req) : {}
-            const garminActivityId = req.method === 'POST'
-                ? String(body.garminActivityId ?? '').trim()
-                : getQueryParam(req, 'garminActivityId')
+            const body = await readJsonBody(req)
+            const activityIds = parseActivityIdsFromUnknown(body.garminActivityIds)
+            const tpWorkoutId = String(body.tpWorkoutId ?? '').trim()
 
-            if (!garminActivityId) {
+            let targetIds = activityIds
+            if (targetIds.length === 0 && tpWorkoutId) {
+                if (!tpStore) {
+                    res.statusCode = 500
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                    res.end(JSON.stringify({ ok: false, error: 'TrainingPeaks store nincs konfigurálva' }))
+                    return
+                }
+
+                const workout = tpStore.getByWorkoutId(tpWorkoutId)
+                if (!workout) {
+                    res.statusCode = 404
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                    res.end(JSON.stringify({ ok: false, error: `TP workout nem található: ${tpWorkoutId}` }))
+                    return
+                }
+
+                let garminActivityId = String(workout.garminActivityId ?? '').trim()
+                if (!garminActivityId) {
+                    garminActivityId = (await tryLinkTpWorkoutToGarminActivity(archiveDir, tpWorkoutId, tpStore)) ?? ''
+                }
+
+                if (!garminActivityId) {
+                    res.statusCode = 409
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                    res.end(JSON.stringify({ ok: false, error: `Ehhez a TP workouthoz még nincs társítva Garmin ID: ${tpWorkoutId}` }))
+                    return
+                }
+                targetIds = [garminActivityId]
+            }
+
+            if (targetIds.length === 0) {
                 res.statusCode = 400
                 res.setHeader('Content-Type', 'application/json; charset=utf-8')
-                res.end(JSON.stringify({ ok: false, error: 'garminActivityId kötelező' }))
+                res.end(JSON.stringify({ ok: false, error: 'garminActivityIds vagy tpWorkoutId kötelező' }))
                 return
             }
 
-            const result = await reprocessWorkoutByGarminId(archiveDir, garminActivityId, tpStore)
-            const markdown = await readFile(result.mdPath, 'utf-8')
+            for (const id of targetIds) {
+                await reprocessWorkoutByGarminId(archiveDir, id, tpStore)
+            }
+
+            const allEntries = await collectResultTextEntries(archiveDir)
+            const wanted = new Set(targetIds)
+            const entries = allEntries.filter((entry) => wanted.has(entry.activityId))
+            const markdownBuffer = await buildResultsMarkdown(entries)
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)
 
             res.statusCode = 200
             res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
-            res.setHeader('X-Garmin-Activity-Id', garminActivityId)
-            res.setHeader('X-Reprocessed-File', result.mdPath)
-            res.end(markdown)
-        } catch (err) {
-            res.statusCode = 500
-            res.setHeader('Content-Type', 'application/json; charset=utf-8')
-            res.end(JSON.stringify({
-                ok: false,
-                error: err instanceof Error ? err.message : String(err),
-            }))
-        }
-    })
-
-    server.middlewares.use('/api/reprocess_workout_by_tp_id', async (req, res) => {
-        if (handleOptions(req, res)) return
-        setCorsHeaders(res)
-
-        if (req.method !== 'GET' && req.method !== 'POST') {
-            res.statusCode = 405
-            res.end('Method Not Allowed')
-            return
-        }
-
-        if (!tpStore) {
-            res.statusCode = 500
-            res.setHeader('Content-Type', 'application/json; charset=utf-8')
-            res.end(JSON.stringify({ ok: false, error: 'TrainingPeaks store nincs konfigurálva' }))
-            return
-        }
-
-        try {
-            const body = req.method === 'POST' ? await readJsonBody(req) : {}
-            const tpWorkoutId = req.method === 'POST'
-                ? String(body.tpWorkoutId ?? '').trim()
-                : getQueryParam(req, 'tpWorkoutId')
-
-            if (!tpWorkoutId) {
-                res.statusCode = 400
-                res.setHeader('Content-Type', 'application/json; charset=utf-8')
-                res.end(JSON.stringify({ ok: false, error: 'tpWorkoutId kötelező' }))
-                return
-            }
-
-            const workout = tpStore.getByWorkoutId(tpWorkoutId)
-            if (!workout) {
-                res.statusCode = 404
-                res.setHeader('Content-Type', 'application/json; charset=utf-8')
-                res.end(JSON.stringify({ ok: false, error: `TP workout nem található: ${tpWorkoutId}` }))
-                return
-            }
-
-            let garminActivityId = String(workout.garminActivityId ?? '').trim()
-            if (!garminActivityId) {
-                garminActivityId = (await tryLinkTpWorkoutToGarminActivity(archiveDir, tpWorkoutId, tpStore)) ?? ''
-            }
-
-            if (!garminActivityId) {
-                res.statusCode = 409
-                res.setHeader('Content-Type', 'application/json; charset=utf-8')
-                res.end(JSON.stringify({
-                    ok: false,
-                    error: `Ehhez a TP workouthoz még nincs társítva Garmin ID: ${tpWorkoutId}`,
-                }))
-                return
-            }
-
-            const result = await reprocessWorkoutByGarminId(archiveDir, garminActivityId, tpStore)
-            const markdown = await readFile(result.mdPath, 'utf-8')
-
-            res.statusCode = 200
-            res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
-            res.setHeader('X-TP-Workout-Id', tpWorkoutId)
-            res.setHeader('X-Garmin-Activity-Id', garminActivityId)
-            res.setHeader('X-Reprocessed-File', result.mdPath)
-            res.end(markdown)
+            res.setHeader('Content-Disposition', `attachment; filename="workout-results-${stamp}.md"`)
+            res.end(markdownBuffer)
         } catch (err) {
             res.statusCode = 500
             res.setHeader('Content-Type', 'application/json; charset=utf-8')
