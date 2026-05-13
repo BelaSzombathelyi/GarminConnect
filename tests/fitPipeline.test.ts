@@ -85,7 +85,7 @@ for (const { name, activityId, dayKey } of TEST_FILES) {
 
         it('tartalmaz körök adatokat', () => {
             expect(text).toContain('## Körök')
-            expect(text).toContain('| # | Táv (km) | Pace (min/km) |')
+            expect(text).toContain('| # | Idő | Táv (km) | Pace (min/km) |')
         })
 
         it('nincs kritikus dekódolási hiba', () => {

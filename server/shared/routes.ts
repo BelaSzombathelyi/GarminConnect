@@ -94,8 +94,22 @@ export async function reprocessWorkoutByGarminId(
     archiveDir: string,
     garminActivityId: string,
     tpStore?: ReturnType<typeof createTrainingPeaksWorkoutStore>,
+    options: { waitForZipMs?: number } = {},
 ): Promise<{ zipPath: string; mdPath: string; startTimeIso: string | null }> {
-    const zipPath = await findZipByGarminActivityId(archiveDir, garminActivityId)
+    // A userscript akkor hív minket, amikor a `pollActivityStatus` már
+    // RECEIVED/PROCESSED-et látott. A chokidar watcher viszont esetenként
+    // még épp dolgozik a ZIP átmozgatásán, vagy a status az activityStore-ból
+    // egy korábbi futás maradványa. Ezért rövid retry-jal próbálkozunk
+    // megtalálni a ZIP-et az archívumban, mielőtt feladnánk.
+    const waitForZipMs = Math.max(0, options.waitForZipMs ?? 4000)
+    const pollIntervalMs = 250
+    const deadline = Date.now() + waitForZipMs
+
+    let zipPath = await findZipByGarminActivityId(archiveDir, garminActivityId)
+    while (!zipPath && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, pollIntervalMs))
+        zipPath = await findZipByGarminActivityId(archiveDir, garminActivityId)
+    }
     if (!zipPath) {
         throw new Error(`Nem található ZIP ehhez a Garmin ID-hoz: ${garminActivityId}`)
     }
