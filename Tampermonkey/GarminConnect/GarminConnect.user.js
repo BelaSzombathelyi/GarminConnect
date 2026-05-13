@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Garmin Connect ONE Sync
 // @namespace    https://connect.garmin.com/
-// @version      3.9.2
+// @version      3.9.3
 // @description  Garmin Connect: activities lista riport + új aktivitások szinkronizálása rejtett iframe-eken keresztül. Iframe módban a térkép azonnal eltávolításra kerül (gyorsabb betöltés), a fogaskerék menüből Export indul, és a Splits/Időközök tábla ACTIVE sorai egy JSON-be kerülnek (data/Garmin/YYYY-MM/DD/{activityId}.json).
 // @author       Szombathelyi Béla
 // @match        https://connect.garmin.com/app/activities
@@ -654,6 +654,15 @@
         const markdown = await httpRequestText('GET', endpoint);
         triggerDownloadFromText(`garmin-${activityId}.md`, markdown);
         return activityId;
+    }
+
+    async function downloadActivityMarkdown(activityId) {
+        const id = String(activityId || '').trim();
+        if (!id) throw new Error('Hiányzó activityId');
+        const endpoint = `${getApiBase()}/reprocess_workout_by_garmin_id?garminActivityId=${encodeURIComponent(id)}`;
+        const markdown = await httpRequestText('GET', endpoint);
+        triggerDownloadFromText(`garmin-${id}.md`, markdown);
+        return id;
     }
 
     async function getLinkedTpWorkoutId(activityId) {

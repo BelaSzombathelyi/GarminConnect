@@ -202,6 +202,40 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
         }
     })
 
+    server.middlewares.use('/api/reprocess_workout_by_garmin_id', async (req, res) => {
+        if (handleOptions(req, res)) return
+        setCorsHeaders(res)
+
+        if (req.method !== 'GET') {
+            res.statusCode = 405
+            res.end('Method Not Allowed')
+            return
+        }
+
+        const garminActivityId = getQueryParam(req, 'garminActivityId')
+        if (!/^\d+$/.test(garminActivityId)) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({ ok: false, error: 'garminActivityId kötelező (numerikus)' }))
+            return
+        }
+
+        try {
+            const { mdPath } = await reprocessWorkoutByGarminId(archiveDir, garminActivityId, tpStore)
+            const markdown = await readFile(mdPath, 'utf-8')
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
+            res.end(markdown)
+        } catch (err) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify({
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+            }))
+        }
+    })
+
     server.middlewares.use('/api/download_workout_markdown', async (req, res) => {
         if (handleOptions(req, res)) return
         setCorsHeaders(res)
