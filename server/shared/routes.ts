@@ -149,6 +149,47 @@ function getQueryParam(req: any, key: string): string {
 }
 
 
+function workoutStartToIsoDate(value: unknown): string {
+    const text = String(value ?? '').trim()
+    const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/)
+    if (isoMatch) {
+        return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`
+    }
+
+    const slashMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
+    if (!slashMatch) {
+        return ''
+    }
+
+    const day = slashMatch[1].padStart(2, '0')
+    const month = slashMatch[2].padStart(2, '0')
+    let year = Number(slashMatch[3])
+    if (year < 100) year += 2000
+    return `${year}-${month}-${day}`
+}
+
+function buildWorkoutMarkdownFileName(workoutStart: unknown, tpWorkoutId: string): string {
+    const isoDate = workoutStartToIsoDate(workoutStart)
+    const safeWorkoutId = String(tpWorkoutId ?? '').trim()
+    if (!isoDate || !safeWorkoutId) {
+        return `tp-workout-${safeWorkoutId || 'unknown'}.md`
+    }
+    return `${isoDate}_${safeWorkoutId}.md`
+}
+
+function parseGarminDateFromZipPath(zipPath: string): string {
+    const normalized = String(zipPath || '').replace(/\\/g, '/')
+    const m = normalized.match(/\/(\d{4}-\d{2})\/(\d{2})\/\d+\.zip$/)
+    if (!m) return ''
+    return `${m[1]}-${m[2]}`
+}
+
+function buildGarminMarkdownFileName(zipPath: string, activityId: string): string {
+    const dateToken = parseGarminDateFromZipPath(zipPath) || 'unknown-date'
+    const safeId = String(activityId ?? '').trim() || 'unknown'
+    return `${dateToken}-${safeId}.md`
+}
+
 function parseActivityIdsFromUnknown(value: unknown): string[] {
     if (!Array.isArray(value)) return []
     const ids = value
@@ -262,11 +303,38 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
 
         try {
             const body = await readJsonBody(req)
-            const activityIds = parseActivityIdsFromUnknown(body.garminActivityIds)
             const tpWorkoutId = String(body.tpWorkoutId ?? '').trim()
+            const requestedGarminActivityId = String(body.garminActivityId ?? '').trim()
+            const requestedGarminActivityIds = parseActivityIdsFromUnknown(body.garminActivityIds)
 
-            let targetIds = activityIds
-            if (targetIds.length === 0 && tpWorkoutId) {
+            if (!tpWorkoutId && !requestedGarminActivityId && requestedGarminActivityIds.length === 0) {
+                res.statusCode = 400
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ ok: false, error: 'tpWorkoutId vagy garminActivityId vagy garminActivityIds kötelező' }))
+                return
+            }
+
+            if (requestedGarminActivityIds.length > 0 && !tpWorkoutId && !requestedGarminActivityId) {
+                for (const id of requestedGarminActivityIds) {
+                    await reprocessWorkoutByGarminId(archiveDir, id, tpStore)
+                }
+
+                const allEntries = await collectResultTextEntries(archiveDir)
+                const wanted = new Set(requestedGarminActivityIds)
+                const entries = allEntries.filter((entry) => wanted.has(entry.activityId))
+                const markdownBuffer = await buildResultsMarkdown(entries)
+                const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)
+
+                res.statusCode = 200
+                res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
+                res.setHeader('Content-Disposition', `attachment; filename="download-results-${stamp}.md"`)
+                res.end(markdownBuffer)
+                return
+            }
+
+            let garminActivityId = requestedGarminActivityId
+
+            if (!garminActivityId && tpWorkoutId) {
                 if (!tpStore) {
                     res.statusCode = 500
                     res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -282,9 +350,10 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
                     return
                 }
 
-                let garminActivityId = String(workout.garminActivityId ?? '').trim()
+                const effectiveTpWorkoutId = String(workout.workoutId ?? '').trim()
+                garminActivityId = String(workout.garminActivityId ?? '').trim()
                 if (!garminActivityId) {
-                    garminActivityId = (await tryLinkTpWorkoutToGarminActivity(archiveDir, tpWorkoutId, tpStore)) ?? ''
+                    garminActivityId = (await tryLinkTpWorkoutToGarminActivity(archiveDir, effectiveTpWorkoutId, tpStore)) ?? ''
                 }
 
                 if (!garminActivityId) {
@@ -293,30 +362,23 @@ export function registerSharedRoutes(server: ViteDevServer, options: RegisterSha
                     res.end(JSON.stringify({ ok: false, error: `Ehhez a TP workouthoz még nincs társítva Garmin ID: ${tpWorkoutId}` }))
                     return
                 }
-                targetIds = [garminActivityId]
             }
 
-            if (targetIds.length === 0) {
+            if (!/^\d+$/.test(garminActivityId)) {
                 res.statusCode = 400
                 res.setHeader('Content-Type', 'application/json; charset=utf-8')
-                res.end(JSON.stringify({ ok: false, error: 'garminActivityIds vagy tpWorkoutId kötelező' }))
+                res.end(JSON.stringify({ ok: false, error: 'garminActivityId kötelező (numerikus)' }))
                 return
             }
 
-            for (const id of targetIds) {
-                await reprocessWorkoutByGarminId(archiveDir, id, tpStore)
-            }
-
-            const allEntries = await collectResultTextEntries(archiveDir)
-            const wanted = new Set(targetIds)
-            const entries = allEntries.filter((entry) => wanted.has(entry.activityId))
-            const markdownBuffer = await buildResultsMarkdown(entries)
-            const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)
+            const { zipPath, mdPath } = await reprocessWorkoutByGarminId(archiveDir, garminActivityId, tpStore)
+            const markdown = await readFile(mdPath, 'utf-8')
+            const downloadFileName = buildGarminMarkdownFileName(zipPath, garminActivityId)
 
             res.statusCode = 200
             res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
-            res.setHeader('Content-Disposition', `attachment; filename="workout-results-${stamp}.md"`)
-            res.end(markdownBuffer)
+            res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`)
+            res.end(markdown)
         } catch (err) {
             res.statusCode = 500
             res.setHeader('Content-Type', 'application/json; charset=utf-8')

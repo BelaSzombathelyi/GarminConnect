@@ -367,10 +367,16 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
             return
         }
 
-        const status = activityStore.getStatus(activityId)
+        const syncState = activityStore.getSyncState(activityId)
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
         res.statusCode = 200
-        res.end(JSON.stringify({ ok: true, activityId, status: status ?? 'UNKNOWN' }))
+        res.end(JSON.stringify({
+            ok: true,
+            activityId,
+            status: syncState.status ?? 'UNKNOWN',
+            jsonReady: syncState.jsonReady,
+            jsonUploadedAt: syncState.jsonUploadedAt,
+        }))
     })
 
     server.middlewares.use('/api/mark_processed', async (req, res) => {
@@ -539,6 +545,8 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
                 ...payload,
             }
             await writeFile(targetJsonPath, JSON.stringify(enriched, null, 2), 'utf-8')
+            activityStore.markJsonUploaded(activityId)
+            const syncState = activityStore.getSyncState(activityId)
 
             console.log(`[garmin-json] mentve: ${targetJsonPath}`)
 
@@ -549,6 +557,8 @@ export function registerGarminRoutes(server: ViteDevServer, options: RegisterGar
                 activityId,
                 relativeDir,
                 jsonPath: targetJsonPath,
+                jsonReady: syncState.jsonReady,
+                jsonUploadedAt: syncState.jsonUploadedAt,
             }))
         } catch (err) {
             res.statusCode = 400

@@ -101,11 +101,33 @@
                         return;
                     }
                     const contentType = response.responseHeaders?.match(/content-type:\s*([^\r\n]+)/i)?.[1]?.trim();
-                    resolve({ data: response.response, contentType });
+                    resolve({ data: response.response, contentType, responseHeaders: response.responseHeaders || '' });
                 },
                 onerror: () => reject(new Error(`Hálózati hiba: ${url}`)),
             });
         });
+    }
+
+    function parseDownloadFileNameFromHeaders(headers, fallbackName = 'workout.md') {
+        const raw = String(headers || '');
+        const cdLine = raw.match(/content-disposition:\s*([^\r\n]+)/i)?.[1] || '';
+
+        const utf8 = cdLine.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+        if (utf8) {
+            try {
+                return decodeURIComponent(utf8).replace(/[\\/]/g, '_');
+            } catch {
+                return utf8.replace(/[\\/]/g, '_');
+            }
+        }
+
+        const quoted = cdLine.match(/filename="([^"]+)"/i)?.[1];
+        if (quoted) return quoted.replace(/[\\/]/g, '_');
+
+        const plain = cdLine.match(/filename=([^;]+)/i)?.[1]?.trim();
+        if (plain) return plain.replace(/[\\/]/g, '_');
+
+        return fallbackName;
     }
 
     function httpRequestText(method, url, data) {
@@ -488,7 +510,7 @@
     }
 
     function postActivityJsonToServer(activityId, payload) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             try {
                 const apiBase = sessionStorage.getItem('gc_api_base') || API_BASE_DEFAULT;
                 GM_xmlhttpRequest({
@@ -499,19 +521,25 @@
                     onload: (response) => {
                         if (response.status >= 200 && response.status < 300) {
                             gcIframeLog(activityId, 'log', '✓ JSON feltöltve a szerverre');
+                            let parsed = {};
+                            try { parsed = response.responseText ? JSON.parse(response.responseText) : {}; } catch {}
+                            resolve(parsed);
                         } else {
-                            gcIframeLog(activityId, 'warn', `JSON upload HTTP ${response.status}: ${(response.responseText || '').slice(0, 200)}`);
+                            const err = new Error(`JSON upload HTTP ${response.status}: ${(response.responseText || '').slice(0, 200)}`);
+                            gcIframeLog(activityId, 'warn', err.message);
+                            reject(err);
                         }
-                        resolve();
                     },
                     onerror: () => {
-                        gcIframeLog(activityId, 'warn', 'JSON upload hálózati hiba');
-                        resolve();
+                        const err = new Error('JSON upload hálózati hiba');
+                        gcIframeLog(activityId, 'warn', err.message);
+                        reject(err);
                     },
                 });
             } catch (err) {
-                gcIframeLog(activityId, 'warn', 'JSON upload kivétel:', err instanceof Error ? err.message : String(err));
-                resolve();
+                const wrapped = new Error(`JSON upload kivétel: ${err instanceof Error ? err.message : String(err)}`);
+                gcIframeLog(activityId, 'warn', wrapped.message);
+                reject(wrapped);
             }
         });
     }
@@ -580,13 +608,14 @@
                     await postActivityJsonToServer(activityId, { activityId });
                 } catch (postErr) {
                     gcIframeLog(activityId, 'warn', 'Fallback JSON upload is hibára futott:', postErr instanceof Error ? postErr.message : String(postErr));
+                    throw postErr;
                 }
             }
 
             // 6) Egy kis grace period, majd jelezzük a parent-nek, hogy a klikk
             //    megtörtént és kezdheti a status pollozást.
             await new Promise((r) => setTimeout(r, IFRAME_POST_CLICK_DELAY_MS));
-            postIframeMessage(activityId, { type: 'gc-iframe-clicked' });
+            postIframeMessage(activityId, { type: 'gc-iframe-clicked', jsonUploaded: true });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             gcIframeLog(activityId, 'error', '✗ Menü-alapú sync hiba:', msg);
@@ -650,18 +679,32 @@
         const { activityId, zipBlob } = await syncCurrentWorkoutZipToServer();
         downloadBlob(`activity-${activityId}.zip`, zipBlob);
 
-        const endpoint = `${getApiBase()}/reprocess_workout_by_garmin_id?garminActivityId=${encodeURIComponent(activityId)}`;
-        const markdown = await httpRequestText('GET', endpoint);
-        triggerDownloadFromText(`garmin-${activityId}.md`, markdown);
+        const res = await httpRequestArrayBuffer('POST', `${getApiBase()}/download_workout_markdown`, {
+            garminActivityId: activityId,
+        });
+        const fileName = parseDownloadFileNameFromHeaders(res.responseHeaders, `workout-${activityId}.md`);
+        const blob = new Blob([res.data], { type: res.contentType || 'text/markdown;charset=utf-8' });
+        downloadBlob(fileName, blob);
         return activityId;
     }
 
     async function downloadActivityMarkdown(activityId) {
         const id = String(activityId || '').trim();
         if (!id) throw new Error('Hiányzó activityId');
-        const endpoint = `${getApiBase()}/reprocess_workout_by_garmin_id?garminActivityId=${encodeURIComponent(id)}`;
-        const markdown = await httpRequestText('GET', endpoint);
-        triggerDownloadFromText(`garmin-${id}.md`, markdown);
+        const res = await httpRequestArrayBuffer('POST', `${getApiBase()}/download_workout_markdown`, {
+            garminActivityId: id,
+        });
+        const fileName = parseDownloadFileNameFromHeaders(res.responseHeaders, `workout-${id}.md`);
+        const blob = new Blob([res.data], { type: res.contentType || 'text/markdown;charset=utf-8' });
+        downloadBlob(fileName, blob);
+        return id;
+    }
+
+    async function syncThenDownloadActivityMarkdown(activityId) {
+        const id = String(activityId || getActivityIdFromUrl() || '').trim();
+        if (!id) throw new Error('Hiányzó activityId');
+        await syncActivityViaIframe(id);
+        await downloadActivityMarkdown(id);
         return id;
     }
 
@@ -764,7 +807,7 @@
             syncBtn.style.opacity = '0.7';
             downloadBtn.textContent = 'Download folyamatban...';
             try {
-                const activityId = await downloadCurrentWorkoutFromEndpoint();
+                const activityId = await syncThenDownloadActivityMarkdown(getActivityIdFromUrl());
                 status.textContent = `Letöltés kész: Garmin ${activityId}`;
             } catch (err) {
                 status.textContent = `Download hiba: ${err instanceof Error ? err.message : String(err)}`;
@@ -851,46 +894,14 @@
 
         if (!shouldAutoDownload) return;
 
-        waitForElementCb(
-            '[class*="ActivitySettingsMenu_"] button[class*="Menu_menuBtn"], button[aria-label="Toggle Menu"]',
-            async () => {
-                const menuBtn = getSettingsMenuButton();
-                if (!menuBtn) {
-                    const ok = await downloadViaApiFallback();
-                    if (ok) closeIfRequested();
-                    return;
-                }
-                menuBtn.click();
-                waitForElementCb(
-                    '[class*="Menu_menuItems"]',
-                    async () => {
-                        const menuItems = document.querySelectorAll('[class*="Menu_menuItems"]');
-                        const exportItem = Array.from(menuItems).find((el) => {
-                            if (!isVisible(el)) return false;
-                            const txt = (el.textContent || '').trim().toLowerCase();
-                            return EXPORT_LABELS.some((label) => txt === label.toLowerCase());
-                        });
-                        if (!exportItem) {
-                            menuBtn.click();
-                            await downloadViaApiFallback();
-                            closeIfRequested();
-                            return;
-                        }
-                        exportItem.click();
-                        setTimeout(() => closeIfRequested(), 1000);
-                    },
-                    5000,
-                );
-            },
-            15000,
-        );
-
-        setTimeout(async () => {
-            const hasMenuButton = !!getSettingsMenuButton();
-            if (hasMenuButton) return;
-            const ok = await downloadViaApiFallback();
-            if (ok) closeIfRequested();
-        }, 16000);
+        (async () => {
+            try {
+                await syncThenDownloadActivityMarkdown(getActivityIdFromUrl());
+                closeIfRequested();
+            } catch (err) {
+                console.warn('[GarminConnect] Auto download (ZIP+JSON+MD) hiba:', err);
+            }
+        })();
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -1095,7 +1106,11 @@
         // 127.0.0.1 engedélyekkel ez átmegy).
         const url = `${getApiBase()}/activity_status?activityId=${encodeURIComponent(activityId)}`;
         const payload = await httpRequestJson('GET', url);
-        return String(payload?.status || 'UNKNOWN');
+        return {
+            status: String(payload?.status || 'UNKNOWN'),
+            jsonReady: Boolean(payload?.jsonReady),
+            jsonUploadedAt: String(payload?.jsonUploadedAt || ''),
+        };
     }
 
     function isTerminalStatus(status) {
@@ -1106,19 +1121,23 @@
     async function pollActivityStatus(activityId, {
         intervalMs = STATUS_POLL_INTERVAL_MS,
         timeoutMs = STATUS_POLL_TIMEOUT_MS,
+        jsonUploadedConfirmed = false,
     } = {}) {
         const start = Date.now();
-        let lastStatus = 'UNKNOWN';
+        let last = { status: 'UNKNOWN', jsonReady: false };
         while (Date.now() - start < timeoutMs) {
             try {
-                lastStatus = await fetchActivityStatus(activityId);
+                last = await fetchActivityStatus(activityId);
             } catch (err) {
                 console.warn('[GC] status poll hiba:', activityId, err instanceof Error ? err.message : err);
             }
-            if (isTerminalStatus(lastStatus)) return lastStatus;
+            if (last.status === 'ERROR') return last;
+            if (isTerminalStatus(last.status) && (last.jsonReady || jsonUploadedConfirmed)) return last;
             await new Promise((r) => setTimeout(r, intervalMs));
         }
-        throw new Error(`Status poll timeout (${activityId}, last=${lastStatus})`);
+        throw new Error(
+            `Status poll timeout (${activityId}, last=${last.status}, jsonReady=${last.jsonReady}, jsonUploadedConfirmed=${jsonUploadedConfirmed})`,
+        );
     }
 
     function syncActivityViaIframe(activityId, { timeoutMs = IFRAME_TIMEOUT_MS } = {}) {
@@ -1128,6 +1147,7 @@
                 reject(new Error('Üres activityId'));
                 return;
             }
+            let jsonUploadedConfirmed = false;
 
             const iframe = document.createElement('iframe');
             iframe.dataset.gcIframeSync = id;
@@ -1183,6 +1203,7 @@
                 }
 
                 if (data.type === 'gc-iframe-clicked') {
+                    jsonUploadedConfirmed = Boolean(data.jsonUploaded);
                     // A kattintás megtörtént, ettől kezdve a parent pollozza a
                     // szerver-oldali státuszt. Az iframe-et NEM bontjuk azonnal,
                     // mert a Chrome letöltés-blokkolja az iframe-ből indított
@@ -1194,11 +1215,11 @@
                         if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
                     }, IFRAME_KEEP_ALIVE_AFTER_CLICK_MS);
                     try {
-                        const finalStatus = await pollActivityStatus(id);
-                        if (finalStatus === 'ERROR') {
+                        const final = await pollActivityStatus(id, { jsonUploadedConfirmed });
+                        if (final.status === 'ERROR') {
                             reject(new Error(`Szerver feldolgozási hiba (${id})`));
                         } else {
-                            resolve({ activityId: id, status: finalStatus });
+                            resolve({ activityId: id, status: final.status, jsonReady: final.jsonReady });
                         }
                     } catch (err) {
                         reject(err);

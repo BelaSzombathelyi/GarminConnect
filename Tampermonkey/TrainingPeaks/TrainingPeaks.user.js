@@ -91,7 +91,7 @@
     });
   }
 
-  function httpRequestText(method, url, data) {
+  function httpRequestTextWithHeaders(method, url, data) {
     return new Promise((resolve, reject) => {
       if (typeof GM_xmlhttpRequest !== "function") {
         reject(new Error("GM_xmlhttpRequest nem elerheto"));
@@ -111,11 +111,54 @@
             return;
           }
 
-          resolve(response.responseText || "");
+          resolve({
+            text: response.responseText || "",
+            headers: String(response.responseHeaders || ""),
+          });
         },
         onerror: () => reject(new Error(`Halozati hiba: ${url}`)),
       });
     });
+  }
+
+  function getHeaderValue(headersText, name) {
+    const target = String(name || "").toLowerCase();
+    const lines = String(headersText || "").split(/\r?\n/);
+    for (const line of lines) {
+      const idx = line.indexOf(":");
+      if (idx <= 0) continue;
+      const key = line.slice(0, idx).trim().toLowerCase();
+      if (key === target) {
+        return line.slice(idx + 1).trim();
+      }
+    }
+    return "";
+  }
+
+  function parseFilenameFromContentDisposition(value) {
+    const text = String(value || "");
+    if (!text) return "";
+
+    const utf8Match = text.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+      try {
+        return decodeURIComponent(utf8Match[1].trim());
+      } catch {
+        return utf8Match[1].trim();
+      }
+    }
+
+    const quotedMatch = text.match(/filename="([^"]+)"/i);
+    if (quotedMatch?.[1]) {
+      return quotedMatch[1].trim();
+    }
+
+    const plainMatch = text.match(/filename=([^;]+)/i);
+    if (plainMatch?.[1]) {
+      return plainMatch[1].trim();
+    }
+
+    return "";
   }
 
   function triggerTextDownload(fileName, text, mimeType) {
@@ -142,9 +185,13 @@
     }
 
     const endpoint = `${API_BASE}/download_workout_markdown`;
-    const markdown = await httpRequestText("POST", endpoint, { tpWorkoutId });
-    triggerTextDownload(`tp-workout-${tpWorkoutId}.md`, markdown);
-    return tpWorkoutId;
+    const response = await httpRequestTextWithHeaders("POST", endpoint, { tpWorkoutId });
+    const contentDisposition = getHeaderValue(response.headers, "content-disposition");
+    const fileName =
+      parseFilenameFromContentDisposition(contentDisposition) ||
+      `tp-workout-${tpWorkoutId}.md`;
+    triggerTextDownload(fileName, response.text);
+    return { tpWorkoutId, fileName };
   }
 
   function inferWorkoutNameFromDetail() {
@@ -1930,8 +1977,8 @@
     wrapper.setAttribute(WORKOUT_DETAIL_DL_ICON_MARKER, "1");
     wrapper.setAttribute("role", "button");
     wrapper.setAttribute("tabindex", "0");
-    wrapper.setAttribute("aria-label", "Workout feldolgozas + JSON letoltes");
-    wrapper.setAttribute("title", "Workout feldolgozas + JSON letoltes");
+    wrapper.setAttribute("aria-label", "Workout feldolgozas + MD letoltes");
+    wrapper.setAttribute("title", "Workout feldolgozas + MD letoltes");
     // A testver ikonok (settingsIcon, menuIcon, closeIcon, ...) ~24x24 px-es,
     // background-image-szel hasznaljak. Nincs hozzaferesunk a TP CSS-hez,
     // ezert inline SVG-vel rajzoljuk a download szimbolumot, hogy egyseges
@@ -1977,7 +2024,7 @@
     return wrapper;
   }
 
-  async function processAndDownloadCurrentWorkoutJson() {
+  async function processAndDownloadCurrentWorkoutMarkdown() {
     const statusEl = UI_STATE.statusEl;
     const setStatus = (msg) => {
       if (statusEl) statusEl.textContent = msg;
@@ -2013,15 +2060,9 @@
       throw new Error("Nem sikerult TP workout ID-t talalni a letoltehez");
     }
 
-    const url = `${API_BASE}/trainingpeaks/get_workout_json?tpWorkoutId=${encodeURIComponent(tpWorkoutId)}`;
-    const json = await httpRequestText("GET", url);
-    triggerTextDownload(
-      `tp-workout-${tpWorkoutId}.json`,
-      json,
-      "application/json;charset=utf-8",
-    );
-    setStatus(`JSON letoltes kesz: TP ${tpWorkoutId}`);
-    return tpWorkoutId;
+    const downloadResult = await downloadCurrentWorkoutMarkdown();
+    setStatus(`MD letoltes kesz: ${downloadResult.fileName}`);
+    return downloadResult.tpWorkoutId;
   }
 
   function ensureWorkoutDetailDownloadIcon() {
@@ -2047,15 +2088,15 @@
       icon.style.opacity = "0.5";
       icon.style.pointerEvents = "none";
       try {
-        await processAndDownloadCurrentWorkoutJson();
+        await processAndDownloadCurrentWorkoutMarkdown();
       } catch (err) {
-        log("Workout JSON letoltes hiba", err);
+        log("Workout MD letoltes hiba", err);
         const msg = err instanceof Error ? err.message : String(err);
         const statusEl = UI_STATE.statusEl;
         if (statusEl) {
-          statusEl.textContent = `JSON letoltes hiba: ${msg}`;
+          statusEl.textContent = `MD letoltes hiba: ${msg}`;
         } else {
-          alert(`JSON letoltes hiba: ${msg}`);
+          alert(`MD letoltes hiba: ${msg}`);
         }
       } finally {
         inFlight = false;
@@ -2301,8 +2342,8 @@
           log("Workout riportalas nem sikerult (folytatjuk a letoltessel)", reportErr);
         }
 
-        const tpWorkoutId = await downloadCurrentWorkoutMarkdown();
-        status.textContent = `MD letoltes kesz: TP ${tpWorkoutId}`;
+        const downloadResult = await downloadCurrentWorkoutMarkdown();
+        status.textContent = `MD letoltes kesz: ${downloadResult.fileName}`;
       } catch (err) {
         const errorText = err instanceof Error ? err.message : String(err);
         status.textContent = `Download hiba: ${errorText}`;

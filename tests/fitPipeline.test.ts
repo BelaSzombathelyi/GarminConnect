@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { afterAll, describe, it, expect } from 'vitest'
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { processBuffer } from '../server/garmin/fitPipeline'
 import { buildResultsMarkdown, buildResultTextEntryFromText, compareResultEntries } from '../server/shared/resultsExporter'
@@ -57,9 +58,10 @@ function findJsonFiles(dir: string): string[] {
     return results
 }
 
-// Megosztott TP store a golden fájlok TP-vel való gazdagításához
-const sharedTpDbPath = join(TP_FIXTURE_DIR, 'trainingpeaks-workouts.sqlite')
-rmSync(sharedTpDbPath, { force: true })
+// Megosztott TP store a golden fájlok TP-vel való gazdagításához.
+// Ne írjunk a fixture könyvtárba: ideiglenes sqlite DB-ben dolgozunk.
+const sharedTpTmpDir = mkdtempSync(join(tmpdir(), 'gc-fitpipeline-tp-'))
+const sharedTpDbPath = join(sharedTpTmpDir, 'trainingpeaks-workouts.sqlite')
 const sharedTpStore = createTrainingPeaksWorkoutStore(sharedTpDbPath, DATA_DIR)
 const allTpFixtures = findJsonFiles(TP_FIXTURE_DIR)
 if (allTpFixtures.length > 0) {
@@ -184,4 +186,9 @@ describe('results export összefűzés', () => {
         expect(outputText).toContain('### 2026-04')
         expect(outputText).not.toContain('ismeretlen idő • ismeretlen típus')
     })
+})
+
+afterAll(() => {
+    sharedTpStore.close()
+    rmSync(sharedTpTmpDir, { recursive: true, force: true })
 })

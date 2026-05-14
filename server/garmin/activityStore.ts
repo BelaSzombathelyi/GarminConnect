@@ -63,6 +63,7 @@ export function createActivityStore(dbFilePath: string) {
             type TEXT,
             status TEXT NOT NULL DEFAULT 'NEW',
             processed_datetime TEXT,
+            json_uploaded_at TEXT,
             download_file_name TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -74,8 +75,8 @@ export function createActivityStore(dbFilePath: string) {
     const selectByIdStmt = db.prepare('SELECT activity_id FROM activities WHERE activity_id = ?')
     const insertStmt = db.prepare(`
         INSERT INTO activities (
-            activity_id, name, date, type, status, processed_datetime, download_file_name, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?)
+            activity_id, name, date, type, status, processed_datetime, json_uploaded_at, download_file_name, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)
     `)
     const updateMetaStmt = db.prepare(`
         UPDATE activities
@@ -96,7 +97,7 @@ export function createActivityStore(dbFilePath: string) {
         LIMIT 1
     `)
     const getStatusByIdStmt = db.prepare(`
-        SELECT status FROM activities WHERE activity_id = ? LIMIT 1
+        SELECT status, json_uploaded_at AS jsonUploadedAt FROM activities WHERE activity_id = ? LIMIT 1
     `)
     const markStatusStmt = db.prepare(`
         UPDATE activities
@@ -105,7 +106,12 @@ export function createActivityStore(dbFilePath: string) {
     `)
     const markReceivedStmt = db.prepare(`
         UPDATE activities
-        SET status = ?, updated_at = ?, processed_datetime = NULL, download_file_name = ?
+        SET status = ?, updated_at = ?, processed_datetime = NULL, json_uploaded_at = NULL, download_file_name = ?
+        WHERE activity_id = ?
+    `)
+    const markJsonUploadedStmt = db.prepare(`
+        UPDATE activities
+        SET json_uploaded_at = ?, updated_at = ?
         WHERE activity_id = ?
     `)
     const getAllNonProcessedStmt = db.prepare(`
@@ -174,6 +180,22 @@ export function createActivityStore(dbFilePath: string) {
             return row?.status ?? null
         },
 
+        getSyncState(activityId: string | number): {
+            status: ActivityStatusValue | null
+            jsonReady: boolean
+            jsonUploadedAt: string | null
+        } {
+            const row = getStatusByIdStmt.get(String(activityId)) as
+                | { status: ActivityStatusValue; jsonUploadedAt?: string | null }
+                | undefined
+
+            return {
+                status: row?.status ?? null,
+                jsonReady: Boolean(row?.jsonUploadedAt),
+                jsonUploadedAt: row?.jsonUploadedAt ?? null,
+            }
+        },
+
         filterDownloadable(activityIds: string[]): string[] {
             return activityIds.filter((id) => {
                 const row = getStatusByIdStmt.get(id) as { status: string } | undefined
@@ -192,6 +214,11 @@ export function createActivityStore(dbFilePath: string) {
                 String(fileName ?? ''),
                 String(activityId),
             )
+        },
+
+        markJsonUploaded(activityId: string | number): void {
+            const ts = nowIso()
+            markJsonUploadedStmt.run(ts, ts, String(activityId))
         },
 
         getAllNonProcessed(): Array<{ activityId: string; date: string }> {
