@@ -135,8 +135,11 @@
             el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window, button: 0 }));
             el.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true, cancelable: true, view: window, button: 0 }));
             el.dispatchEvent(new MouseEvent('click',     { bubbles: true, cancelable: true, view: window, button: 0 }));
-        } catch {
-            try { el.click(); } catch {}
+        } catch (dispatchErr) {
+            console.warn('[GC Offline Export] MouseEvent dispatch hiba, fallback .click()-re:', dispatchErr);
+            try { el.click(); } catch (clickErr) {
+                console.warn('[GC Offline Export] .click() is sikertelen:', clickErr);
+            }
         }
     }
 
@@ -445,7 +448,7 @@
         if (!summary) return '–';
         const avgSpeed = summary.averageSpeed;
         const typeKey  = (summary.activityType?.typeKey || '').toLowerCase();
-        const isCycling = /cycl|bike|biking|bik/.test(typeKey);
+        const isCycling = /cycl|bike/.test(typeKey);
         const isSwim    = /swim/.test(typeKey);
         if (isCycling) return mpsToKmh(avgSpeed);
         if (isSwim) {
@@ -465,7 +468,7 @@
         if (!summary) return '–';
         const maxSpeed = summary.maxSpeed;
         const typeKey  = (summary.activityType?.typeKey || '').toLowerCase();
-        const isCycling = /cycl|bike|biking|bik/.test(typeKey);
+        const isCycling = /cycl|bike/.test(typeKey);
         if (isCycling) return mpsToKmh(maxSpeed);
         return mpsToMinPerKm(maxSpeed);
     }
@@ -588,7 +591,8 @@
             if (typeof ateAnae   === 'number') mainLines.push(`Edzési hatás (anaerob): ${ateAnae.toFixed(1)}`);
             if (typeof vO2Max    === 'number') mainLines.push(`VO₂ max: ${vO2Max.toFixed(1)}`);
             if (typeof rpe       === 'number') mainLines.push(`Észlelt erőfeszítés: ${Math.round(rpe / 10)}/10`);
-            if (typeof minTemp   === 'number') mainLines.push(`Hőmérséklet (min/max): ${minTemp}°C / ${typeof maxTemp === 'number' ? maxTemp : '?'}°C`);
+            if (typeof minTemp === 'number' && typeof maxTemp === 'number')
+                mainLines.push(`Hőmérséklet (min/max): ${minTemp}°C / ${maxTemp}°C`);
         } else if (headerStats.length) {
             // Fallback: fejléc stats, ha az API nem volt elérhető
             for (const { label, value } of headerStats) {
@@ -622,7 +626,8 @@
         // ── Körök (API laps) ────────────────────────────────────────────────
         if (laps && laps.length > 0) {
             const lapLines = ['## Körök (API)\n'];
-            const visibleCols = detectLapColumns(laps);
+            const actTypeKey = summary?.activityType?.typeKey || '';
+            const visibleCols = detectLapColumns(laps, actTypeKey);
             lapLines.push(mdTable(visibleCols.headers, visibleCols.rows));
             sections.push(lapLines.join('\n'));
         }
@@ -662,18 +667,19 @@
         return sections.join('\n\n');
     }
 
-    /** Meghatározza, mely lap-mezők tartalmazzák adatot, és gyártja a tábla sorait */
-    function detectLapColumns(laps) {
+    /** Meghatározza, mely lap-mezők tartalmazzák adatot, és gyártja a tábla sorait.
+     * @param {object[]} laps - A Garmin API lapDTOs tömbje
+     * @param {string} activityTypeKey - Az aktivitás típusfőkulcsa (pl. "running", "cycling")
+     */
+    function detectLapColumns(laps, activityTypeKey) {
+        const isCycling = /cycl|bike/.test(String(activityTypeKey || '').toLowerCase());
         // Mindig megjelenítjük ezeket (ha vannak értékek)
         const colDefs = [
             { key: 'lapIndex',      label: '#',           fmt: (v) => typeof v === 'number' ? String(v + 1) : '–' },
             { key: 'duration',      label: 'Idő',         fmt: secondsToHMS },
             { key: 'movingDuration',label: 'Menetidő',    fmt: secondsToHMS },
             { key: 'distance',      label: 'Táv',         fmt: mToKm },
-            { key: 'averageSpeed',  label: 'Avg tempó',   fmt: (v, lap) => {
-                const typeKey = (lap._typeKey || '').toLowerCase();
-                return /cycl|bike/.test(typeKey) ? mpsToKmh(v) : mpsToMinPerKm(v);
-            }},
+            { key: 'averageSpeed',  label: 'Avg tempó',   fmt: (v) => isCycling ? mpsToKmh(v) : mpsToMinPerKm(v) },
             { key: 'averageHR',     label: 'Avg HR',      fmt: (v) => typeof v === 'number' ? `${v} bpm` : '–' },
             { key: 'maxHR',         label: 'Max HR',      fmt: (v) => typeof v === 'number' ? `${v} bpm` : '–' },
             { key: 'elevationGain', label: '+m',          fmt: (v) => typeof v === 'number' ? `+${Math.round(v)}` : '–' },
@@ -696,7 +702,7 @@
             usedDefs.map((def) => {
                 const val = lap[def.key];
                 if (val === undefined || val === null) return '–';
-                try { return def.fmt(val, lap); } catch { return String(val); }
+                try { return def.fmt(val); } catch { return String(val); }
             }),
         );
         return { headers, rows };
@@ -729,7 +735,8 @@
             a.click();
             document.body.removeChild(a);
             setTimeout(() => URL.revokeObjectURL(url), 2000);
-        } catch {
+        } catch (downloadErr) {
+            console.warn('[GC Offline Export] Blob letöltés sikertelen, data URI fallback:', downloadErr);
             // iOS Safari fallback: data URI megnyitása új tabban
             // (Fájlok appból elmenthető / Másolás lehetséges)
             const dataUri = `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`;
